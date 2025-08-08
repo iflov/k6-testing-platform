@@ -50,7 +50,7 @@ docker run --rm -it \
   -e K6_WEB_DASHBOARD_EXPORT=/reports/$REPORT_NAME \
   -v $(pwd)/k6-scripts:/scripts:ro \
   -v $(pwd)/reports:/reports \
-  grafana/k6:latest run \
+  grafana/k6:0.52.0 run \
   --out influxdb=http://influxdb:8086/k6 \
   --out web-dashboard \
   /scripts/scenarios/$TEST_FILE

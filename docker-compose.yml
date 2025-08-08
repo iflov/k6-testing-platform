@@ -56,31 +56,8 @@ services:
     networks:
       - k6-network
 
-  # K6 - Load testing tool (profile for manual runs)
-  k6:
-    image: grafana/k6:latest
-    profiles:
-      - test
-    ports:
-      - "5665:5665"  # k6 Web Dashboard default port
-    environment:
-      - TARGET_URL=http://mock-server:3001
-      - VUS=10
-      - DURATION=30s
-      - K6_WEB_DASHBOARD=true
-      - K6_WEB_DASHBOARD_HOST=0.0.0.0
-      - K6_WEB_DASHBOARD_PORT=5665
-      - K6_WEB_DASHBOARD_PERIOD=1s  # Update frequency
-      - K6_WEB_DASHBOARD_EXPORT=/reports/test-report.html
-    volumes:
-      - ./k6-scripts:/scripts
-      - ./reports:/reports
-    command: run --out influxdb=http://influxdb:8086/k6 --out web-dashboard /scripts/scenarios/simple-load-test.js
-    depends_on:
-      - mock-server
-      - influxdb
-    networks:
-      - k6-network
+  # K6는 Control Panel에서 동적으로 생성됨
+  # Control Panel의 "Start Test" 버튼을 사용하여 테스트 실행
 
 networks:
   k6-network:
