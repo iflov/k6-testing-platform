@@ -1,0 +1,17 @@
+{
+  "name": "k6-testing-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "K6 Load Testing Platform with Control Panel",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "docker-compose up",
+    "build": "make build",
+    "test": "make test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

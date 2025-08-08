@@ -28,7 +28,6 @@ out/
 # Test results
 /tmp/
 coverage/
-*.json
 
 # OS files
 Thumbs.db
