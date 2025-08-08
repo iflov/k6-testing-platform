@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Docker
+*.log
+
+# Test results
+/tmp/
+coverage/
+*.json
+
+# OS files
+Thumbs.db
+
+# Grafana & InfluxDB data (for local development)
+grafana-data/
+influxdb-data/

@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* CRITICAL: Force ALL input/select elements to have pure black text */
+input:not(:disabled),
+select:not(:disabled),
+textarea:not(:disabled) {
+  color: rgb(0, 0, 0) !important;
+  -webkit-text-fill-color: rgb(0, 0, 0) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure select options are also black */
+select:not(:disabled) option {
+  color: rgb(0, 0, 0) !important;
+  -webkit-text-fill-color: rgb(0, 0, 0) !important;
+}
+
+/* Focus state should also be black */
+input:focus,
+select:focus,
+textarea:focus {
+  color: rgb(0, 0, 0) !important;
+  -webkit-text-fill-color: rgb(0, 0, 0) !important;
+  opacity: 1 !important;
+}
+
+/* Only disabled elements should be gray */
+input:disabled, 
+select:disabled, 
+textarea:disabled {
+  color: rgb(156, 163, 175) !important;
+  -webkit-text-fill-color: rgb(156, 163, 175) !important;
+  background-color: rgb(243, 244, 246) !important;
+  opacity: 1 !important;
+}
+
+/* Placeholder text should be lighter but visible */
+input::placeholder,
+textarea::placeholder {
+  color: rgb(156, 163, 175) !important;
+  -webkit-text-fill-color: rgb(156, 163, 175) !important;
+  opacity: 1 !important;
+}
