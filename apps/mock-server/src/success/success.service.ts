@@ -9,7 +9,16 @@ export class SuccessService {
     return {
       statusCode: 200,
       error: false,
-      message: 'ok',
+      message: 'get success',
+      timestamp: new Date(),
+    };
+  }
+
+  async postSuccess(): Promise<ApiResponse> {
+    return {
+      statusCode: 201,
+      error: false,
+      message: 'post success',
       timestamp: new Date(),
     };
   }

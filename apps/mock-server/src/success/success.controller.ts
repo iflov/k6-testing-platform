@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 
 import { SuccessService } from './success.service';
 
@@ -9,5 +9,10 @@ export class SuccessController {
   @Get()
   async getSuccess() {
     return this.successService.getSuccess();
+  }
+
+  @Post()
+  async postSuccess() {
+    return this.successService.postSuccess();
   }
 }
