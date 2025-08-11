@@ -252,37 +252,40 @@ function textSummary(data, options) {
   
   if (metrics) {
     summary += '\n⚡ Spike Test Results:\n';
-    summary += `  • Peak VUs Reached: ${metrics.peak_vus?.value || metrics.vus_max?.max || 0}\n`;
-    summary += `  • Spike Errors Count: ${metrics.spike_errors?.count || 0}\n`;
-    summary += `  • System Recovery Rate: ${(metrics.system_recovered?.rate * 100).toFixed(2)}%\n`;
+    summary += `  • Peak VUs Reached: ${(metrics.peak_vus && metrics.peak_vus.value) || (metrics.vus_max && metrics.vus_max.max) || 0}\n`;
+    summary += `  • Spike Errors Count: ${(metrics.spike_errors && metrics.spike_errors.count) || 0}\n`;
+    summary += `  • System Recovery Rate: ${metrics.system_recovered && metrics.system_recovered.rate ? (metrics.system_recovered.rate * 100).toFixed(2) : '0.00'}%\n`;
     
     summary += '\n⏱️ Response Times During Spike:\n';
-    summary += `  • Average (Overall): ${metrics.http_req_duration?.avg?.toFixed(2)}ms\n`;
-    summary += `  • Average (Spike): ${metrics.spike_response_time?.avg?.toFixed(2)}ms\n`;
-    summary += `  • P90 (Spike): ${metrics.spike_response_time?.p90?.toFixed(2)}ms\n`;
-    summary += `  • P95 (Overall): ${metrics.http_req_duration?.p95?.toFixed(2)}ms\n`;
-    summary += `  • P99 (Overall): ${metrics.http_req_duration?.p99?.toFixed(2)}ms\n`;
-    summary += `  • Max Response Time: ${metrics.http_req_duration?.max?.toFixed(2)}ms\n`;
+    summary += `  • Average (Overall): ${metrics.http_req_duration && metrics.http_req_duration.avg ? metrics.http_req_duration.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • Average (Spike): ${metrics.spike_response_time && metrics.spike_response_time.avg ? metrics.spike_response_time.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • P90 (Spike): ${metrics.spike_response_time && metrics.spike_response_time['p(90)'] ? metrics.spike_response_time['p(90)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P95 (Overall): ${metrics.http_req_duration && metrics.http_req_duration['p(95)'] ? metrics.http_req_duration['p(95)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P99 (Overall): ${metrics.http_req_duration && metrics.http_req_duration['p(99)'] ? metrics.http_req_duration['p(99)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • Max Response Time: ${metrics.http_req_duration && metrics.http_req_duration.max ? metrics.http_req_duration.max.toFixed(2) : '0'}ms\n`;
     
     summary += '\n🔄 Recovery Metrics:\n';
-    summary += `  • Average Recovery Time: ${metrics.recovery_time?.avg?.toFixed(2)}ms\n`;
-    summary += `  • P95 Recovery Time: ${metrics.recovery_time?.p95?.toFixed(2)}ms\n`;
-    summary += `  • Max Recovery Time: ${metrics.recovery_time?.max?.toFixed(2)}ms\n`;
+    summary += `  • Average Recovery Time: ${metrics.recovery_time && metrics.recovery_time.avg ? metrics.recovery_time.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • P95 Recovery Time: ${metrics.recovery_time && metrics.recovery_time['p(95)'] ? metrics.recovery_time['p(95)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • Max Recovery Time: ${metrics.recovery_time && metrics.recovery_time.max ? metrics.recovery_time.max.toFixed(2) : '0'}ms\n`;
     
     summary += '\n📈 Performance Under Load:\n';
-    summary += `  • Total Requests: ${metrics.http_reqs?.count || 0}\n`;
-    summary += `  • Peak Request Rate: ${metrics.http_reqs?.rate?.toFixed(2)} req/s\n`;
-    summary += `  • Failed Requests: ${metrics.http_req_failed?.passes || 0}\n`;
-    summary += `  • Error Rate: ${(metrics.errors?.rate * 100).toFixed(2)}%\n`;
+    summary += `  • Total Requests: ${(metrics.http_reqs && metrics.http_reqs.count) || 0}\n`;
+    summary += `  • Peak Request Rate: ${metrics.http_reqs && metrics.http_reqs.rate ? metrics.http_reqs.rate.toFixed(2) : '0'} req/s\n`;
+    summary += `  • Failed Requests: ${(metrics.http_req_failed && metrics.http_req_failed.passes) || 0}\n`;
+    summary += `  • Error Rate: ${metrics.errors && metrics.errors.rate ? (metrics.errors.rate * 100).toFixed(2) : '0.00'}%\n`;
     
     summary += '\n✅ Success Metrics:\n';
-    summary += `  • Checks Passed: ${metrics.checks?.passes || 0}\n`;
-    summary += `  • Checks Failed: ${metrics.checks?.fails || 0}\n`;
-    summary += `  • Success Rate: ${((metrics.checks?.passes / (metrics.checks?.passes + metrics.checks?.fails)) * 100).toFixed(2)}%\n`;
+    summary += `  • Checks Passed: ${(metrics.checks && metrics.checks.passes) || 0}\n`;
+    summary += `  • Checks Failed: ${(metrics.checks && metrics.checks.fails) || 0}\n`;
+    const passes = (metrics.checks && metrics.checks.passes) || 0;
+    const fails = (metrics.checks && metrics.checks.fails) || 0;
+    const successRate = passes + fails > 0 ? ((passes / (passes + fails)) * 100).toFixed(2) : '0.00';
+    summary += `  • Success Rate: ${successRate}%\n`;
     
     summary += '\n🌊 Spike Analysis:\n';
-    const spikeErrorRate = metrics.spike_errors?.count / metrics.http_reqs?.count || 0;
-    const recoveryRate = metrics.system_recovered?.rate || 0;
+    const spikeErrorRate = (metrics.spike_errors && metrics.spike_errors.count && metrics.http_reqs && metrics.http_reqs.count) ? (metrics.spike_errors.count / metrics.http_reqs.count) : 0;
+    const recoveryRate = (metrics.system_recovered && metrics.system_recovered.rate) || 0;
     
     if (spikeErrorRate < 0.05 && recoveryRate > 0.8) {
       summary += '  ✅ Excellent: System handled spikes very well with quick recovery\n';

@@ -207,37 +207,40 @@ function textSummary(data, options) {
   
   if (metrics) {
     summary += '\n🔥 Stress Test Results:\n';
-    summary += `  • Maximum VUs Reached: ${metrics.vus_max?.max || 0}\n`;
-    summary += `  • Breaking Points Detected: ${metrics.breaking_point_reached?.count || 0}\n`;
-    summary += `  • Max Successful VUs: ${metrics.max_successful_vus?.max || 'N/A'}\n`;
+    summary += `  • Maximum VUs Reached: ${(metrics.vus_max && metrics.vus_max.max) || 0}\n`;
+    summary += `  • Breaking Points Detected: ${(metrics.breaking_point_reached && metrics.breaking_point_reached.count) || 0}\n`;
+    summary += `  • Max Successful VUs: ${(metrics.max_successful_vus && metrics.max_successful_vus.max) || 'N/A'}\n`;
     
     summary += '\n⏱️ Response Times Under Stress:\n';
-    summary += `  • Average: ${metrics.http_req_duration?.avg?.toFixed(2)}ms\n`;
-    summary += `  • Median: ${metrics.http_req_duration?.med?.toFixed(2)}ms\n`;
-    summary += `  • P90: ${metrics.http_req_duration?.p90?.toFixed(2)}ms\n`;
-    summary += `  • P95: ${metrics.http_req_duration?.p95?.toFixed(2)}ms\n`;
-    summary += `  • P99: ${metrics.http_req_duration?.p99?.toFixed(2)}ms\n`;
-    summary += `  • Max: ${metrics.http_req_duration?.max?.toFixed(2)}ms\n`;
+    summary += `  • Average: ${metrics.http_req_duration && metrics.http_req_duration.avg ? metrics.http_req_duration.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • Median: ${metrics.http_req_duration && metrics.http_req_duration.med ? metrics.http_req_duration.med.toFixed(2) : '0'}ms\n`;
+    summary += `  • P90: ${metrics.http_req_duration && metrics.http_req_duration['p(90)'] ? metrics.http_req_duration['p(90)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P95: ${metrics.http_req_duration && metrics.http_req_duration['p(95)'] ? metrics.http_req_duration['p(95)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P99: ${metrics.http_req_duration && metrics.http_req_duration['p(99)'] ? metrics.http_req_duration['p(99)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • Max: ${metrics.http_req_duration && metrics.http_req_duration.max ? metrics.http_req_duration.max.toFixed(2) : '0'}ms\n`;
     
     summary += '\n📊 Performance Degradation:\n';
-    summary += `  • Total Requests: ${metrics.http_reqs?.count || 0}\n`;
-    summary += `  • Request Rate: ${metrics.http_reqs?.rate?.toFixed(2)} req/s\n`;
-    summary += `  • Failed Requests: ${metrics.http_req_failed?.passes || 0}\n`;
-    summary += `  • Error Rate: ${(metrics.errors?.rate * 100).toFixed(2)}%\n`;
+    summary += `  • Total Requests: ${(metrics.http_reqs && metrics.http_reqs.count) || 0}\n`;
+    summary += `  • Request Rate: ${metrics.http_reqs && metrics.http_reqs.rate ? metrics.http_reqs.rate.toFixed(2) : '0'} req/s\n`;
+    summary += `  • Failed Requests: ${(metrics.http_req_failed && metrics.http_req_failed.passes) || 0}\n`;
+    summary += `  • Error Rate: ${metrics.errors && metrics.errors.rate ? (metrics.errors.rate * 100).toFixed(2) : '0.00'}%\n`;
     
     summary += '\n✅ Success Metrics:\n';
-    summary += `  • Checks Passed: ${metrics.checks?.passes || 0}\n`;
-    summary += `  • Checks Failed: ${metrics.checks?.fails || 0}\n`;
-    summary += `  • Success Rate: ${((metrics.checks?.passes / (metrics.checks?.passes + metrics.checks?.fails)) * 100).toFixed(2)}%\n`;
+    summary += `  • Checks Passed: ${(metrics.checks && metrics.checks.passes) || 0}\n`;
+    summary += `  • Checks Failed: ${(metrics.checks && metrics.checks.fails) || 0}\n`;
+    const passes = (metrics.checks && metrics.checks.passes) || 0;
+    const fails = (metrics.checks && metrics.checks.fails) || 0;
+    const successRate = passes + fails > 0 ? ((passes / (passes + fails)) * 100).toFixed(2) : '0.00';
+    summary += `  • Success Rate: ${successRate}%\n`;
     
     summary += '\n💾 Resource Usage:\n';
-    summary += `  • Data Received: ${(metrics.data_received?.count / 1024 / 1024).toFixed(2)} MB\n`;
-    summary += `  • Data Sent: ${(metrics.data_sent?.count / 1024 / 1024).toFixed(2)} MB\n`;
-    summary += `  • Total Iterations: ${metrics.iterations?.count || 0}\n`;
+    summary += `  • Data Received: ${metrics.data_received && metrics.data_received.count ? (metrics.data_received.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
+    summary += `  • Data Sent: ${metrics.data_sent && metrics.data_sent.count ? (metrics.data_sent.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
+    summary += `  • Total Iterations: ${(metrics.iterations && metrics.iterations.count) || 0}\n`;
     
     // Stress analysis
-    const errorRate = metrics.errors?.rate || 0;
-    const p99Duration = metrics.http_req_duration?.p99 || 0;
+    const errorRate = (metrics.errors && metrics.errors.rate) || 0;
+    const p99Duration = (metrics.http_req_duration && metrics.http_req_duration['p(99)']) || 0;
     
     summary += '\n🎯 Stress Analysis:\n';
     if (errorRate < 0.05 && p99Duration < 2000) {

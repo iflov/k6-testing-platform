@@ -94,32 +94,32 @@ function textSummary(data, options) {
   
   if (metrics) {
     summary += '\n🎯 Breakpoint Analysis:\n';
-    summary += `  • Maximum VUs Tested: ${metrics.vus_max?.max || 0}\n`;
-    summary += `  • Breakpoint VUs: ${metrics.breakpoint_vus?.value || 'Not reached'}\n`;
-    summary += `  • Max Successful VUs: ${metrics.max_vus_reached?.value || 0}\n`;
+    summary += `  • Maximum VUs Tested: ${(metrics.vus_max && metrics.vus_max.max) || 0}\n`;
+    summary += `  • Breakpoint VUs: ${(metrics.breakpoint_vus && metrics.breakpoint_vus.value) || 'Not reached'}\n`;
+    summary += `  • Max Successful VUs: ${(metrics.max_vus_reached && metrics.max_vus_reached.value) || 0}\n`;
     
     summary += '\n⏱️ Response Times:\n';
-    summary += `  • Average: ${metrics.http_req_duration?.avg?.toFixed(2)}ms\n`;
-    summary += `  • Median: ${metrics.http_req_duration?.med?.toFixed(2)}ms\n`;
-    summary += `  • P95: ${metrics.http_req_duration?.p95?.toFixed(2)}ms\n`;
-    summary += `  • P99: ${metrics.http_req_duration?.p99?.toFixed(2)}ms\n`;
-    summary += `  • Max: ${metrics.http_req_duration?.max?.toFixed(2)}ms\n`;
+    summary += `  • Average: ${metrics.http_req_duration && metrics.http_req_duration.avg ? metrics.http_req_duration.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • Median: ${metrics.http_req_duration && metrics.http_req_duration.med ? metrics.http_req_duration.med.toFixed(2) : '0'}ms\n`;
+    summary += `  • P95: ${metrics.http_req_duration && metrics.http_req_duration['p(95)'] ? metrics.http_req_duration['p(95)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P99: ${metrics.http_req_duration && metrics.http_req_duration['p(99)'] ? metrics.http_req_duration['p(99)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • Max: ${metrics.http_req_duration && metrics.http_req_duration.max ? metrics.http_req_duration.max.toFixed(2) : '0'}ms\n`;
     
     summary += '\n📊 Load Capacity:\n';
-    summary += `  • Total Requests: ${metrics.total_requests?.count || 0}\n`;
-    summary += `  • Request Rate: ${metrics.http_reqs?.rate?.toFixed(2)} req/s\n`;
-    summary += `  • Success Rate: ${(metrics.success_rate?.rate * 100).toFixed(2)}%\n`;
-    summary += `  • Error Rate: ${(metrics.errors?.rate * 100).toFixed(2)}%\n`;
-    summary += `  • Failed Requests: ${metrics.http_req_failed?.passes || 0}\n`;
+    summary += `  • Total Requests: ${(metrics.total_requests && metrics.total_requests.count) || 0}\n`;
+    summary += `  • Request Rate: ${metrics.http_reqs && metrics.http_reqs.rate ? metrics.http_reqs.rate.toFixed(2) : '0'} req/s\n`;
+    summary += `  • Success Rate: ${metrics.success_rate && metrics.success_rate.rate ? (metrics.success_rate.rate * 100).toFixed(2) : '0.00'}%\n`;
+    summary += `  • Error Rate: ${metrics.errors && metrics.errors.rate ? (metrics.errors.rate * 100).toFixed(2) : '0.00'}%\n`;
+    summary += `  • Failed Requests: ${(metrics.http_req_failed && metrics.http_req_failed.passes) || 0}\n`;
     
     summary += '\n💾 Data Transfer:\n';
-    summary += `  • Data Received: ${(metrics.data_received?.count / 1024 / 1024).toFixed(2)} MB\n`;
-    summary += `  • Data Sent: ${(metrics.data_sent?.count / 1024 / 1024).toFixed(2)} MB\n`;
+    summary += `  • Data Received: ${metrics.data_received && metrics.data_received.count ? (metrics.data_received.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
+    summary += `  • Data Sent: ${metrics.data_sent && metrics.data_sent.count ? (metrics.data_sent.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
     
     // Capacity assessment
-    const errorRate = metrics.errors?.rate || 0;
-    const avgResponseTime = metrics.http_req_duration?.avg || 0;
-    const breakpointVUs = metrics.breakpoint_vus?.value || 0;
+    const errorRate = (metrics.errors && metrics.errors.rate) || 0;
+    const avgResponseTime = (metrics.http_req_duration && metrics.http_req_duration.avg) || 0;
+    const breakpointVUs = (metrics.breakpoint_vus && metrics.breakpoint_vus.value) || 0;
     
     summary += '\n🏁 Capacity Assessment:\n';
     if (breakpointVUs > 0) {
@@ -128,7 +128,7 @@ function textSummary(data, options) {
       summary += `  • Safe operating range: ${Math.floor(breakpointVUs * 0.6)} VUs (60% of breakpoint)\n`;
     } else if (errorRate < 0.05) {
       summary += '  ✅ System handled maximum test load successfully\n';
-      summary += `  • Can safely handle ${metrics.vus_max?.max} concurrent users\n`;
+      summary += `  • Can safely handle ${(metrics.vus_max && metrics.vus_max.max) || 0} concurrent users\n`;
     } else {
       summary += '  ⚠️ System showed degradation but no clear breakpoint\n';
       summary += `  • Review response times and error patterns for capacity planning\n`;

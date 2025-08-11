@@ -326,56 +326,62 @@ function textSummary(data, options) {
   let summary = '\n========== SOAK TEST SUMMARY ==========\n';
   
   if (metrics) {
-    const testDurationHours = (data.state?.testRunDurationMs || 0) / 1000 / 60 / 60;
+    const testDurationHours = ((data.state && data.state.testRunDurationMs) || 0) / 1000 / 60 / 60;
     
     summary += '\n🕒 Test Duration & Volume:\n';
     summary += `  • Total Duration: ${testDurationHours.toFixed(2)} hours\n`;
-    summary += `  • Total Requests: ${metrics.total_requests?.count || 0}\n`;
-    summary += `  • Request Rate: ${metrics.http_reqs?.rate?.toFixed(2)} req/s\n`;
-    summary += `  • Total Data Sent: ${(metrics.data_sent?.count / 1024 / 1024).toFixed(2)} MB\n`;
-    summary += `  • Total Data Received: ${(metrics.data_received?.count / 1024 / 1024).toFixed(2)} MB\n`;
+    summary += `  • Total Requests: ${(metrics.total_requests && metrics.total_requests.count) || 0}\n`;
+    summary += `  • Request Rate: ${metrics.http_reqs && metrics.http_reqs.rate ? metrics.http_reqs.rate.toFixed(2) : '0'} req/s\n`;
+    summary += `  • Total Data Sent: ${metrics.data_sent && metrics.data_sent.count ? (metrics.data_sent.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
+    summary += `  • Total Data Received: ${metrics.data_received && metrics.data_received.count ? (metrics.data_received.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
     
     summary += '\n📈 Performance Over Time:\n';
-    summary += `  • Initial Response Time: ${baselineMetrics.responseTime?.toFixed(2) || 'N/A'}ms\n`;
-    summary += `  • Average Response Time: ${metrics.http_req_duration?.avg?.toFixed(2)}ms\n`;
-    summary += `  • P95 Response Time: ${metrics.http_req_duration?.p95?.toFixed(2)}ms\n`;
-    summary += `  • P99 Response Time: ${metrics.http_req_duration?.p99?.toFixed(2)}ms\n`;
-    summary += `  • Max Response Time: ${metrics.http_req_duration?.max?.toFixed(2)}ms\n`;
+    summary += `  • Initial Response Time: ${baselineMetrics.responseTime ? baselineMetrics.responseTime.toFixed(2) : 'N/A'}ms\n`;
+    summary += `  • Average Response Time: ${metrics.http_req_duration && metrics.http_req_duration.avg ? metrics.http_req_duration.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • P95 Response Time: ${metrics.http_req_duration && metrics.http_req_duration['p(95)'] ? metrics.http_req_duration['p(95)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P99 Response Time: ${metrics.http_req_duration && metrics.http_req_duration['p(99)'] ? metrics.http_req_duration['p(99)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • Max Response Time: ${metrics.http_req_duration && metrics.http_req_duration.max ? metrics.http_req_duration.max.toFixed(2) : '0'}ms\n`;
     
     summary += '\n📋 Degradation Analysis:\n';
-    const avgDegradation = metrics.response_time_degradation?.avg || 0;
-    const maxDegradation = metrics.response_time_degradation?.max || 0;
-    const degradationPercentage = metrics.performance_degradation_percentage?.value || 0;
+    const avgDegradation = (metrics.response_time_degradation && metrics.response_time_degradation.avg) || 0;
+    const maxDegradation = (metrics.response_time_degradation && metrics.response_time_degradation.max) || 0;
+    const degradationPercentage = (metrics.performance_degradation_percentage && metrics.performance_degradation_percentage.value) || 0;
     
     summary += `  • Average Degradation: ${avgDegradation.toFixed(2)}ms\n`;
     summary += `  • Max Degradation: ${maxDegradation.toFixed(2)}ms\n`;
     summary += `  • Degradation Percentage: ${degradationPercentage.toFixed(2)}%\n`;
     
     summary += '\n💾 Resource Usage:\n';
-    summary += `  • Average Memory: ${metrics.memory_usage_mb?.avg?.toFixed(2) || 'N/A'} MB\n`;
-    summary += `  • Peak Memory: ${metrics.memory_usage_mb?.max?.toFixed(2) || 'N/A'} MB\n`;
-    summary += `  • Average CPU: ${metrics.cpu_usage_percentage?.avg?.toFixed(2) || 'N/A'}%\n`;
-    summary += `  • Peak CPU: ${metrics.cpu_usage_percentage?.max?.toFixed(2) || 'N/A'}%\n`;
+    summary += `  • Average Memory: ${metrics.memory_usage_mb && metrics.memory_usage_mb.avg ? metrics.memory_usage_mb.avg.toFixed(2) : 'N/A'} MB\n`;
+    summary += `  • Peak Memory: ${metrics.memory_usage_mb && metrics.memory_usage_mb.max ? metrics.memory_usage_mb.max.toFixed(2) : 'N/A'} MB\n`;
+    summary += `  • Average CPU: ${metrics.cpu_usage_percentage && metrics.cpu_usage_percentage.avg ? metrics.cpu_usage_percentage.avg.toFixed(2) : 'N/A'}%\n`;
+    summary += `  • Peak CPU: ${metrics.cpu_usage_percentage && metrics.cpu_usage_percentage.max ? metrics.cpu_usage_percentage.max.toFixed(2) : 'N/A'}%\n`;
     
     summary += '\n⚠️ Error & Stability Metrics:\n';
-    summary += `  • Error Rate: ${(metrics.errors?.rate * 100).toFixed(3)}%\n`;
-    summary += `  • Failed Requests: ${metrics.http_req_failed?.passes || 0}\n`;
-    summary += `  • Connection Errors: ${metrics.connection_errors?.count || 0}\n`;
-    summary += `  • Resource Exhaustion Events: ${metrics.resource_exhaustion?.count || 0}\n`;
+    summary += `  • Error Rate: ${metrics.errors && metrics.errors.rate ? (metrics.errors.rate * 100).toFixed(3) : '0.000'}%\n`;
+    summary += `  • Failed Requests: ${(metrics.http_req_failed && metrics.http_req_failed.passes) || 0}\n`;
+    summary += `  • Connection Errors: ${(metrics.connection_errors && metrics.connection_errors.count) || 0}\n`;
+    summary += `  • Resource Exhaustion Events: ${(metrics.resource_exhaustion && metrics.resource_exhaustion.count) || 0}\n`;
     
     summary += '\n✅ Success Metrics:\n';
-    summary += `  • Checks Passed: ${metrics.checks?.passes || 0}\n`;
-    summary += `  • Checks Failed: ${metrics.checks?.fails || 0}\n`;
-    summary += `  • Success Rate: ${((metrics.checks?.passes / (metrics.checks?.passes + metrics.checks?.fails)) * 100).toFixed(2)}%\n`;
+    summary += `  • Checks Passed: ${(metrics.checks && metrics.checks.passes) || 0}\n`;
+    summary += `  • Checks Failed: ${(metrics.checks && metrics.checks.fails) || 0}\n`;
+    const passes = (metrics.checks && metrics.checks.passes) || 0;
+    const fails = (metrics.checks && metrics.checks.fails) || 0;
+    const successRate = passes + fails > 0 ? ((passes / (passes + fails)) * 100).toFixed(2) : '0.00';
+    summary += `  • Success Rate: ${successRate}%\n`;
     
     // Stability Assessment
     summary += '\n🎯 Stability Assessment:\n';
     
-    if (avgDegradation < 50 && metrics.errors?.rate < 0.01 && metrics.resource_exhaustion?.count === 0) {
+    const errorRate = (metrics.errors && metrics.errors.rate) || 0;
+    const exhaustionCount = (metrics.resource_exhaustion && metrics.resource_exhaustion.count) || 0;
+    
+    if (avgDegradation < 50 && errorRate < 0.01 && exhaustionCount === 0) {
       summary += '  ✅ EXCELLENT: System is highly stable for long-term operation\n';
-    } else if (avgDegradation < 100 && metrics.errors?.rate < 0.02 && metrics.resource_exhaustion?.count < 10) {
+    } else if (avgDegradation < 100 && errorRate < 0.02 && exhaustionCount < 10) {
       summary += '  ✅ GOOD: System is stable with minor degradation\n';
-    } else if (avgDegradation < 200 && metrics.errors?.rate < 0.05 && metrics.resource_exhaustion?.count < 50) {
+    } else if (avgDegradation < 200 && errorRate < 0.05 && exhaustionCount < 50) {
       summary += '  ⚠️ FAIR: System shows moderate degradation over time\n';
     } else {
       summary += '  ❌ POOR: System has significant stability issues\n';
@@ -385,10 +391,10 @@ function textSummary(data, options) {
     if (avgDegradation > 100) {
       summary += '  ⚠️ Possible memory leak detected (response time degradation)\n';
     }
-    if (metrics.connection_errors?.count > 50) {
+    if ((metrics.connection_errors && metrics.connection_errors.count) > 50) {
       summary += '  ⚠️ Connection pooling issues detected\n';
     }
-    if (metrics.resource_exhaustion?.count > 20) {
+    if ((metrics.resource_exhaustion && metrics.resource_exhaustion.count) > 20) {
       summary += '  ⚠️ Resource management issues detected\n';
     }
     if (degradationPercentage > 30) {

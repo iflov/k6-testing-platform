@@ -52,18 +52,18 @@ export function handleSummary(data) {
     summary += `  • Target URL: ${BASE_URL}${ENDPOINT}\n`;
     
     summary += '\n⏱️ Response Times:\n';
-    summary += `  • Average: ${metrics.http_req_duration?.avg?.toFixed(2)}ms\n`;
-    summary += `  • Median: ${metrics.http_req_duration?.med?.toFixed(2)}ms\n`;
-    summary += `  • P95: ${metrics.http_req_duration?.p95?.toFixed(2)}ms\n`;
-    summary += `  • P99: ${metrics.http_req_duration?.p99?.toFixed(2)}ms\n`;
+    summary += `  • Average: ${metrics.http_req_duration && metrics.http_req_duration.avg ? metrics.http_req_duration.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • Median: ${metrics.http_req_duration && metrics.http_req_duration.med ? metrics.http_req_duration.med.toFixed(2) : '0'}ms\n`;
+    summary += `  • P95: ${metrics.http_req_duration && metrics.http_req_duration['p(95)'] ? metrics.http_req_duration['p(95)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P99: ${metrics.http_req_duration && metrics.http_req_duration['p(99)'] ? metrics.http_req_duration['p(99)'].toFixed(2) : '0'}ms\n`;
     
     summary += '\n📈 Throughput:\n';
-    summary += `  • Total Requests: ${metrics.http_reqs?.count || 0}\n`;
-    summary += `  • Request Rate: ${metrics.http_reqs?.rate?.toFixed(2)} req/s\n`;
+    summary += `  • Total Requests: ${(metrics.http_reqs && metrics.http_reqs.count) || 0}\n`;
+    summary += `  • Request Rate: ${metrics.http_reqs && metrics.http_reqs.rate ? metrics.http_reqs.rate.toFixed(2) : '0'} req/s\n`;
     
     summary += '\n✅ Success Metrics:\n';
-    summary += `  • Success Rate: ${((1 - metrics.errors?.rate) * 100).toFixed(2)}%\n`;
-    summary += `  • Error Rate: ${(metrics.errors?.rate * 100).toFixed(2)}%\n`;
+    summary += `  • Success Rate: ${metrics.errors && metrics.errors.rate ? ((1 - metrics.errors.rate) * 100).toFixed(2) : '100.00'}%\n`;
+    summary += `  • Error Rate: ${metrics.errors && metrics.errors.rate ? (metrics.errors.rate * 100).toFixed(2) : '0.00'}%\n`;
   }
   
   summary += '\n========================================\n';

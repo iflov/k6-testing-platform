@@ -192,33 +192,36 @@ function textSummary(data, options) {
   
   if (metrics) {
     summary += '\n📊 Performance Metrics:\n';
-    summary += `  • Average Response Time: ${metrics.http_req_duration?.avg?.toFixed(2)}ms\n`;
-    summary += `  • Median Response Time: ${metrics.http_req_duration?.med?.toFixed(2)}ms\n`;
-    summary += `  • P95 Response Time: ${metrics.http_req_duration?.p95?.toFixed(2)}ms\n`;
-    summary += `  • P99 Response Time: ${metrics.http_req_duration?.p99?.toFixed(2)}ms\n`;
+    summary += `  • Average Response Time: ${metrics.http_req_duration && metrics.http_req_duration.avg ? metrics.http_req_duration.avg.toFixed(2) : '0'}ms\n`;
+    summary += `  • Median Response Time: ${metrics.http_req_duration && metrics.http_req_duration.med ? metrics.http_req_duration.med.toFixed(2) : '0'}ms\n`;
+    summary += `  • P95 Response Time: ${metrics.http_req_duration && metrics.http_req_duration['p(95)'] ? metrics.http_req_duration['p(95)'].toFixed(2) : '0'}ms\n`;
+    summary += `  • P99 Response Time: ${metrics.http_req_duration && metrics.http_req_duration['p(99)'] ? metrics.http_req_duration['p(99)'].toFixed(2) : '0'}ms\n`;
     
     summary += '\n📈 Throughput:\n';
-    summary += `  • Total Requests: ${metrics.http_reqs?.count || 0}\n`;
-    summary += `  • Request Rate: ${metrics.http_reqs?.rate?.toFixed(2)} req/s\n`;
-    summary += `  • Successful Orders: ${metrics.successful_orders?.count || 0}\n`;
-    summary += `  • Failed Orders: ${metrics.failed_orders?.count || 0}\n`;
+    summary += `  • Total Requests: ${(metrics.http_reqs && metrics.http_reqs.count) || 0}\n`;
+    summary += `  • Request Rate: ${metrics.http_reqs && metrics.http_reqs.rate ? metrics.http_reqs.rate.toFixed(2) : '0'} req/s\n`;
+    summary += `  • Successful Orders: ${(metrics.successful_orders && metrics.successful_orders.count) || 0}\n`;
+    summary += `  • Failed Orders: ${(metrics.failed_orders && metrics.failed_orders.count) || 0}\n`;
     
     summary += '\n✅ Success Metrics:\n';
-    summary += `  • Checks Passed: ${metrics.checks?.passes || 0}\n`;
-    summary += `  • Checks Failed: ${metrics.checks?.fails || 0}\n`;
-    summary += `  • Success Rate: ${((metrics.checks?.passes / (metrics.checks?.passes + metrics.checks?.fails)) * 100).toFixed(2)}%\n`;
+    summary += `  • Checks Passed: ${(metrics.checks && metrics.checks.passes) || 0}\n`;
+    summary += `  • Checks Failed: ${(metrics.checks && metrics.checks.fails) || 0}\n`;
+    const passes = (metrics.checks && metrics.checks.passes) || 0;
+    const fails = (metrics.checks && metrics.checks.fails) || 0;
+    const successRate = passes + fails > 0 ? ((passes / (passes + fails)) * 100).toFixed(2) : '0.00';
+    summary += `  • Success Rate: ${successRate}%\n`;
     
     summary += '\n❌ Error Metrics:\n';
-    summary += `  • Error Rate: ${(metrics.errors?.rate * 100).toFixed(2)}%\n`;
-    summary += `  • Failed Requests: ${metrics.http_req_failed?.passes || 0}\n`;
+    summary += `  • Error Rate: ${metrics.errors && metrics.errors.rate ? (metrics.errors.rate * 100).toFixed(2) : '0.00'}%\n`;
+    summary += `  • Failed Requests: ${(metrics.http_req_failed && metrics.http_req_failed.passes) || 0}\n`;
     
     summary += '\n🌐 Network:\n';
-    summary += `  • Data Received: ${(metrics.data_received?.count / 1024 / 1024).toFixed(2)} MB\n`;
-    summary += `  • Data Sent: ${(metrics.data_sent?.count / 1024 / 1024).toFixed(2)} MB\n`;
+    summary += `  • Data Received: ${metrics.data_received && metrics.data_received.count ? (metrics.data_received.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
+    summary += `  • Data Sent: ${metrics.data_sent && metrics.data_sent.count ? (metrics.data_sent.count / 1024 / 1024).toFixed(2) : '0.00'} MB\n`;
     
     summary += '\n👥 Virtual Users:\n';
-    summary += `  • Max VUs: ${metrics.vus_max?.max || 0}\n`;
-    summary += `  • Iterations: ${metrics.iterations?.count || 0}\n`;
+    summary += `  • Max VUs: ${(metrics.vus_max && metrics.vus_max.max) || 0}\n`;
+    summary += `  • Iterations: ${(metrics.iterations && metrics.iterations.count) || 0}\n`;
   }
   
   summary += '\n=======================================\n';
