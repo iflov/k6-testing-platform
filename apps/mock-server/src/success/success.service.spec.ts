@@ -15,4 +15,13 @@ describe('SuccessService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  it('should be return Success with 200 status code', async () => {
+    const result = await service.getSuccess();
+    expect(result).toEqual({
+      statusCode: 200,
+      error: false,
+      message: 'ok',
+    });
+  });
 });

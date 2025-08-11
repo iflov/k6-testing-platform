@@ -5,11 +5,15 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-# Use npm install instead of npm ci since we don't have package-lock.json
+# Install dependencies
 RUN npm install
 
-# Copy TypeScript config and source
+# Copy all configuration files needed for NestJS build
+COPY nest-cli.json ./
 COPY tsconfig.json ./
+COPY tsconfig.build.json ./
+
+# Copy source code
 COPY src ./src
 
 # Build the application
@@ -20,11 +24,14 @@ FROM node:22-slim
 
 WORKDIR /app
 
-# Copy built application
+# Copy only production dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
 
 EXPOSE 3001
 
-CMD ["npm", "start"]
+# Use production start script
+CMD ["npm", "run", "start:prod"]
