@@ -15,7 +15,8 @@ K6 웹 대시보드를 활용한 범용 부하 테스트 플랫폼
 k6-testing-platform/
 ├── apps/
 │   ├── control-panel/      # Next.js 컨트롤 패널
-│   └── mock-server/        # Express Mock 서버
+│   ├── mock-server/        # Express Mock 서버
+│   └── k6-runner/          # K6 테스트 실행 서비스
 ├── k6-scripts/             # K6 테스트 시나리오
 ├── grafana/                # Grafana 설정
 ├── docker-compose.yml      # 로컬 개발 환경
@@ -47,6 +48,7 @@ make logs  # 또는 docker-compose logs -f
 
 - **Control Panel**: http://localhost:3000 - 테스트 실행 UI
 - **Mock Server**: http://localhost:3001 - 테스트 타겟 서버
+- **K6 Runner API**: http://localhost:3002 - K6 테스트 실행 서비스
 - **K6 Web Dashboard**: http://localhost:5665 - 실시간 테스트 모니터링 (테스트 실행 시)
 - **InfluxDB**: http://localhost:8086 - 메트릭 저장소
 

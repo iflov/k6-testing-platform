@@ -80,6 +80,12 @@ k6-service:
 - Docker-in-Docker로 MVP 구현
 - 기본 기능 검증
 
+### Phase 1.5: K6 Runner 서비스 도입 (완료)
+- 독립적인 k6-runner 서비스 구현
+- k6를 child process로 실행
+- REST API를 통한 테스트 관리
+- Web Dashboard 통합 유지
+
 ### Phase 2: Job Queue 도입
 1. Redis 추가
 2. Bull Queue 구현

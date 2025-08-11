@@ -7,11 +7,11 @@ services:
       context: ./apps/control-panel
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "${CONTROL_PANEL_PORT}:3000"
     environment:
-      - NODE_ENV=development
-      - K6_INFLUXDB_URL=http://influxdb:8086
-      - MOCK_SERVER_URL=http://mock-server:3001
+      - NODE_ENV=${NODE_ENV}
+      - K6_INFLUXDB_URL=${K6_INFLUXDB_URL}
+      - MOCK_SERVER_URL=${MOCK_SERVER_URL}
     depends_on:
       - mock-server
       - influxdb
@@ -28,15 +28,15 @@ services:
       context: ./apps/mock-server
       dockerfile: Dockerfile
     ports:
-      - "3001:3001"
+      - "${MOCK_SERVER_PORT}:3001"
     environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - ENABLE_DELAY=false
-      - MIN_DELAY=0
-      - MAX_DELAY=100
-      - ENABLE_ERROR_SIMULATION=false
-      - ERROR_RATE=5
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${MOCK_SERVER_PORT}
+      - ENABLE_DELAY=${ENABLE_DELAY}
+      - MIN_DELAY=${MIN_DELAY}
+      - MAX_DELAY=${MAX_DELAY}
+      - ENABLE_ERROR_SIMULATION=${ENABLE_ERROR_SIMULATION}
+      - ERROR_RATE=${ERROR_RATE}
     networks:
       - k6-network
 
@@ -44,20 +44,36 @@ services:
   influxdb:
     image: influxdb:1.8
     ports:
-      - "8086:8086"
+      - "${INFLUXDB_PORT}:8086"
     environment:
-      - INFLUXDB_DB=k6
-      - INFLUXDB_ADMIN_USER=admin
-      - INFLUXDB_ADMIN_PASSWORD=admin123
-      - INFLUXDB_USER=k6
-      - INFLUXDB_USER_PASSWORD=k6pass
+      - INFLUXDB_DB=${INFLUXDB_DB}
+      - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+      - INFLUXDB_USER=${INFLUXDB_USER}
+      - INFLUXDB_USER_PASSWORD=${INFLUXDB_USER_PASSWORD}
     volumes:
       - influxdb-data:/var/lib/influxdb
     networks:
       - k6-network
 
-  # K6는 Control Panel에서 동적으로 생성됨
-  # Control Panel의 "Start Test" 버튼을 사용하여 테스트 실행
+  # K6 Runner - k6 테스트 실행 서비스
+  k6-runner:
+    build:
+      context: ./apps/k6-runner
+      dockerfile: Dockerfile
+    ports:
+      - "${K6_RUNNER_API_PORT}:3002" # API 포트
+      - "${K6_RUNNER_DASHBOARD_PORT}:5665" # Web Dashboard 포트
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - INFLUXDB_URL=${INFLUXDB_URL}
+      - MOCK_SERVER_URL=${MOCK_SERVER_URL}
+    depends_on:
+      - mock-server
+      - influxdb
+    networks:
+      - k6-network
+    restart: unless-stopped
 
 networks:
   k6-network:
