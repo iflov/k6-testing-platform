@@ -7,11 +7,9 @@ services:
       context: ./apps/control-panel
       dockerfile: Dockerfile
     ports:
-      - "${CONTROL_PANEL_PORT}:3000"
-    environment:
-      - NODE_ENV=${NODE_ENV}
-      - K6_INFLUXDB_URL=${K6_INFLUXDB_URL}
-      - MOCK_SERVER_URL=${MOCK_SERVER_URL}
+      - "3000:3000"
+    env_file:
+      - ./apps/control-panel/.env
     depends_on:
       - mock-server
       - influxdb
@@ -28,15 +26,9 @@ services:
       context: ./apps/mock-server
       dockerfile: Dockerfile
     ports:
-      - "${MOCK_SERVER_PORT}:3001"
-    environment:
-      - NODE_ENV=${NODE_ENV}
-      - PORT=${MOCK_SERVER_PORT}
-      - ENABLE_DELAY=${ENABLE_DELAY}
-      - MIN_DELAY=${MIN_DELAY}
-      - MAX_DELAY=${MAX_DELAY}
-      - ENABLE_ERROR_SIMULATION=${ENABLE_ERROR_SIMULATION}
-      - ERROR_RATE=${ERROR_RATE}
+      - "3001:3001"
+    env_file:
+      - ./apps/mock-server/.env
     networks:
       - k6-network
 
@@ -44,13 +36,9 @@ services:
   influxdb:
     image: influxdb:1.8
     ports:
-      - "${INFLUXDB_PORT}:8086"
-    environment:
-      - INFLUXDB_DB=${INFLUXDB_DB}
-      - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
-      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
-      - INFLUXDB_USER=${INFLUXDB_USER}
-      - INFLUXDB_USER_PASSWORD=${INFLUXDB_USER_PASSWORD}
+      - "8086:8086"
+    env_file:
+      - ./services/influxdb/.env
     volumes:
       - influxdb-data:/var/lib/influxdb
     networks:
@@ -62,12 +50,10 @@ services:
       context: ./apps/k6-runner
       dockerfile: Dockerfile
     ports:
-      - "${K6_RUNNER_API_PORT}:3002" # API 포트
-      - "${K6_RUNNER_DASHBOARD_PORT}:5665" # Web Dashboard 포트
-    environment:
-      - NODE_ENV=${NODE_ENV}
-      - INFLUXDB_URL=${INFLUXDB_URL}
-      - MOCK_SERVER_URL=${MOCK_SERVER_URL}
+      - "3002:3002" # API 포트
+      - "5665:5665" # Web Dashboard 포트 (K6가 실행될 때 사용)
+    env_file:
+      - ./apps/k6-runner/.env
     depends_on:
       - mock-server
       - influxdb

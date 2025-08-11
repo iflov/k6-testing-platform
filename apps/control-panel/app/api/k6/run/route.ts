@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // K6 Runner 서비스를 통해 테스트 실행
 export async function POST(request: NextRequest) {
   try {
-    const { scenario, vus, duration, targetUrl } = await request.json();
+    const { scenario, vus, duration, targetUrl, enableDashboard = true } = await request.json();
 
     // k6-runner 서비스로 요청 전달
     const response = await fetch('http://k6-runner:3002/api/test/start', {
@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
         vus: vus || 10,
         duration: duration || '30s',
         targetUrl: targetUrl || 'http://mock-server:3001',
+        enableDashboard: enableDashboard, // 기본적으로 Dashboard 활성화
       }),
     });
 

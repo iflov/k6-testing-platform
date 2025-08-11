@@ -1,6 +1,7 @@
-# Dependencies
+# Node
 node_modules/
 npm-debug.log*
+yarn-debug.log*
 yarn-error.log*
 
 # Build outputs
@@ -23,20 +24,25 @@ out/
 *.swo
 .DS_Store
 
+# Git
+.git/
+.gitignore
+
 # Docker
-*.log
+.dockerignore
+docker-compose*.yml
+
+# Documentation
+*.md
+docs/
 
 # Test results
-/tmp/
 coverage/
+*.log
 
 # OS files
 Thumbs.db
+.DS_Store
 
-# Grafana & InfluxDB data (for local development)
-grafana-data/
-influxdb-data/
-
-# Claude
-.serena
-.claude
+# K6 test results
+/tmp/k6-test-*.js

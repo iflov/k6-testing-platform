@@ -1,11 +1,7 @@
-# Next.js
-.next/
-out/
-build/
-dist/
-
-# Dependencies
+# Node.js
 node_modules/
+dist/
+build/
 
 # Environment
 .env
@@ -22,7 +18,7 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
-next-env.d.ts
+dist/
 
 # OS
 .DS_Store

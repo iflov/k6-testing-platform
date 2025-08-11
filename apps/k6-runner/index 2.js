@@ -19,35 +19,10 @@ app.use((req, res, next) => {
 
 // 테스트 시작 API
 app.post('/api/test/start', async (req, res) => {
-  const { vus = 10, duration = '30s', targetUrl, enableDashboard = false } = req.body;
+  const { vus = 10, duration = '30s', targetUrl } = req.body;
   
-  // 이전 테스트가 있으면 정리
   if (currentTest) {
-    console.log('Previous test found, cleaning up...');
-    try {
-      currentTest.process.kill('SIGTERM');
-      // 프로세스가 종료될 때까지 잠시 대기
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // 강제 종료가 필요한 경우
-      if (currentTest && currentTest.process) {
-        currentTest.process.kill('SIGKILL');
-      }
-      
-      // 임시 파일 삭제
-      if (currentTest.scriptPath) {
-        try {
-          await fs.unlink(currentTest.scriptPath);
-        } catch (err) {
-          console.error('Failed to delete temp script:', err);
-        }
-      }
-      
-      currentTest = null;
-      console.log('Previous test cleaned up successfully');
-    } catch (error) {
-      console.error('Error cleaning up previous test:', error);
-    }
+    return res.status(400).json({ error: 'Test already running' });
   }
 
   const testId = uuidv4();
@@ -76,28 +51,25 @@ export default function () {
     const scriptPath = `/tmp/k6-test-${testId}.js`;
     await fs.writeFile(scriptPath, script);
 
-    // K6 실행 옵션 설정
-    const k6Args = [
-      'run',
-      '--out', `influxdb=${process.env.INFLUXDB_URL || 'http://influxdb:8086/k6'}`
-    ];
-    
-    const k6Env = { ...process.env };
-    
-    // Dashboard가 활성화된 경우에만 추가
-    if (enableDashboard) {
-      k6Args.push('--out', 'web-dashboard');
-      k6Env.K6_WEB_DASHBOARD = 'true';
-      k6Env.K6_WEB_DASHBOARD_HOST = '0.0.0.0';
-      k6Env.K6_WEB_DASHBOARD_PORT = '5665';
-      k6Env.K6_WEB_DASHBOARD_PERIOD = '1s';
-      k6Env.K6_WEB_DASHBOARD_EXPORT = `/tmp/k6-dashboard-${testId}.html`;
-    }
-    
-    k6Args.push(scriptPath);
+    // Web Dashboard는 한 번에 하나의 테스트만 실행 가능
+    // 각 테스트의 결과는 HTML로 export
     
     // k6 실행
-    const k6Process = spawn('k6', k6Args, { env: k6Env });
+    const k6Process = spawn('k6', [
+      'run',
+      '--out', `influxdb=${process.env.INFLUXDB_URL || 'http://influxdb:8086/k6'}`,
+      '--out', 'web-dashboard',
+      scriptPath
+    ], {
+      env: {
+        ...process.env,
+        K6_WEB_DASHBOARD: 'true',
+        K6_WEB_DASHBOARD_HOST: '0.0.0.0',
+        K6_WEB_DASHBOARD_PORT: '5665',
+        K6_WEB_DASHBOARD_PERIOD: '1s',
+        K6_WEB_DASHBOARD_EXPORT: `/tmp/k6-dashboard-${testId}.html`
+      }
+    });
 
     // 로그 출력
     k6Process.stdout.on('data', (data) => {
@@ -115,8 +87,7 @@ export default function () {
       vus,
       duration,
       targetUrl,
-      scriptPath,
-      dashboardEnabled: enableDashboard
+      scriptPath
     };
 
     // 프로세스 종료 처리
@@ -127,36 +98,21 @@ export default function () {
       if (currentTest && currentTest.scriptPath) {
         try {
           await fs.unlink(currentTest.scriptPath);
-          console.log(`Deleted temp script: ${currentTest.scriptPath}`);
         } catch (err) {
           console.error('Failed to delete temp script:', err);
         }
       }
       
-      // Dashboard가 사용된 경우 포트 해제 대기
-      if (currentTest && currentTest.dashboardEnabled) {
-        console.log('Waiting for dashboard port to be released...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
       currentTest = null;
-      console.log('Test cleanup completed');
     });
 
-    const response = { 
+    res.json({ 
       status: 'started',
       testId,
+      dashboardUrl: `http://localhost:${dashboardPort}`,
+      dashboardPort: dashboardPort,
       message: 'Test started successfully'
-    };
-    
-    if (enableDashboard) {
-      response.dashboardUrl = 'http://localhost:5665';
-      response.note = 'Dashboard is available while test is running';
-    } else {
-      response.note = 'Dashboard disabled. Metrics are being sent to InfluxDB';
-    }
-    
-    res.json(response);
+    });
   } catch (error) {
     console.error('Failed to start test:', error);
     res.status(500).json({ 

@@ -1,0 +1,31 @@
+# InfluxDB Configuration Example
+# 고급 설정이 필요한 경우에만 사용
+# 사용법: influxdb.conf로 복사 후 docker-compose.yml에서 마운트
+
+[meta]
+  dir = "/var/lib/influxdb/meta"
+
+[data]
+  dir = "/var/lib/influxdb/data"
+  wal-dir = "/var/lib/influxdb/wal"
+  
+  # K6 메트릭용 최적화
+  cache-max-memory-size = "1g"
+  cache-snapshot-memory-size = "25m"
+  
+[http]
+  enabled = true
+  bind-address = ":8086"
+  auth-enabled = false
+  
+  # K6 대량 데이터 처리용
+  max-body-size = 25000000
+  
+[continuous_queries]
+  enabled = true
+
+# 데이터 보존 정책 (선택사항)
+# 7일 후 자동 삭제
+# [retention]
+#   enabled = true
+#   check-interval = "30m"
