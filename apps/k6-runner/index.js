@@ -17,9 +17,20 @@ app.use((req, res, next) => {
   next();
 });
 
+// 사용 가능한 시나리오 목록
+const availableScenarios = {
+  'smoke': 'k6-scripts/scenarios/smoke-test.js',
+  'load': 'k6-scripts/scenarios/load-test.js',
+  'stress': 'k6-scripts/scenarios/stress-test.js',
+  'spike': 'k6-scripts/scenarios/spike-test.js',
+  'soak': 'k6-scripts/scenarios/soak-test.js',
+  'breakpoint': 'k6-scripts/scenarios/breakpoint-test.js',
+  'simple-load': 'k6-scripts/scenarios/simple-load-test.js'
+};
+
 // 테스트 시작 API
 app.post('/api/test/start', async (req, res) => {
-  const { vus = 10, duration = '30s', targetUrl, enableDashboard = false } = req.body;
+  const { vus = 10, duration = '30s', targetUrl, enableDashboard = false, scenario = 'custom' } = req.body;
   
   // 이전 테스트가 있으면 정리
   if (currentTest) {
@@ -51,9 +62,17 @@ app.post('/api/test/start', async (req, res) => {
   }
 
   const testId = uuidv4();
+  let scriptPath;
   
-  // K6 스크립트 생성
-  const script = `
+  try {
+    // 시나리오 선택 또는 커스텀 스크립트 생성
+    if (scenario !== 'custom' && availableScenarios[scenario]) {
+      // 기존 시나리오 파일 사용
+      scriptPath = path.join(__dirname, availableScenarios[scenario]);
+      console.log(`Using predefined scenario: ${scenario} from ${scriptPath}`);
+    } else {
+      // 커스텀 K6 스크립트 생성
+      const script = `
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
@@ -69,32 +88,42 @@ export default function () {
   });
   sleep(1);
 }
-  `;
-
-  try {
-    // 스크립트 파일 저장
-    const scriptPath = `/tmp/k6-test-${testId}.js`;
-    await fs.writeFile(scriptPath, script);
+      `;
+      
+      // 스크립트 파일 저장
+      scriptPath = `/tmp/k6-test-${testId}.js`;
+      await fs.writeFile(scriptPath, script);
+      console.log(`Created custom script at ${scriptPath}`);
+    }
 
     // K6 실행 옵션 설정
+    const influxdbUrl = process.env.INFLUXDB_URL || 'http://influxdb:8086/k6';
+    console.log(`InfluxDB URL: ${influxdbUrl}`);
+    
     const k6Args = [
       'run',
-      '--out', `influxdb=${process.env.INFLUXDB_URL || 'http://influxdb:8086/k6'}`
+      '--out', `influxdb=${influxdbUrl}`
     ];
     
     const k6Env = { ...process.env };
     
     // Dashboard가 활성화된 경우에만 추가
     if (enableDashboard) {
-      k6Args.push('--out', 'web-dashboard');
+      console.log('Enabling K6 Web Dashboard...');
+      // web-dashboard output 설정을 파라미터로 전달
+      k6Args.push('--out', 'web-dashboard=host=0.0.0.0&port=5665');
+      
+      // 환경변수도 설정 (백업)
       k6Env.K6_WEB_DASHBOARD = 'true';
       k6Env.K6_WEB_DASHBOARD_HOST = '0.0.0.0';
       k6Env.K6_WEB_DASHBOARD_PORT = '5665';
-      k6Env.K6_WEB_DASHBOARD_PERIOD = '1s';
-      k6Env.K6_WEB_DASHBOARD_EXPORT = `/tmp/k6-dashboard-${testId}.html`;
+      
+      console.log('K6 Dashboard will be available at http://localhost:5665');
     }
     
     k6Args.push(scriptPath);
+    
+    console.log('K6 command:', 'k6', k6Args.join(' '));
     
     // k6 실행
     const k6Process = spawn('k6', k6Args, { env: k6Env });
@@ -115,7 +144,8 @@ export default function () {
       vus,
       duration,
       targetUrl,
-      scriptPath,
+      scriptPath: scenario !== 'custom' && availableScenarios[scenario] ? null : scriptPath, // 기존 시나리오는 삭제하지 않음
+      scenario,
       dashboardEnabled: enableDashboard
     };
 
@@ -123,7 +153,7 @@ export default function () {
     k6Process.on('exit', async (code) => {
       console.log(`K6 process exited with code ${code}`);
       
-      // 임시 파일 삭제
+      // 임시 파일 삭제 (커스텀 스크립트만)
       if (currentTest && currentTest.scriptPath) {
         try {
           await fs.unlink(currentTest.scriptPath);
@@ -146,6 +176,7 @@ export default function () {
     const response = { 
       status: 'started',
       testId,
+      scenario,
       message: 'Test started successfully'
     };
     
@@ -195,6 +226,22 @@ app.post('/api/test/stop', async (req, res) => {
   }
 });
 
+// 사용 가능한 시나리오 목록 API
+app.get('/api/scenarios', (req, res) => {
+  res.json({
+    scenarios: Object.keys(availableScenarios),
+    description: {
+      'smoke': 'Quick test to verify system is working',
+      'load': 'Standard load test with gradual ramp-up',
+      'stress': 'Test system under heavy load',
+      'spike': 'Sudden increase in traffic',
+      'soak': 'Extended duration test for memory leaks',
+      'breakpoint': 'Find system breaking point',
+      'simple-load': 'Simple constant load test'
+    }
+  });
+});
+
 // 테스트 상태 확인 API
 app.get('/api/test/status', (req, res) => {
   res.json({
@@ -204,7 +251,8 @@ app.get('/api/test/status', (req, res) => {
       startTime: currentTest.startTime,
       vus: currentTest.vus,
       duration: currentTest.duration,
-      targetUrl: currentTest.targetUrl
+      targetUrl: currentTest.targetUrl,
+      scenario: currentTest.scenario
     } : null
   });
 });

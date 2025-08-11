@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # Control Panel - Next.js UI
   control-panel:
@@ -15,7 +13,7 @@ services:
       - influxdb
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # For Docker API access
-      - ./k6-scripts:/scripts:ro # Mount K6 scripts as read-only
+      - ./apps/k6-runner/k6-scripts:/scripts:ro # Mount K6 scripts as read-only
       - /tmp:/tmp # For temporary test files
     networks:
       - k6-network
@@ -57,6 +55,9 @@ services:
     depends_on:
       - mock-server
       - influxdb
+    volumes:
+      - ./apps/k6-runner/k6-scripts:/app/k6-scripts:ro # K6 scripts 마운트
+      - /tmp:/tmp # 임시 파일용
     networks:
       - k6-network
     restart: unless-stopped

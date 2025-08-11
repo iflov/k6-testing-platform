@@ -1,4 +1,4 @@
-.PHONY: help dev build test clean install up down logs build-control build-mock push-images
+.PHONY: help dev build test clean install up down logs build-control build-mock build-runner push-images
 
 # Default target
 help:
@@ -31,6 +31,7 @@ install:
 	@echo "Installing dependencies..."
 	cd apps/control-panel && npm install
 	cd apps/mock-server && npm install
+	cd apps/k6-runner && npm install
 
 # Development mode - all services with logs
 dev:
@@ -54,7 +55,7 @@ clean:
 	docker system prune -f
 
 # Build all images
-build: build-control build-mock
+build: build-control build-mock build-runner
 
 # Build control panel
 build-control:
@@ -65,6 +66,11 @@ build-control:
 build-mock:
 	@echo "Building Mock Server..."
 	docker build -t k6-mock-server:latest ./apps/mock-server
+
+# Build k6 runner
+build-runner:
+	@echo "Building K6 Runner..."
+	docker build -t k6-runner:latest ./apps/k6-runner
 
 # Run tests
 test:
@@ -110,6 +116,9 @@ shell-control:
 
 shell-mock:
 	docker-compose exec mock-server sh
+
+shell-runner:
+	docker-compose exec k6-runner sh
 
 influx-cli:
 	docker-compose exec influxdb influx -database k6

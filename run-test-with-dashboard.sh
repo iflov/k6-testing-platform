@@ -48,7 +48,7 @@ docker run --rm -it \
   -e K6_WEB_DASHBOARD_PORT=5665 \
   -e K6_WEB_DASHBOARD_PERIOD=1s \
   -e K6_WEB_DASHBOARD_EXPORT=/reports/$REPORT_NAME \
-  -v $(pwd)/k6-scripts:/scripts:ro \
+  -v $(pwd)/apps/k6-runner/k6-scripts:/scripts:ro \
   -v $(pwd)/reports:/reports \
   grafana/k6:0.52.0 run \
   --out influxdb=http://influxdb:8086/k6 \

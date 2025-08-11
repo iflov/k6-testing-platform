@@ -17,9 +17,11 @@ k6-testing-platform/
 │   ├── control-panel/      # Next.js 컨트롤 패널
 │   ├── mock-server/        # Express Mock 서버
 │   └── k6-runner/          # K6 테스트 실행 서비스
-├── k6-scripts/             # K6 테스트 시나리오
-├── grafana/                # Grafana 설정
+│       └── k6-scripts/     # K6 테스트 시나리오
+├── services/
+│   └── influxdb/          # InfluxDB 설정
 ├── docker-compose.yml      # 로컬 개발 환경
+├── run-test-with-dashboard.sh  # 테스트 실행 스크립트
 └── Makefile               # 자동화 스크립트
 ```
 
@@ -71,7 +73,7 @@ docker run --rm -it \
   -e K6_WEB_DASHBOARD=true \
   -e K6_WEB_DASHBOARD_HOST=0.0.0.0 \
   -e K6_WEB_DASHBOARD_PORT=5665 \
-  -v $(pwd)/k6-scripts:/scripts:ro \
+  -v $(pwd)/apps/k6-runner/k6-scripts:/scripts:ro \
   -v $(pwd)/reports:/reports \
   grafana/k6:latest run \
   --out influxdb=http://influxdb:8086/k6 \
