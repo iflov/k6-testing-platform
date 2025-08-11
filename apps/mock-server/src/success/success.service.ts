@@ -14,7 +14,7 @@ export class SuccessService {
     };
   }
 
-  async postSuccess(): Promise<ApiResponse> {
+  async postSuccess(body: any): Promise<ApiResponse> {
     return {
       statusCode: 201,
       error: false,
