@@ -15,6 +15,7 @@ export class SuccessService {
   }
 
   async postSuccess(body: any): Promise<ApiResponse> {
+    console.log('body::::::', body);
     return {
       statusCode: 201,
       error: false,

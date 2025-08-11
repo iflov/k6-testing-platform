@@ -37,8 +37,12 @@ services:
       - "8086:8086"
     env_file:
       - ./services/influxdb/.env
+    environment:
+      - INFLUXDB_DB=k6
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
     volumes:
       - influxdb-data:/var/lib/influxdb
+      - ./services/influxdb/init-influxdb.sh:/docker-entrypoint-initdb.d/init-influxdb.sh:ro
     networks:
       - k6-network
 

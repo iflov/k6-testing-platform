@@ -7,12 +7,13 @@ const INFLUXDB_DB = process.env.K6_INFLUXDB_DB || "k6";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const testId = searchParams.get("testId");
-
-  // testId가 없어도 최근 데이터를 가져옴
-  console.log("Fetching metrics for testId:", testId || "latest");
+  const realtime = searchParams.get("realtime") === "true";
 
   // 실제 InfluxDB에서 메트릭 조회
   try {
+    // 시간 범위 설정 (실시간 모드일 경우 10초, 아니면 5분)
+    const timeRange = realtime ? "10s" : "5m";
+
     // 여러 메트릭을 병렬로 조회
     const [
       httpReqDuration,
@@ -22,12 +23,12 @@ export async function GET(request: NextRequest) {
       iterationDuration,
       dataTransfer,
     ] = await Promise.all([
-      queryHttpReqDuration(),
-      queryHttpReqs(),
-      queryVUs(),
-      queryHttpReqFailed(),
-      queryIterationDuration(),
-      queryDataTransfer(),
+      queryHttpReqDuration(timeRange),
+      queryHttpReqs(timeRange),
+      queryVUs(timeRange),
+      queryHttpReqFailed(timeRange),
+      queryIterationDuration(timeRange),
+      queryDataTransfer(timeRange),
     ]);
 
     const metrics = {
@@ -61,9 +62,6 @@ async function queryInfluxDB(query: string) {
     epoch: "ms",
   });
 
-  console.log("InfluxDB Query URL:", url);
-  console.log("Query:", query.trim());
-
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -78,13 +76,12 @@ async function queryInfluxDB(query: string) {
   }
 
   const data = await response.json();
-  console.log("InfluxDB Response:", JSON.stringify(data, null, 2));
 
   return data.results?.[0]?.series?.[0] || null;
 }
 
 // HTTP 요청 지속 시간 메트릭
-async function queryHttpReqDuration() {
+async function queryHttpReqDuration(timeRange = "5m") {
   const query = `
     SELECT mean("value") as avg, 
            min("value") as min, 
@@ -92,10 +89,7 @@ async function queryHttpReqDuration() {
            percentile("value", 95) as p95,
            percentile("value", 99) as p99
     FROM "http_req_duration"
-    WHERE time > now() - 30m
-    GROUP BY time(10s) fill(none)
-    ORDER BY time DESC
-    LIMIT 1
+    WHERE time > now() - ${timeRange}
   `;
 
   const series = await queryInfluxDB(query);
@@ -117,15 +111,12 @@ async function queryHttpReqDuration() {
 }
 
 // HTTP 요청 수 메트릭
-async function queryHttpReqs() {
+async function queryHttpReqs(timeRange = "5m") {
   const query = `
-    SELECT sum("value") as count,
+    SELECT count("value") as count,
            mean("value") as rate
     FROM "http_reqs"
-    WHERE time > now() - 30m
-    GROUP BY time(10s) fill(none)
-    ORDER BY time DESC
-    LIMIT 1
+    WHERE time > now() - ${timeRange}
   `;
 
   const series = await queryInfluxDB(query);
@@ -144,12 +135,12 @@ async function queryHttpReqs() {
 }
 
 // Virtual Users 메트릭
-async function queryVUs() {
+async function queryVUs(timeRange = "5m") {
   const query = `
     SELECT last("value") as current,
            max("value") as max
     FROM "vus"
-    WHERE time > now() - 30m
+    WHERE time > now() - ${timeRange}
   `;
 
   const series = await queryInfluxDB(query);
@@ -168,15 +159,12 @@ async function queryVUs() {
 }
 
 // 실패한 HTTP 요청 메트릭
-async function queryHttpReqFailed() {
+async function queryHttpReqFailed(timeRange = "5m") {
   const query = `
-    SELECT sum("value") as count,
+    SELECT count("value") as count,
            mean("value") as rate
     FROM "http_req_failed"
-    WHERE time > now() - 30m
-    GROUP BY time(10s) fill(0)
-    ORDER BY time DESC
-    LIMIT 1
+    WHERE time > now() - ${timeRange}
   `;
 
   const series = await queryInfluxDB(query);
@@ -185,9 +173,8 @@ async function queryHttpReqFailed() {
     const values = series.values[0];
     const columns = series.columns;
 
-    const totalReqs = await queryHttpReqs();
     const failedCount = getValueByColumn(values, columns, "count") || 0;
-    const failRate = totalReqs.count > 0 ? failedCount / totalReqs.count : 0;
+    const failRate = getValueByColumn(values, columns, "rate") || 0;
 
     return {
       count: Math.floor(failedCount),
@@ -199,16 +186,13 @@ async function queryHttpReqFailed() {
 }
 
 // Iteration 지속 시간 메트릭
-async function queryIterationDuration() {
+async function queryIterationDuration(timeRange = "5m") {
   const query = `
     SELECT mean("value") as avg,
            min("value") as min,
            max("value") as max
     FROM "iteration_duration"
-    WHERE time > now() - 30m
-    GROUP BY time(10s) fill(none)
-    ORDER BY time DESC
-    LIMIT 1
+    WHERE time > now() - ${timeRange}
   `;
 
   const series = await queryInfluxDB(query);
@@ -228,17 +212,17 @@ async function queryIterationDuration() {
 }
 
 // 데이터 전송량 메트릭
-async function queryDataTransfer() {
+async function queryDataTransfer(timeRange = "5m") {
   const querySent = `
     SELECT sum("value") as total
     FROM "data_sent"
-    WHERE time > now() - 30m
+    WHERE time > now() - ${timeRange}
   `;
 
   const queryReceived = `
     SELECT sum("value") as total
     FROM "data_received"
-    WHERE time > now() - 30m
+    WHERE time > now() - ${timeRange}
   `;
 
   const [sentSeries, receivedSeries] = await Promise.all([

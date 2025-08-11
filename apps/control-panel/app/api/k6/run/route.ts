@@ -23,9 +23,21 @@ export async function POST(request: NextRequest) {
     const {
       vus,
       duration,
+      iterations,
+      executionMode,
       targetUrl,
       enableDashboard = true,
     } = await request.json();
+
+    console.log(
+      "1111111:::",
+      vus,
+      duration,
+      iterations,
+      executionMode,
+      targetUrl,
+      enableDashboard
+    );
 
     // k6-runner 서비스로 요청 전달
     const response = await fetch(K6_RUNNER_TEST_START_URL, {
@@ -36,6 +48,8 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         vus: vus || 10,
         duration: duration || "30s",
+        iterations: iterations,
+        executionMode: executionMode || "duration",
         targetUrl: targetUrl || MOCK_SERVER_URL,
         enableDashboard: enableDashboard, // 기본적으로 Dashboard 활성화
       }),
