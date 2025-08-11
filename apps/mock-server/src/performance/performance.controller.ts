@@ -19,27 +19,12 @@ export class PerformanceController {
     return this.performanceService.getTimeout(timeout);
   }
 
-  @Get('/heavy')
-  async getHeavy(
-    @Query('complexity', new ParseIntPipe({ optional: true }))
-    complexity?: number,
-  ) {
-    return this.performanceService.getHeavy(complexity);
-  }
-
   @Get('/variable-latency')
   async getVariableLatency(
     @Query('min', new ParseIntPipe({ optional: true })) min?: number,
     @Query('max', new ParseIntPipe({ optional: true })) max?: number,
   ) {
     return this.performanceService.getVariableLatency(min, max);
-  }
-
-  @Get('/memory-leak')
-  async getMemoryLeak(
-    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
-  ) {
-    return this.performanceService.getMemoryLeak(size);
   }
 
   @Get('/concurrency-issue')

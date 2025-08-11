@@ -15,8 +15,6 @@ describe('PerformanceService', () => {
 
   afterEach(() => {
     jest.useRealTimers();
-    // 메모리 누수 테스트 후 정리
-    service.clearMemoryLeak();
   });
 
   it('should be defined', () => {
@@ -84,40 +82,6 @@ describe('PerformanceService', () => {
     });
   });
 
-  describe('getHeavy', () => {
-    it('should perform CPU intensive task', async () => {
-      // 테스트용 작은 complexity
-      const result = await service.getHeavy(1000);
-
-      expect(result.statusCode).toBe(200);
-      expect(result.error).toBe(false);
-      expect(result.message).toBe('Heavy computation completed');
-      expect(result.metrics.iterations).toBe(1000);
-      expect(result.metrics.duration).toBeGreaterThanOrEqual(0);
-      expect(result.metrics.cpuTime).toBeGreaterThanOrEqual(0);
-      expect(result.timestamp).toBeDefined();
-    });
-
-    it('should scale with complexity', async () => {
-      const small = await service.getHeavy(100);
-      const large = await service.getHeavy(10000);
-
-      expect(large.metrics.duration).toBeGreaterThanOrEqual(
-        small.metrics.duration,
-      );
-      expect(large.metrics.iterations).toBeGreaterThan(
-        small.metrics.iterations,
-      );
-    });
-
-    it('should track memory usage', async () => {
-      const result = await service.getHeavy(1000);
-
-      expect(result.metrics.memoryUsed).toBeDefined();
-      expect(typeof result.metrics.memoryUsed).toBe('number');
-    });
-  });
-
   describe('getVariableLatency', () => {
     it('should produce delays within default range', async () => {
       jest.useFakeTimers();
@@ -148,37 +112,6 @@ describe('PerformanceService', () => {
         expect(result.metrics.duration).toBeGreaterThanOrEqual(100);
         expect(result.metrics.duration).toBeLessThanOrEqual(200);
       });
-    });
-  });
-
-  describe('getMemoryLeak', () => {
-    it('should accumulate memory over multiple calls', async () => {
-      const first = await service.getMemoryLeak(10);
-      const second = await service.getMemoryLeak(10);
-      const third = await service.getMemoryLeak(10);
-
-      expect(first.metrics.iterations).toBe(1);
-      expect(second.metrics.iterations).toBe(2);
-      expect(third.metrics.iterations).toBe(3);
-    });
-
-    it('should report memory usage', async () => {
-      const result = await service.getMemoryLeak(100);
-
-      expect(result.statusCode).toBe(200);
-      expect(result.error).toBe(false);
-      expect(result.metrics.memoryUsed).toBeDefined();
-      expect(typeof result.metrics.memoryUsed).toBe('number');
-    });
-
-    it('should clear memory leaks when clearMemoryLeak is called', async () => {
-      await service.getMemoryLeak(10);
-      await service.getMemoryLeak(10);
-
-      service.clearMemoryLeak();
-
-      const result = await service.getMemoryLeak(10);
-      expect(result.metrics.iterations).toBe(1); // Reset to 1
     });
   });
 

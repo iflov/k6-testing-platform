@@ -3,6 +3,7 @@ export interface BaseResponse {
   error: boolean;
   message: string;
   timestamp: Date;
+  path?: string;
 }
 
 export interface MetricsData {
@@ -12,7 +13,10 @@ export interface MetricsData {
   cpuTime?: number;
 }
 
-export interface ApiResponse extends BaseResponse {
+// Success와 Error 서비스용 기본 응답
+export type ApiResponse = BaseResponse;
+
+// Performance 서비스용 메트릭 포함 응답
+export interface PerformanceResponse extends BaseResponse {
   metrics?: MetricsData;
-  path?: string;
 }
