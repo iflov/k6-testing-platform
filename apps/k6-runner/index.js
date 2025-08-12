@@ -216,6 +216,21 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
   }
 }
 
+// 포트가 사용 중인지 확인하는 함수
+async function isPortInUse(port) {
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+  
+  try {
+    const result = await execAsync(`lsof -i :${port}`);
+    return result.stdout.length > 0;
+  } catch (error) {
+    // lsof 명령이 실패하면 포트가 사용되지 않는 것으로 간주
+    return false;
+  }
+}
+
 // 테스트 시작 API
 app.post("/api/test/start", async (req, res) => {
   console.log("Starting test with config:", req.body);
@@ -299,17 +314,29 @@ export default function () {${httpRequest}
       TARGET_URL: targetUrl || config.mockServerUrl,
     };
 
-    // Dashboard가 활성화된 경우에만 추가
+    // Dashboard 활성화 여부 결정
+    let dashboardActuallyEnabled = false;
+    
     if (enableDashboard) {
-      // web-dashboard output 설정을 파라미터로 전달
-      k6Args.push("--out", `web-dashboard=host=${config.k6DashboardHost}&port=${config.k6DashboardPort}`);
-
-      // 환경변수도 설정 (백업)
-      k6Env.K6_WEB_DASHBOARD = "true";
-      k6Env.K6_WEB_DASHBOARD_HOST = config.k6DashboardHost;
-      k6Env.K6_WEB_DASHBOARD_PORT = config.k6DashboardPort;
+      // 포트가 사용 중인지 확인
+      const portInUse = await isPortInUse(config.k6DashboardPort);
       
-      console.log(`Dashboard will be available on port ${config.k6DashboardPort}`);
+      if (portInUse) {
+        console.warn(`Dashboard port ${config.k6DashboardPort} is already in use. Running test without dashboard.`);
+      } else {
+        // 포트가 사용 가능한 경우에만 대시보드 활성화
+        dashboardActuallyEnabled = true;
+        
+        // web-dashboard output 설정을 파라미터로 전달
+        k6Args.push("--out", `web-dashboard=host=${config.k6DashboardHost}&port=${config.k6DashboardPort}`);
+
+        // 환경변수도 설정 (백업)
+        k6Env.K6_WEB_DASHBOARD = "true";
+        k6Env.K6_WEB_DASHBOARD_HOST = config.k6DashboardHost;
+        k6Env.K6_WEB_DASHBOARD_PORT = config.k6DashboardPort;
+        
+        console.log(`Dashboard will be available on port ${config.k6DashboardPort}`);
+      }
     }
 
     k6Args.push(scriptPath);
@@ -418,11 +445,14 @@ export default function () {${httpRequest}
       testId,
       scenario,
       message: "Test started successfully",
+      dashboardEnabled: dashboardActuallyEnabled,
     };
 
-    if (enableDashboard) {
-      response.dashboardUrl = "http://localhost:5665";
+    if (dashboardActuallyEnabled) {
+      response.dashboardUrl = `http://${config.k6DashboardHost}:${config.k6DashboardPort}`;
       response.note = "Dashboard is available while test is running";
+    } else if (enableDashboard && !dashboardActuallyEnabled) {
+      response.note = `Dashboard was requested but port ${config.k6DashboardPort} is already in use. Test running without dashboard.`;
     } else {
       response.note = "Dashboard disabled. Metrics are being sent to InfluxDB";
     }

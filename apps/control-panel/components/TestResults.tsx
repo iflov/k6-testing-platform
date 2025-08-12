@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 interface TestResultsProps {
   testId: string | null;
   status: 'idle' | 'running';
+  metrics: Metrics | null;
 }
 
 interface Metrics {
@@ -15,44 +14,7 @@ interface Metrics {
   iteration_duration: { avg: number };
 }
 
-export default function TestResults({ testId, status }: TestResultsProps) {
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
-    if (status === 'running' && testId) {
-      // 첫 번째 metrics 즉시 가져오기
-      const fetchMetrics = async () => {
-        try {
-          const response = await fetch(`/api/k6/metrics?testId=${testId}`);
-          const data = await response.json();
-          setMetrics(data);
-        } catch (error) {
-          console.error('Failed to fetch metrics:', error);
-        }
-      };
-      
-      // 즉시 실행
-      fetchMetrics();
-      
-      // 주기적 실행
-      interval = setInterval(fetchMetrics, 2000);
-    } else {
-      // status가 running이 아니면 metrics를 null로 리셋
-      if (status === 'idle') {
-        setMetrics(null);
-      }
-    }
-    
-    // cleanup 함수 - status나 testId가 변경되거나 컴포넌트가 unmount될 때 실행
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-        console.log('Metrics polling stopped');
-      }
-    };
-  }, [status, testId]);
+export default function TestResults({ testId, status, metrics }: TestResultsProps) {
 
   if (status === 'idle') {
     return (

@@ -1,13 +1,127 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import TestController from '@/components/TestController';
 import TestStatus from '@/components/TestStatus';
 import TestResults from '@/components/TestResults';
 
+interface Metrics {
+  http_req_duration: { avg: number; min: number; max: number; p95: number };
+  http_reqs: { rate: number };
+  vus: number;
+  http_req_failed: { rate: number };
+  iteration_duration: { avg: number };
+}
+
 export default function Home() {
   const [testStatus, setTestStatus] = useState<'idle' | 'running'>('idle');
   const [testId, setTestId] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  
+  // useRef를 사용하여 최신 상태를 항상 참조
+  const statusRef = useRef(testStatus);
+  const testIdRef = useRef(testId);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const metricsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const errorCountRef = useRef(0);
+  
+  // 상태가 변경될 때마다 ref 업데이트
+  useEffect(() => {
+    statusRef.current = testStatus;
+  }, [testStatus]);
+  
+  useEffect(() => {
+    testIdRef.current = testId;
+  }, [testId]);
+
+  // 메트릭 가져오기 함수
+  const fetchMetrics = useCallback(async () => {
+    if (!testIdRef.current) return;
+    
+    try {
+      const response = await fetch(`/api/k6/metrics?testId=${testIdRef.current}`);
+      const data = await response.json();
+      setMetrics(data);
+    } catch (error) {
+      console.error('Failed to fetch metrics:', error);
+    }
+  }, []);
+
+  // 상태 체크 함수 (setTimeout 재귀 방식)
+  const checkStatus = useCallback(async () => {
+    // 현재 상태가 running이 아니면 중지
+    if (statusRef.current !== 'running') {
+      console.log('Status is not running, stopping polling');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/k6/status');
+      const data = await response.json();
+      
+      console.log('Status check result:', data);
+      
+      // 에러 카운트 리셋
+      errorCountRef.current = 0;
+      
+      // 테스트가 더 이상 실행 중이지 않으면
+      if (!data.running) {
+        console.log('Test completed, stopping all polling');
+        setTestStatus('idle');
+        setTestId(null);
+        setMetrics(null);
+        
+        // 모든 타임아웃 정리
+        if (pollingTimeoutRef.current) {
+          clearTimeout(pollingTimeoutRef.current);
+          pollingTimeoutRef.current = null;
+        }
+        if (metricsTimeoutRef.current) {
+          clearTimeout(metricsTimeoutRef.current);
+          metricsTimeoutRef.current = null;
+        }
+        return;
+      }
+      
+      // 테스트가 계속 실행 중이면 다음 체크 스케줄
+      if (statusRef.current === 'running') {
+        pollingTimeoutRef.current = setTimeout(checkStatus, 2000);
+      }
+    } catch (error) {
+      console.error('Failed to check test status:', error);
+      errorCountRef.current++;
+      
+      // 연속 에러가 10번 이상 발생하면 폴링 중지
+      if (errorCountRef.current >= 10) {
+        console.error('Too many consecutive errors, stopping polling');
+        setTestStatus('idle');
+        setTestId(null);
+        setMetrics(null);
+        alert('Lost connection to test runner. Please check the status manually.');
+        return;
+      }
+      
+      // 에러가 있어도 재시도
+      if (statusRef.current === 'running') {
+        pollingTimeoutRef.current = setTimeout(checkStatus, 2000);
+      }
+    }
+  }, []);
+
+  // 메트릭 폴링 함수 (setTimeout 재귀 방식)
+  const pollMetrics = useCallback(async () => {
+    if (statusRef.current !== 'running' || !testIdRef.current) {
+      console.log('Stopping metrics polling');
+      return;
+    }
+
+    await fetchMetrics();
+
+    // 다음 메트릭 폴링 스케줄
+    if (statusRef.current === 'running') {
+      metricsTimeoutRef.current = setTimeout(pollMetrics, 2000);
+    }
+  }, [fetchMetrics]);
 
   // 컴포넌트 마운트 시 실제 상태 확인
   useEffect(() => {
@@ -22,9 +136,9 @@ export default function Home() {
           setTestStatus('running');
           setTestId(data.testId);
         } else {
-          // 실행 중인 테스트가 없으면 확실히 idle 상태로 설정
           setTestStatus('idle');
           setTestId(null);
+          setMetrics(null);
         }
       } catch (error) {
         console.error('Failed to check initial status:', error);
@@ -32,68 +146,51 @@ export default function Home() {
     };
     
     checkInitialStatus();
-  }, []); // 빈 배열로 마운트 시 한 번만 실행
+  }, []);
 
-  // k6-runner의 실제 상태를 폴링
+  // 테스트 상태에 따른 폴링 시작/중지
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-    let errorCount = 0;
-    
     if (testStatus === 'running') {
-      console.log('Starting status polling for running test');
+      console.log('Starting polling for running test');
       
-      const checkStatus = async () => {
-        try {
-          const response = await fetch('/api/k6/status');
-          const data = await response.json();
-          
-          console.log('Status check result:', data);
-          
-          // 성공하면 에러 카운트 리셋
-          errorCount = 0;
-          
-          // 테스트가 더 이상 실행 중이지 않으면
-          if (!data.running) {
-            // 테스트가 자동으로 종료된 경우 idle 상태로 변경
-            console.log('Test completed, stopping polling and setting status to idle');
-            setTestStatus('idle');
-            setTestId(null); // testId도 초기화
-            // interval은 testStatus가 idle로 변경되면서 useEffect cleanup에서 자동으로 정리됨
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to check test status:', error);
-          errorCount++;
-          
-          // 연속 에러가 10번 이상 발생하면 폴링 중지
-          if (errorCount >= 10) {
-            console.error('Too many consecutive errors, stopping status polling');
-            setTestStatus('idle');
-            setTestId(null);
-            alert('Lost connection to test runner. Please check the status manually.');
-            return;
-          }
-        }
-      };
+      // 이전 타임아웃 정리
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+      }
+      if (metricsTimeoutRef.current) {
+        clearTimeout(metricsTimeoutRef.current);
+      }
       
-      // 첫 체크를 즉시 실행
+      // 폴링 시작
       checkStatus();
-      
-      // 주기적 체크 설정
-      intervalId = setInterval(checkStatus, 2000); // 2초마다 상태 확인
-      console.log('Interval created:', intervalId);
+      pollMetrics();
     } else {
-      console.log('Test status is not running:', testStatus);
+      console.log('Test not running, cleaning up polling');
+      
+      // 모든 폴링 중지
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+        pollingTimeoutRef.current = null;
+      }
+      if (metricsTimeoutRef.current) {
+        clearTimeout(metricsTimeoutRef.current);
+        metricsTimeoutRef.current = null;
+      }
+      
+      // 메트릭 초기화
+      setMetrics(null);
     }
-
-    // cleanup 함수 - testStatus가 변경되거나 컴포넌트가 unmount될 때 실행
+    
+    // cleanup 함수
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        console.log('Cleaning up status polling interval from useEffect cleanup');
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+      }
+      if (metricsTimeoutRef.current) {
+        clearTimeout(metricsTimeoutRef.current);
       }
     };
-  }, [testStatus]);
+  }, [testStatus, testId, checkStatus, pollMetrics]);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -104,12 +201,37 @@ export default function Home() {
           <div className="space-y-6">
             <TestController 
               onTestStart={(id) => {
+                console.log('Test starting with ID:', id);
+                // 모든 폴링 정리
+                if (pollingTimeoutRef.current) {
+                  clearTimeout(pollingTimeoutRef.current);
+                  pollingTimeoutRef.current = null;
+                }
+                if (metricsTimeoutRef.current) {
+                  clearTimeout(metricsTimeoutRef.current);
+                  metricsTimeoutRef.current = null;
+                }
+                // 상태 설정
                 setTestId(id);
                 setTestStatus('running');
+                setMetrics(null);
+                errorCountRef.current = 0;
               }}
               onTestStop={() => {
+                console.log('Test stopping');
+                // 모든 폴링 정리
+                if (pollingTimeoutRef.current) {
+                  clearTimeout(pollingTimeoutRef.current);
+                  pollingTimeoutRef.current = null;
+                }
+                if (metricsTimeoutRef.current) {
+                  clearTimeout(metricsTimeoutRef.current);
+                  metricsTimeoutRef.current = null;
+                }
+                // 상태 초기화
                 setTestStatus('idle');
                 setTestId(null);
+                setMetrics(null);
               }}
               testStatus={testStatus}
             />
@@ -118,7 +240,7 @@ export default function Home() {
           </div>
           
           <div>
-            <TestResults testId={testId} status={testStatus} />
+            <TestResults testId={testId} status={testStatus} metrics={metrics} />
           </div>
         </div>
       </div>

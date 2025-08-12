@@ -90,6 +90,7 @@ export default function TestController({
     urlPath: "/success",
     httpMethod: "GET" as "GET" | "POST",
     requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
+    enableDashboard: false,
   });
   const [loading, setLoading] = useState(false);
 
