@@ -1,12 +1,12 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 # Use npm install instead of npm ci since we don't have package-lock.json
-RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -15,10 +15,10 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+FROM node:22-slim
 
 # Install Docker CLI to communicate with Docker daemon
-RUN apk add --no-cache docker-cli
+RUN apt-get update && apt-get install -y docker.io && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
