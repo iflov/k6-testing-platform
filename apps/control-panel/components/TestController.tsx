@@ -36,7 +36,7 @@ export default function TestController({
     duration: "30s",
     iterations: 100,
     executionMode: "duration" as "duration" | "iterations" | "hybrid",
-    targetUrl: "http://host.docker.internal:3001",
+    targetUrl: `${process.env.MOCK_SERVER_URL}`,
   });
   const [loading, setLoading] = useState(false);
 

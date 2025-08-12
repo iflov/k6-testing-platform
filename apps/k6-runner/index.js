@@ -3,6 +3,7 @@ const { spawn } = require("child_process");
 const fs = require("fs").promises;
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const config = require("./config");
 
 const app = express();
 app.use(express.json());
@@ -172,9 +173,7 @@ export const options = ${optionsConfig};
 
 export default function () {
   const res = http.get('${
-    targetUrl ||
-    process.env.MOCK_SERVER_URL ||
-    "http://host.docker.internal:3001"
+    targetUrl || config.mockServerUrl
   }');
   check(res, {
     'status is 200': (r) => r.status === 200,
@@ -189,32 +188,24 @@ export default function () {
     }
 
     // K6 실행 옵션 설정
-    const influxdbUrl = process.env.INFLUXDB_URL || "http://influxdb:8086";
-
-    const k6Args = ["run", "--out", `influxdb=${influxdbUrl}/k6`];
+    const k6Args = ["run", "--out", `influxdb=${config.influxdbK6Url}`];
 
     const k6Env = {
       ...process.env,
-      TARGET_URL:
-        targetUrl ||
-        process.env.MOCK_SERVER_URL ||
-        "http://host.docker.internal:3001",
+      TARGET_URL: targetUrl || config.mockServerUrl,
     };
 
     // Dashboard가 활성화된 경우에만 추가
     if (enableDashboard) {
-      // 포트를 동적으로 할당하거나 고정 포트 사용
-      const dashboardPort = process.env.K6_DASHBOARD_PORT || "5665";
-      
       // web-dashboard output 설정을 파라미터로 전달
-      k6Args.push("--out", `web-dashboard=host=0.0.0.0&port=${dashboardPort}`);
+      k6Args.push("--out", `web-dashboard=host=${config.k6DashboardHost}&port=${config.k6DashboardPort}`);
 
       // 환경변수도 설정 (백업)
       k6Env.K6_WEB_DASHBOARD = "true";
-      k6Env.K6_WEB_DASHBOARD_HOST = "0.0.0.0";
-      k6Env.K6_WEB_DASHBOARD_PORT = dashboardPort;
+      k6Env.K6_WEB_DASHBOARD_HOST = config.k6DashboardHost;
+      k6Env.K6_WEB_DASHBOARD_PORT = config.k6DashboardPort;
       
-      console.log(`Dashboard will be available on port ${dashboardPort}`);
+      console.log(`Dashboard will be available on port ${config.k6DashboardPort}`);
     }
 
     k6Args.push(scriptPath);
@@ -401,14 +392,16 @@ app.get("/api/test/status", (req, res) => {
 
 // 헬스 체크
 app.get("/health", (req, res) => {
-  res.json({
-    status: "healthy",
-    service: "k6-runner",
-    timestamp: new Date().toISOString(),
-  });
+  res.json(config.getHealthInfo());
 });
 
-const PORT = process.env.PORT || 3002;
+// Config 정보 엔드포인트 (디버깅용)
+app.get("/config", (req, res) => {
+  res.json(config.getConfigInfo());
+});
+
+const PORT = config.port;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`K6 Runner Service listening on port ${PORT}`);
+  console.log(`Environment: ${config.environment}`);
 });

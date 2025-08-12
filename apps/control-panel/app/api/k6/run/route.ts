@@ -1,21 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const K6_RUNNER_TEST_START_URL =
-  process.env.K6_RUNNER_TEST_START_URL ||
-  "http://k6-runner:3002/api/test/start";
-
-const K6_RUNNER_TEST_STOP_URL =
-  process.env.K6_RUNNER_TEST_STOP_URL || "http://k6-runner:3002/api/test/stop";
-
-const K6_RUNNER_TEST_STATUS_URL =
-  process.env.K6_RUNNER_TEST_STATUS_URL ||
-  "http://k6-runner:3002/api/test/status";
-
-const K6_DASHBOARD_URL =
-  process.env.K6_DASHBOARD_URL || "http://localhost:5665";
-
-const MOCK_SERVER_URL =
-  process.env.MOCK_SERVER_URL || "http://mock-server:3001";
+import config from "@/lib/config";
 
 // K6 Runner 서비스를 통해 테스트 실행
 export async function POST(request: NextRequest) {
@@ -29,18 +13,8 @@ export async function POST(request: NextRequest) {
       enableDashboard = false,
     } = await request.json();
 
-    console.log(
-      "1111111:::",
-      vus,
-      duration,
-      iterations,
-      executionMode,
-      targetUrl,
-      enableDashboard
-    );
-
     // k6-runner 서비스로 요청 전달
-    const response = await fetch(K6_RUNNER_TEST_START_URL, {
+    const response = await fetch(config.k6RunnerTestStartUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -50,7 +24,7 @@ export async function POST(request: NextRequest) {
         duration: duration || "30s",
         iterations: iterations,
         executionMode: executionMode || "duration",
-        targetUrl: targetUrl || MOCK_SERVER_URL,
+        targetUrl: targetUrl || config.mockServerUrl,
         enableDashboard: enableDashboard, // Dashboard는 필요시에만 활성화
       }),
     });
@@ -68,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       testId: result.testId || Date.now().toString(),
       message: "Test started successfully",
-      dashboardUrl: result.dashboardUrl || K6_DASHBOARD_URL,
+      dashboardUrl: result.dashboardUrl || config.k6DashboardUrl,
       status: result.status,
     });
   } catch (error) {
@@ -83,7 +57,7 @@ export async function POST(request: NextRequest) {
 // 테스트 상태 확인
 export async function GET() {
   try {
-    const response = await fetch(K6_RUNNER_TEST_STATUS_URL);
+    const response = await fetch(config.k6RunnerTestStatusUrl);
 
     if (!response.ok) {
       return NextResponse.json(
@@ -100,7 +74,7 @@ export async function GET() {
             {
               id: "current",
               ...status.details,
-              dashboardUrl: K6_DASHBOARD_URL,
+              dashboardUrl: config.k6DashboardUrl,
             },
           ]
         : [],
@@ -114,7 +88,7 @@ export async function GET() {
 // 테스트 중지
 export async function DELETE() {
   try {
-    const response = await fetch(K6_RUNNER_TEST_STOP_URL, {
+    const response = await fetch(config.k6RunnerTestStopUrl, {
       method: "POST",
     });
 
