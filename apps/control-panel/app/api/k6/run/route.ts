@@ -5,6 +5,7 @@ import config from "@/lib/config";
 export async function POST(request: NextRequest) {
   try {
     const {
+      scenario,
       vus,
       duration,
       iterations,
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        scenario: scenario,
         vus: vus || 10,
         duration: duration || "30s",
         iterations: iterations,

@@ -31,6 +31,11 @@ export default function TestResults({ testId, status }: TestResultsProps) {
       }, 2000);
 
       return () => clearInterval(interval);
+    } else if (status === 'idle' || status === 'stopped') {
+      // 테스트가 중지되거나 완료되면 메트릭 가져오기 중단
+      // 'idle' 상태는 테스트가 자연스럽게 종료된 경우
+      // 'stopped' 상태는 사용자가 수동으로 중지한 경우
+      return;
     }
   }, [status, testId]);
 
@@ -82,15 +87,15 @@ export default function TestResults({ testId, status }: TestResultsProps) {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Min:</span>
-                <span className="font-mono">{metrics.http_req_duration.min.toFixed(2)} ms</span>
+                <span className="font-mono text-gray-900">{metrics.http_req_duration.min.toFixed(2)} ms</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">P95:</span>
-                <span className="font-mono">{metrics.http_req_duration.p95.toFixed(2)} ms</span>
+                <span className="font-mono text-gray-900">{metrics.http_req_duration.p95.toFixed(2)} ms</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Max:</span>
-                <span className="font-mono">{metrics.http_req_duration.max.toFixed(2)} ms</span>
+                <span className="font-mono text-gray-900">{metrics.http_req_duration.max.toFixed(2)} ms</span>
               </div>
             </div>
           </div>

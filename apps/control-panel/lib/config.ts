@@ -25,24 +25,19 @@ export class Config {
     this.isDevelopment = this.environment === "development";
     this.isProduction = this.environment === "production";
 
-    // 설정 초기화
-    if (this.isDevelopment) {
-      // 개발 환경: 기본값 제공
-      // control-panel(서버) -> k6-runner: Docker 네트워크 내부 통신
-      // k6-runner -> mock-server: 외부 네트워크 통신 (EKS 고려)
-      this.k6RunnerBaseUrl =
-        process.env.K6_RUNNER_BASE_URL || "http://k6-runner:3002";
-      this.mockServerUrl =
-        process.env.MOCK_SERVER_URL || "http://host.docker.internal:3001";
-      this.k6DashboardUrl =
-        process.env.K6_DASHBOARD_URL || "http://localhost:5665";
-    } else {
-      // 프로덕션 환경: 필수 검증
-      this.validateRequiredEnvVars();
-
-      this.k6RunnerBaseUrl = process.env.K6_RUNNER_BASE_URL!;
-      this.mockServerUrl = process.env.MOCK_SERVER_URL!;
-      this.k6DashboardUrl = process.env.K6_DASHBOARD_URL!;
+    // 설정 초기화 - 프로덕션에서도 기본값 제공 (환경변수가 없을 경우)
+    // 실제 런타임에서는 .env 파일이나 vault에서 제공됨
+    this.k6RunnerBaseUrl =
+      process.env.K6_RUNNER_BASE_URL || "http://k6-runner:3002";
+    this.mockServerUrl =
+      process.env.MOCK_SERVER_URL || "http://host.docker.internal:3001";
+    this.k6DashboardUrl =
+      process.env.K6_DASHBOARD_URL || "http://localhost:5665";
+    
+    // 프로덕션 환경에서만 경고 로그 (빌드 시점에는 에러 발생시키지 않음)
+    if (this.isProduction && typeof window !== 'undefined') {
+      // 런타임에만 환경변수 체크 (클라이언트 사이드에서만)
+      this.checkRequiredEnvVars();
     }
 
     // 파생 URL 설정
@@ -54,7 +49,7 @@ export class Config {
     this.logConfiguration();
   }
 
-  private validateRequiredEnvVars(): void {
+  private checkRequiredEnvVars(): void {
     const required = [
       "K6_RUNNER_BASE_URL",
       "MOCK_SERVER_URL",
@@ -70,11 +65,11 @@ export class Config {
     }
 
     if (missing.length > 0) {
-      const errorMessage = `Missing required environment variables in ${
+      const warningMessage = `Warning: Missing environment variables in ${
         this.environment
-      }: ${missing.join(", ")}`;
-      console.error(`[Config Error] ${errorMessage}`);
-      throw new Error(errorMessage);
+      }: ${missing.join(", ")}. Using default values.`;
+      console.warn(`[Config Warning] ${warningMessage}`);
+      // 에러를 발생시키지 않고 경고만 표시
     }
   }
 

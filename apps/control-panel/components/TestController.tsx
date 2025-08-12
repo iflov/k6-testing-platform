@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+import { ScenarioId } from "@/lib/scenario";
+import configModule from "@/lib/config";
+
 interface TestControllerProps {
   onTestStart: (testId: string) => void;
   onTestStop: () => void;
@@ -9,15 +12,15 @@ interface TestControllerProps {
 }
 
 const scenarios = [
-  { id: "load", name: "Load Test", description: "Constant load over time" },
-  { id: "stress", name: "Stress Test", description: "Gradually increase load" },
-  { id: "spike", name: "Spike Test", description: "Sudden increase in load" },
-  { id: "soak", name: "Soak Test", description: "Extended duration test" },
   {
     id: "smoke",
     name: "Smoke Test",
     description: "Quick test to check if the system is working",
   },
+  { id: "load", name: "Load Test", description: "Constant load over time" },
+  { id: "stress", name: "Stress Test", description: "Gradually increase load" },
+  { id: "soak", name: "Soak Test", description: "Extended duration test" },
+  { id: "spike", name: "Spike Test", description: "Sudden increase in load" },
   {
     id: "breakpoint",
     name: "Breakpoint Test",
@@ -31,12 +34,12 @@ export default function TestController({
   testStatus,
 }: TestControllerProps) {
   const [config, setConfig] = useState({
-    scenario: "load",
+    scenario: "load" as ScenarioId,
     vus: 10,
     duration: "30s",
     iterations: 100,
     executionMode: "duration" as "duration" | "iterations" | "hybrid",
-    targetUrl: `${process.env.MOCK_SERVER_URL}`,
+    targetUrl: configModule.mockServerUrl,
   });
   const [loading, setLoading] = useState(false);
 
@@ -48,7 +51,6 @@ export default function TestController({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
       });
-      console.log("response:::", response);
       const data = await response.json();
       if (data.testId) {
         onTestStart(data.testId);
@@ -85,7 +87,9 @@ export default function TestController({
           </label>
           <select
             value={config.scenario}
-            onChange={(e) => setConfig({ ...config, scenario: e.target.value })}
+            onChange={(e) =>
+              setConfig({ ...config, scenario: e.target.value as ScenarioId })
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
             style={{
               color:

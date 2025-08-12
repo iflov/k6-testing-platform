@@ -18,16 +18,201 @@ app.use((req, res, next) => {
   next();
 });
 
-// 사용 가능한 시나리오 목록
-const availableScenarios = {
-  smoke: "k6-scripts/scenarios/smoke-test.js",
-  load: "k6-scripts/scenarios/load-test.js",
-  stress: "k6-scripts/scenarios/stress-test.js",
-  spike: "k6-scripts/scenarios/spike-test.js",
-  soak: "k6-scripts/scenarios/soak-test.js",
-  breakpoint: "k6-scripts/scenarios/breakpoint-test.js",
-  "simple-load": "k6-scripts/scenarios/simple-load-test.js",
-};
+// 사용 가능한 시나리오 목록 (이제 파일 경로 대신 타입만 정의)
+const availableScenarios = [
+  "smoke",
+  "load", 
+  "stress",
+  "spike",
+  "soak",
+  "breakpoint"
+];
+
+// Duration 문자열을 초 단위로 변환하는 함수
+function parseDuration(duration) {
+  const match = duration.match(/^(\d+)([smh])$/);
+  if (!match) return 30; // 기본값 30초
+  
+  const value = parseInt(match[1]);
+  const unit = match[2];
+  
+  switch(unit) {
+    case 's': return value;
+    case 'm': return value * 60;
+    case 'h': return value * 3600;
+    default: return 30;
+  }
+}
+
+// 초를 duration 문자열로 변환하는 함수
+function formatDuration(seconds) {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  return `${Math.floor(seconds / 3600)}h`;
+}
+
+// Executor 매핑 함수
+function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
+  // 사용자가 설정한 값 우선 적용
+  const userVus = vus || 10;
+  const userDuration = duration || "30s";
+  const userIterations = iterations || 100;
+  
+  // Duration을 초 단위로 변환
+  const totalSeconds = parseDuration(userDuration);
+  
+  // Ramp up/down 비율 (각각 15%)
+  const rampUpSeconds = Math.floor(totalSeconds * 0.15);
+  const rampDownSeconds = Math.floor(totalSeconds * 0.15);
+  const steadySeconds = totalSeconds - rampUpSeconds - rampDownSeconds;
+  
+  // 시나리오별 executor 매핑
+  const executorConfigs = {
+    smoke: {
+      // Smoke Test: 최소한의 부하로 빠른 검증 (ramp up/down 불필요)
+      scenarios: {
+        smoke_test: {
+          executor: 'constant-vus',
+          vus: userVus,
+          duration: userDuration,
+        },
+      },
+    },
+    load: {
+      // Load Test: 15% ramp up, 70% steady, 15% ramp down
+      scenarios: {
+        load_test: {
+          executor: 'ramping-vus',
+          startVUs: 0,
+          stages: [
+            { duration: formatDuration(rampUpSeconds), target: userVus }, // 15% 시간 동안 ramp up
+            { duration: formatDuration(steadySeconds), target: userVus }, // 70% 시간 동안 유지
+            { duration: formatDuration(rampDownSeconds), target: 0 }, // 15% 시간 동안 ramp down
+          ],
+        },
+      },
+    },
+    stress: {
+      // Stress Test: 단계적 증가 (총 시간을 6단계로 분할)
+      scenarios: {
+        stress_test: {
+          executor: 'ramping-vus',
+          startVUs: 0,
+          stages: [
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus }, // 10%: 1x 부하로 증가
+            { duration: formatDuration(Math.floor(totalSeconds * 0.2)), target: userVus }, // 20%: 1x 부하 유지
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 2 }, // 10%: 2x 부하로 증가
+            { duration: formatDuration(Math.floor(totalSeconds * 0.2)), target: userVus * 2 }, // 20%: 2x 부하 유지
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 3 }, // 10%: 3x 부하로 증가
+            { duration: formatDuration(Math.floor(totalSeconds * 0.2)), target: userVus * 3 }, // 20%: 3x 부하 유지
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: 0 }, // 10%: 종료
+          ],
+        },
+      },
+    },
+    soak: {
+      // Soak Test: 장시간 일정 부하 (ramp up/down 불필요)
+      scenarios: {
+        soak_test: {
+          executor: 'constant-vus',
+          vus: userVus,
+          duration: userDuration,
+        },
+      },
+    },
+    spike: {
+      // Spike Test: 급격한 부하 증가 (총 시간 비율 배분)
+      scenarios: {
+        spike_test: {
+          executor: 'ramping-vus',
+          startVUs: Math.floor(userVus * 0.1),
+          stages: [
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: Math.floor(userVus * 0.1) }, // 10%: 낮은 부하
+            { duration: formatDuration(Math.floor(totalSeconds * 0.05)), target: userVus * 2 }, // 5%: 급격히 증가
+            { duration: formatDuration(Math.floor(totalSeconds * 0.7)), target: userVus * 2 }, // 70%: 높은 부하 유지
+            { duration: formatDuration(Math.floor(totalSeconds * 0.05)), target: Math.floor(userVus * 0.1) }, // 5%: 급격히 감소
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: 0 }, // 10%: 종료
+          ],
+        },
+      },
+    },
+    breakpoint: {
+      // Breakpoint Test: 시스템 한계점 찾기 (총 시간을 8단계로 분할)
+      scenarios: {
+        breakpoint_test: {
+          executor: 'ramping-arrival-rate',
+          startRate: 10,
+          timeUnit: '1s',
+          preAllocatedVUs: userVus,
+          maxVUs: userVus * 10,
+          stages: [
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 5 }, // 10%: 첫 번째 레벨
+            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 5 }, // 15%: 유지
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 10 }, // 10%: 두 번째 레벨
+            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 10 }, // 15%: 유지
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 15 }, // 10%: 세 번째 레벨
+            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 15 }, // 15%: 유지
+            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 20 }, // 10%: 네 번째 레벨
+            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 20 }, // 15%: 유지
+          ],
+        },
+      },
+    },
+  };
+
+  // 시나리오별 executor 반환
+  if (executorConfigs[scenario]) {
+    // executionMode가 iterations인 경우 shared-iterations executor 사용
+    if (executionMode === 'iterations') {
+      return {
+        scenarios: {
+          [`${scenario}_iterations`]: {
+            executor: 'shared-iterations',
+            vus: userVus,
+            iterations: userIterations,
+            maxDuration: userDuration,
+          },
+        },
+      };
+    }
+    return executorConfigs[scenario];
+  }
+
+  // Custom 시나리오 또는 기본 설정
+  if (executionMode === 'iterations') {
+    return {
+      scenarios: {
+        custom_iterations: {
+          executor: 'shared-iterations',
+          vus: userVus,
+          iterations: userIterations,
+        },
+      },
+    };
+  } else if (executionMode === 'hybrid') {
+    return {
+      scenarios: {
+        hybrid_scenario: {
+          executor: 'shared-iterations',
+          vus: userVus,
+          iterations: userIterations,
+          maxDuration: userDuration,
+        },
+      },
+    };
+  } else {
+    // Duration mode (default)
+    return {
+      scenarios: {
+        custom_constant: {
+          executor: 'constant-vus',
+          vus: userVus,
+          duration: userDuration,
+        },
+      },
+    };
+  }
+}
 
 // 테스트 시작 API
 app.post("/api/test/start", async (req, res) => {
@@ -92,80 +277,12 @@ app.post("/api/test/start", async (req, res) => {
   let scriptPath;
 
   try {
-    // 시나리오 선택 또는 커스텀 스크립트 생성
-    if (scenario !== "custom" && availableScenarios[scenario]) {
-      // 기존 시나리오 파일을 래핑하여 사용자 옵션 적용
-      let optionsConfig;
+    // 시나리오별 executor 설정 가져오기
+    const executorConfig = getExecutorConfig(scenario, vus, duration, iterations, executionMode);
+    const optionsConfig = JSON.stringify(executorConfig, null, 2);
 
-      if (executionMode === "iterations") {
-        optionsConfig = `{
-  vus: ${vus},
-  iterations: ${iterations || 100},
-}`;
-      } else if (executionMode === "hybrid") {
-        optionsConfig = `{
-  scenarios: {
-    hybrid_scenario: {
-      executor: 'shared-iterations',
-      vus: ${vus},
-      iterations: ${iterations || 100},
-      maxDuration: '${duration}',
-    },
-  },
-}`;
-      } else {
-        // Duration mode (default)
-        optionsConfig = `{
-  vus: ${vus},
-  duration: '${duration}',
-}`;
-      }
-
-      // 기존 시나리오를 래핑하여 옵션 오버라이드
-      const wrappedScript = `
-import { default as scenarioTest } from '${availableScenarios[scenario]}';
-
-// Override options with user settings
-export const options = ${optionsConfig};
-
-export default function() {
-  // Call the original scenario test function
-  return scenarioTest();
-}
-      `;
-
-      scriptPath = `/tmp/k6-test-${testId}.js`;
-      await fs.writeFile(scriptPath, wrappedScript);
-    } else {
-      // 커스텀 K6 스크립트 생성
-      let optionsConfig;
-
-      if (executionMode === "iterations") {
-        optionsConfig = `{
-  vus: ${vus},
-  iterations: ${iterations || 100},
-}`;
-      } else if (executionMode === "hybrid") {
-        // Hybrid mode: scenarios를 사용하여 duration과 iterations를 모두 설정
-        optionsConfig = `{
-  scenarios: {
-    hybrid_scenario: {
-      executor: 'shared-iterations',
-      vus: ${vus},
-      iterations: ${iterations || 100},
-      maxDuration: '${duration}',
-    },
-  },
-}`;
-      } else {
-        // Duration mode (default)
-        optionsConfig = `{
-  vus: ${vus},
-  duration: '${duration}',
-}`;
-      }
-
-      const script = `
+    // 모든 시나리오에 대해 동일한 테스트 함수 사용
+    const script = `
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
@@ -180,12 +297,11 @@ export default function () {
   });
   sleep(1);
 }
-      `;
+    `;
 
-      // 스크립트 파일 저장
-      scriptPath = `/tmp/k6-test-${testId}.js`;
-      await fs.writeFile(scriptPath, script);
-    }
+    // 스크립트 파일 저장
+    scriptPath = `/tmp/k6-test-${testId}.js`;
+    await fs.writeFile(scriptPath, script);
 
     // K6 실행 옵션 설정
     const k6Args = ["run", "--out", `influxdb=${config.influxdbK6Url}`];
@@ -241,10 +357,7 @@ export default function () {
       iterations,
       executionMode,
       targetUrl,
-      scriptPath:
-        scenario !== "custom" && availableScenarios[scenario]
-          ? null
-          : scriptPath, // 기존 시나리오는 삭제하지 않음
+      scriptPath, // 모든 시나리오에 대해 임시 파일 사용
       scenario,
       dashboardEnabled: enableDashboard,
     };
@@ -358,15 +471,23 @@ app.post("/api/test/stop", async (req, res) => {
 // 사용 가능한 시나리오 목록 API
 app.get("/api/scenarios", (req, res) => {
   res.json({
-    scenarios: Object.keys(availableScenarios),
+    scenarios: availableScenarios,
     description: {
-      smoke: "Quick test to verify system is working",
-      load: "Standard load test with gradual ramp-up",
-      stress: "Test system under heavy load",
-      spike: "Sudden increase in traffic",
-      soak: "Extended duration test for memory leaks",
-      breakpoint: "Find system breaking point",
-      "simple-load": "Simple constant load test",
+      smoke: "Quick test to verify system is working (constant-vus executor)",
+      load: "Standard load test with gradual ramp-up (ramping-vus executor)",
+      stress: "Test system under heavy load with increasing stages (ramping-vus executor)",
+      spike: "Sudden increase in traffic (ramping-vus executor)",
+      soak: "Extended duration test for memory leaks (constant-vus executor)",
+      breakpoint: "Find system breaking point (ramping-arrival-rate executor)",
+    },
+    executors: {
+      smoke: "constant-vus",
+      load: "ramping-vus",
+      stress: "ramping-vus",
+      spike: "ramping-vus",
+      soak: "constant-vus",
+      breakpoint: "ramping-arrival-rate",
+      custom: "user-defined",
     },
   });
 });

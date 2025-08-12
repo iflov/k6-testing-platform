@@ -13,8 +13,6 @@ RUN npm ci --only=production
 
 # 소스 코드 복사
 COPY index.js ./
-# k6 스크립트 복사
-COPY k6-scripts ./k6-scripts
 
 # k6가 Web Dashboard를 위해 사용할 포트
 EXPOSE 3002 5665
