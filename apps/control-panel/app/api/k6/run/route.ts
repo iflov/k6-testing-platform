@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       iterations,
       executionMode,
       targetUrl,
-      enableDashboard = true,
+      enableDashboard = false,
     } = await request.json();
 
     console.log(
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         iterations: iterations,
         executionMode: executionMode || "duration",
         targetUrl: targetUrl || MOCK_SERVER_URL,
-        enableDashboard: enableDashboard, // 기본적으로 Dashboard 활성화
+        enableDashboard: enableDashboard, // Dashboard는 필요시에만 활성화
       }),
     });
 

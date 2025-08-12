@@ -30,6 +30,8 @@ const availableScenarios = {
 
 // 테스트 시작 API
 app.post("/api/test/start", async (req, res) => {
+  console.log("Starting test with config:", req.body);
+  
   const {
     vus = 10,
     duration = "30s",
@@ -43,13 +45,24 @@ app.post("/api/test/start", async (req, res) => {
   // 이전 테스트가 있으면 정리
   if (currentTest) {
     try {
-      currentTest.process.kill("SIGTERM");
-      // 프로세스가 종료될 때까지 잠시 대기
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Cleaning up previous test:", currentTest.testId);
+      
+      // 프로세스가 아직 실행 중인지 확인
+      if (currentTest.process && !currentTest.process.killed) {
+        currentTest.process.kill("SIGTERM");
+        
+        // 프로세스가 종료될 때까지 대기 (최대 3초)
+        let waitCount = 0;
+        while (!currentTest.process.killed && waitCount < 30) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          waitCount++;
+        }
 
-      // 강제 종료가 필요한 경우
-      if (currentTest && currentTest.process) {
-        currentTest.process.kill("SIGKILL");
+        // 여전히 살아있으면 강제 종료
+        if (!currentTest.process.killed) {
+          console.log("Force killing k6 process");
+          currentTest.process.kill("SIGKILL");
+        }
       }
 
       // 임시 파일 삭제
@@ -61,9 +74,16 @@ app.post("/api/test/start", async (req, res) => {
         }
       }
 
+      // Dashboard가 활성화되어 있었다면 포트가 해제될 때까지 추가 대기
+      if (currentTest.dashboardEnabled) {
+        console.log("Waiting for dashboard port to be released...");
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
       currentTest = null;
     } catch (error) {
       console.error("Error cleaning up previous test:", error);
+      currentTest = null;
     }
   }
 
@@ -152,7 +172,9 @@ export const options = ${optionsConfig};
 
 export default function () {
   const res = http.get('${
-    targetUrl || process.env.MOCK_SERVER_URL || "http://mock-server:3001"
+    targetUrl ||
+    process.env.MOCK_SERVER_URL ||
+    "http://host.docker.internal:3001"
   }');
   check(res, {
     'status is 200': (r) => r.status === 200,
@@ -174,24 +196,50 @@ export default function () {
     const k6Env = {
       ...process.env,
       TARGET_URL:
-        targetUrl || process.env.MOCK_SERVER_URL || "http://mock-server:3001",
+        targetUrl ||
+        process.env.MOCK_SERVER_URL ||
+        "http://host.docker.internal:3001",
     };
 
     // Dashboard가 활성화된 경우에만 추가
     if (enableDashboard) {
+      // 포트를 동적으로 할당하거나 고정 포트 사용
+      const dashboardPort = process.env.K6_DASHBOARD_PORT || "5665";
+      
       // web-dashboard output 설정을 파라미터로 전달
-      k6Args.push("--out", "web-dashboard=host=0.0.0.0&port=5665");
+      k6Args.push("--out", `web-dashboard=host=0.0.0.0&port=${dashboardPort}`);
 
       // 환경변수도 설정 (백업)
       k6Env.K6_WEB_DASHBOARD = "true";
       k6Env.K6_WEB_DASHBOARD_HOST = "0.0.0.0";
-      k6Env.K6_WEB_DASHBOARD_PORT = "5665";
+      k6Env.K6_WEB_DASHBOARD_PORT = dashboardPort;
+      
+      console.log(`Dashboard will be available on port ${dashboardPort}`);
     }
 
     k6Args.push(scriptPath);
 
+    console.log("Executing k6 with args:", k6Args);
+    console.log("K6 environment TARGET_URL:", k6Env.TARGET_URL);
+    console.log("Script path:", scriptPath);
+
     // k6 실행
     const k6Process = spawn("k6", k6Args, { env: k6Env });
+
+    // k6 stdout/stderr 로깅
+    k6Process.stdout.on('data', (data) => {
+      console.log(`k6 stdout: ${data}`);
+    });
+
+    k6Process.stderr.on('data', (data) => {
+      const errorMessage = data.toString();
+      console.error(`k6 stderr: ${errorMessage}`);
+      
+      // Dashboard 포트 충돌 감지
+      if (errorMessage.includes('bind: address already in use') && errorMessage.includes('5665')) {
+        console.warn('Dashboard port 5665 is already in use. Test will continue without dashboard.');
+      }
+    });
 
     currentTest = {
       process: k6Process,
@@ -211,11 +259,14 @@ export default function () {
     };
 
     // 프로세스 종료 처리
-    k6Process.on("exit", async (code) => {
+    k6Process.on("exit", async (code, signal) => {
+      console.log(`k6 process exited with code ${code} and signal ${signal}`);
+      
       // 임시 파일 삭제 (커스텀 스크립트만)
       if (currentTest && currentTest.scriptPath) {
         try {
           await fs.unlink(currentTest.scriptPath);
+          console.log("Temp script deleted:", currentTest.scriptPath);
         } catch (err) {
           console.error("Failed to delete temp script:", err);
         }
@@ -223,7 +274,8 @@ export default function () {
 
       // Dashboard가 사용된 경우 포트 해제 대기
       if (currentTest && currentTest.dashboardEnabled) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log("Dashboard was enabled, waiting for port release...");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
       currentTest = null;
@@ -260,14 +312,43 @@ app.post("/api/test/stop", async (req, res) => {
   }
 
   try {
-    currentTest.process.kill("SIGTERM");
+    console.log("Stopping test:", currentTest.testId);
+    const dashboardEnabled = currentTest.dashboardEnabled;
+    
+    // 프로세스가 아직 실행 중인지 확인
+    if (currentTest.process && !currentTest.process.killed) {
+      currentTest.process.kill("SIGTERM");
 
-    // 강제 종료 타임아웃
-    setTimeout(() => {
-      if (currentTest && currentTest.process) {
+      // 프로세스가 종료될 때까지 대기 (최대 3초)
+      let waitCount = 0;
+      while (!currentTest.process.killed && waitCount < 30) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        waitCount++;
+      }
+
+      // 여전히 살아있으면 강제 종료
+      if (!currentTest.process.killed) {
+        console.log("Force killing k6 process");
         currentTest.process.kill("SIGKILL");
       }
-    }, 5000);
+    }
+
+    // 임시 파일 삭제
+    if (currentTest.scriptPath) {
+      try {
+        await fs.unlink(currentTest.scriptPath);
+      } catch (err) {
+        console.error("Failed to delete temp script:", err);
+      }
+    }
+
+    // Dashboard가 활성화되어 있었다면 포트가 해제될 때까지 추가 대기
+    if (dashboardEnabled) {
+      console.log("Waiting for dashboard port to be released...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    currentTest = null;
 
     res.json({
       status: "stopped",
@@ -275,6 +356,7 @@ app.post("/api/test/stop", async (req, res) => {
     });
   } catch (error) {
     console.error("Failed to stop test:", error);
+    currentTest = null;
     res.status(500).json({
       error: "Failed to stop test",
       details: error.message,

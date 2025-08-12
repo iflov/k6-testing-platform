@@ -36,7 +36,7 @@ export default function TestController({
     duration: "30s",
     iterations: 100,
     executionMode: "duration" as "duration" | "iterations" | "hybrid",
-    targetUrl: "http://mock-server:3001",
+    targetUrl: "http://host.docker.internal:3001",
   });
   const [loading, setLoading] = useState(false);
 
@@ -48,6 +48,7 @@ export default function TestController({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
       });
+      console.log("response:::", response);
       const data = await response.json();
       if (data.testId) {
         onTestStart(data.testId);
