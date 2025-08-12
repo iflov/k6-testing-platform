@@ -11,8 +11,10 @@ export default function Home() {
 
   // k6-runner의 실제 상태를 폴링
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
     if (testStatus === 'running') {
-      const interval = setInterval(async () => {
+      interval = setInterval(async () => {
         try {
           const response = await fetch('/api/k6/status');
           const data = await response.json();
@@ -22,15 +24,19 @@ export default function Home() {
             // 테스트가 자동으로 종료된 경우 idle 상태로 변경
             setTestStatus('idle');
             setTestId(null); // testId도 초기화
-            clearInterval(interval);
           }
         } catch (error) {
           console.error('Failed to check test status:', error);
         }
       }, 2000); // 2초마다 상태 확인 (metrics와 동일한 간격)
-
-      return () => clearInterval(interval);
     }
+
+    // cleanup 함수 - testStatus가 변경되거나 컴포넌트가 unmount될 때 실행
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [testStatus]);
 
   return (

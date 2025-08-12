@@ -19,8 +19,10 @@ export default function TestResults({ testId, status }: TestResultsProps) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
 
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
     if (status === 'running' && testId) {
-      const interval = setInterval(async () => {
+      interval = setInterval(async () => {
         try {
           const response = await fetch(`/api/k6/metrics?testId=${testId}`);
           const data = await response.json();
@@ -29,14 +31,14 @@ export default function TestResults({ testId, status }: TestResultsProps) {
           console.error('Failed to fetch metrics:', error);
         }
       }, 2000);
-
-      return () => clearInterval(interval);
-    } else if (status === 'idle' || status === 'stopped') {
-      // 테스트가 중지되거나 완료되면 메트릭 가져오기 중단
-      // 'idle' 상태는 테스트가 자연스럽게 종료된 경우
-      // 'stopped' 상태는 사용자가 수동으로 중지한 경우
-      return;
     }
+    
+    // cleanup 함수 - status나 testId가 변경되거나 컴포넌트가 unmount될 때 실행
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [status, testId]);
 
   if (status === 'idle') {

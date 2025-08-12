@@ -224,8 +224,11 @@ app.post("/api/test/start", async (req, res) => {
     iterations,
     executionMode = "duration",
     targetUrl,
+    urlPath = "",
     enableDashboard = false,
     scenario = "custom",
+    httpMethod = "GET",
+    requestBody = null,
   } = req.body;
 
   // 이전 테스트가 있으면 정리
@@ -281,6 +284,26 @@ app.post("/api/test/start", async (req, res) => {
     const executorConfig = getExecutorConfig(scenario, vus, duration, iterations, executionMode);
     const optionsConfig = JSON.stringify(executorConfig, null, 2);
 
+    // 완전한 URL 구성 (baseUrl + path)
+    const baseUrl = targetUrl || config.mockServerUrl;
+    const fullUrl = urlPath ? `${baseUrl}${urlPath}` : baseUrl;
+
+    // HTTP 메서드에 따른 스크립트 생성
+    let httpRequest;
+    if (httpMethod === "POST") {
+      // POST 요청의 경우
+      const bodyData = requestBody ? requestBody : '{"message": "test"}';
+      httpRequest = `
+  const params = {
+    headers: { 'Content-Type': 'application/json' },
+  };
+  const res = http.post('${fullUrl}', '${bodyData.replace(/'/g, "\\'")}', params);`;
+    } else {
+      // GET 요청의 경우 (기본값)
+      httpRequest = `
+  const res = http.get('${fullUrl}');`;
+    }
+
     // 모든 시나리오에 대해 동일한 테스트 함수 사용
     const script = `
 import http from 'k6/http';
@@ -288,10 +311,7 @@ import { check, sleep } from 'k6';
 
 export const options = ${optionsConfig};
 
-export default function () {
-  const res = http.get('${
-    targetUrl || config.mockServerUrl
-  }');
+export default function () {${httpRequest}
   check(res, {
     'status is 200': (r) => r.status === 200,
   });

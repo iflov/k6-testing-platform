@@ -28,6 +28,52 @@ const scenarios = [
   },
 ];
 
+// Mock 서버의 사용 가능한 엔드포인트 목록
+const availableEndpoints = [
+  { method: "GET", path: "/", description: "Root endpoint" },
+  { method: "GET", path: "/health", description: "Health check" },
+  { method: "GET", path: "/success", description: "Success response" },
+  { method: "POST", path: "/success", description: "Success with body" },
+  { method: "GET", path: "/performance/slow", description: "Slow response (2s delay)" },
+  { method: "GET", path: "/performance/timeout", description: "Timeout simulation" },
+  { method: "GET", path: "/performance/variable-latency", description: "Random latency" },
+  { method: "GET", path: "/performance/concurrency-issue", description: "Concurrency test" },
+];
+
+// 시나리오별 Execution Mode 호환성 정의
+const scenarioExecutionModes = {
+  smoke: {
+    duration: { enabled: true, tooltip: "" },
+    iterations: { enabled: true, tooltip: "" },
+    hybrid: { enabled: true, tooltip: "" },
+  },
+  load: {
+    duration: { enabled: true, tooltip: "" },
+    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without ramping stages" },
+    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
+  },
+  stress: {
+    duration: { enabled: true, tooltip: "" },
+    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without gradual increase" },
+    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
+  },
+  soak: {
+    duration: { enabled: true, tooltip: "" },
+    iterations: { enabled: true, tooltip: "Runs specified iterations for endurance testing" },
+    hybrid: { enabled: true, tooltip: "Runs iterations with maximum duration limit" },
+  },
+  spike: {
+    duration: { enabled: true, tooltip: "" },
+    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without spike pattern" },
+    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
+  },
+  breakpoint: {
+    duration: { enabled: true, tooltip: "" },
+    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without arrival rate ramping" },
+    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
+  },
+};
+
 export default function TestController({
   onTestStart,
   onTestStop,
@@ -40,6 +86,10 @@ export default function TestController({
     iterations: 100,
     executionMode: "duration" as "duration" | "iterations" | "hybrid",
     targetUrl: configModule.mockServerUrl,
+    selectedEndpoint: "GET /success",
+    urlPath: "/success",
+    httpMethod: "GET" as "GET" | "POST",
+    requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
   });
   const [loading, setLoading] = useState(false);
 
@@ -87,9 +137,22 @@ export default function TestController({
           </label>
           <select
             value={config.scenario}
-            onChange={(e) =>
-              setConfig({ ...config, scenario: e.target.value as ScenarioId })
-            }
+            onChange={(e) => {
+              const newScenario = e.target.value as ScenarioId;
+              const modes = scenarioExecutionModes[newScenario];
+              
+              // 현재 execution mode가 새 시나리오에서 사용 불가능하면 duration으로 변경
+              let newExecutionMode = config.executionMode;
+              if (!modes[config.executionMode].enabled) {
+                newExecutionMode = "duration"; // duration은 모든 시나리오에서 사용 가능
+              }
+              
+              setConfig({ 
+                ...config, 
+                scenario: newScenario,
+                executionMode: newExecutionMode
+              });
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
             style={{
               color:
@@ -152,46 +215,86 @@ export default function TestController({
             Execution Mode
           </label>
           <div className="flex gap-2 mb-3">
-            <button
-              type="button"
-              onClick={() =>
-                setConfig({ ...config, executionMode: "duration" })
-              }
-              className={`flex-1 px-3 py-2 rounded-md border transition-colors ${
-                config.executionMode === "duration"
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-              disabled={testStatus === "running"}
-            >
-              Duration
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setConfig({ ...config, executionMode: "iterations" })
-              }
-              className={`flex-1 px-3 py-2 rounded-md border transition-colors ${
-                config.executionMode === "iterations"
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-              disabled={testStatus === "running"}
-            >
-              Iterations
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfig({ ...config, executionMode: "hybrid" })}
-              className={`flex-1 px-3 py-2 rounded-md border transition-colors ${
-                config.executionMode === "hybrid"
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-              disabled={testStatus === "running"}
-            >
-              Hybrid
-            </button>
+            <div className="relative flex-1">
+              <button
+                type="button"
+                onClick={() =>
+                  scenarioExecutionModes[config.scenario].duration.enabled &&
+                  setConfig({ ...config, executionMode: "duration" })
+                }
+                className={`w-full px-3 py-2 rounded-md border transition-colors ${
+                  config.executionMode === "duration"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : scenarioExecutionModes[config.scenario].duration.enabled
+                    ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={testStatus === "running" || !scenarioExecutionModes[config.scenario].duration.enabled}
+                title={scenarioExecutionModes[config.scenario].duration.tooltip}
+              >
+                Duration
+              </button>
+            </div>
+            <div className="relative flex-1 group">
+              <button
+                type="button"
+                onClick={() =>
+                  scenarioExecutionModes[config.scenario].iterations.enabled &&
+                  setConfig({ ...config, executionMode: "iterations" })
+                }
+                className={`w-full px-3 py-2 rounded-md border transition-colors ${
+                  config.executionMode === "iterations"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : scenarioExecutionModes[config.scenario].iterations.enabled
+                    ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={testStatus === "running" || !scenarioExecutionModes[config.scenario].iterations.enabled}
+                title={scenarioExecutionModes[config.scenario].iterations.tooltip}
+              >
+                Iterations
+              </button>
+              {!scenarioExecutionModes[config.scenario].iterations.enabled && scenarioExecutionModes[config.scenario].iterations.tooltip && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                  <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
+                    {scenarioExecutionModes[config.scenario].iterations.tooltip}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                      <div className="border-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative flex-1 group">
+              <button
+                type="button"
+                onClick={() => 
+                  scenarioExecutionModes[config.scenario].hybrid.enabled &&
+                  setConfig({ ...config, executionMode: "hybrid" })
+                }
+                className={`w-full px-3 py-2 rounded-md border transition-colors ${
+                  config.executionMode === "hybrid"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : scenarioExecutionModes[config.scenario].hybrid.enabled
+                    ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={testStatus === "running" || !scenarioExecutionModes[config.scenario].hybrid.enabled}
+                title={scenarioExecutionModes[config.scenario].hybrid.tooltip}
+              >
+                Hybrid
+              </button>
+              {!scenarioExecutionModes[config.scenario].hybrid.enabled && scenarioExecutionModes[config.scenario].hybrid.tooltip && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                  <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
+                    {scenarioExecutionModes[config.scenario].hybrid.tooltip}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                      <div className="border-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -324,14 +427,40 @@ export default function TestController({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Target URL
+            Target Server (Mock Server)
           </label>
           <input
             type="text"
             value={config.targetUrl}
-            onChange={(e) =>
-              setConfig({ ...config, targetUrl: e.target.value })
-            }
+            readOnly
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
+            style={{
+              WebkitTextFillColor: "rgb(107, 114, 128)",
+            }}
+            title="Mock server URL is fixed for testing endpoints"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Endpoint
+          </label>
+          <select
+            value={config.selectedEndpoint}
+            onChange={(e) => {
+              const selectedValue = e.target.value;
+              const endpoint = availableEndpoints.find(
+                ep => `${ep.method} ${ep.path}` === selectedValue
+              );
+              if (endpoint) {
+                setConfig({
+                  ...config,
+                  selectedEndpoint: selectedValue,
+                  httpMethod: endpoint.method as "GET" | "POST",
+                  urlPath: endpoint.path,
+                });
+              }
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
             style={{
               color:
@@ -345,8 +474,50 @@ export default function TestController({
               opacity: 1,
             }}
             disabled={testStatus === "running"}
-          />
+          >
+            {availableEndpoints.map((endpoint) => (
+              <option
+                key={`${endpoint.method}-${endpoint.path}`}
+                value={`${endpoint.method} ${endpoint.path}`}
+                style={{
+                  color: "rgb(0, 0, 0)",
+                  WebkitTextFillColor: "rgb(0, 0, 0)",
+                }}
+              >
+                ({endpoint.method}) {endpoint.path} - {endpoint.description}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {config.httpMethod === "POST" && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Request Body (JSON)
+            </label>
+            <textarea
+              value={config.requestBody}
+              onChange={(e) =>
+                setConfig({ ...config, requestBody: e.target.value })
+              }
+              rows={5}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 font-mono text-sm"
+              style={{
+                color:
+                  testStatus === "running"
+                    ? "rgb(156, 163, 175)"
+                    : "rgb(0, 0, 0)",
+                WebkitTextFillColor:
+                  testStatus === "running"
+                    ? "rgb(156, 163, 175)"
+                    : "rgb(0, 0, 0)",
+                opacity: 1,
+              }}
+              disabled={testStatus === "running"}
+              placeholder='{"key": "value"}'
+            />
+          </div>
+        )}
 
         <div className="flex gap-2 pt-4">
           {testStatus !== "running" ? (
