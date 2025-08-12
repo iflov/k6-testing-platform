@@ -62,8 +62,10 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
   const totalSeconds = parseDuration(userDuration);
   
   // Ramp up/down 비율 (각각 15%)
-  const rampUpSeconds = Math.floor(totalSeconds * 0.15);
-  const rampDownSeconds = Math.floor(totalSeconds * 0.15);
+  // 최소 1초 보장 (너무 짧은 duration에서 0초가 되는 것 방지)
+  // totalSeconds가 10초 미만이면 최소 1초, 그 이상이면 15% 적용
+  const rampUpSeconds = totalSeconds < 10 ? Math.max(1, Math.floor(totalSeconds * 0.15)) : Math.floor(totalSeconds * 0.15);
+  const rampDownSeconds = totalSeconds < 10 ? Math.max(1, Math.floor(totalSeconds * 0.15)) : Math.floor(totalSeconds * 0.15);
   const steadySeconds = totalSeconds - rampUpSeconds - rampDownSeconds;
   
   // 시나리오별 executor 매핑
@@ -83,7 +85,7 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
       scenarios: {
         load_test: {
           executor: 'ramping-vus',
-          startVUs: 0,
+          startVUs: 1,
           stages: [
             { duration: formatDuration(rampUpSeconds), target: userVus }, // 15% 시간 동안 ramp up
             { duration: formatDuration(steadySeconds), target: userVus }, // 70% 시간 동안 유지
@@ -97,7 +99,7 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
       scenarios: {
         stress_test: {
           executor: 'ramping-vus',
-          startVUs: 0,
+          startVUs: 1,
           stages: [
             { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus }, // 10%: 1x 부하로 증가
             { duration: formatDuration(Math.floor(totalSeconds * 0.2)), target: userVus }, // 20%: 1x 부하 유지
@@ -231,49 +233,15 @@ app.post("/api/test/start", async (req, res) => {
     requestBody = null,
   } = req.body;
 
-  // 이전 테스트가 있으면 정리
+  // 이전 테스트가 있으면 에러 반환 (동시에 여러 테스트 실행 방지)
   if (currentTest) {
-    try {
-      console.log("Cleaning up previous test:", currentTest.testId);
-      
-      // 프로세스가 아직 실행 중인지 확인
-      if (currentTest.process && !currentTest.process.killed) {
-        currentTest.process.kill("SIGTERM");
-        
-        // 프로세스가 종료될 때까지 대기 (최대 3초)
-        let waitCount = 0;
-        while (!currentTest.process.killed && waitCount < 30) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          waitCount++;
-        }
-
-        // 여전히 살아있으면 강제 종료
-        if (!currentTest.process.killed) {
-          console.log("Force killing k6 process");
-          currentTest.process.kill("SIGKILL");
-        }
-      }
-
-      // 임시 파일 삭제
-      if (currentTest.scriptPath) {
-        try {
-          await fs.unlink(currentTest.scriptPath);
-        } catch (err) {
-          console.error("Failed to delete temp script:", err);
-        }
-      }
-
-      // Dashboard가 활성화되어 있었다면 포트가 해제될 때까지 추가 대기
-      if (currentTest.dashboardEnabled) {
-        console.log("Waiting for dashboard port to be released...");
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-
-      currentTest = null;
-    } catch (error) {
-      console.error("Error cleaning up previous test:", error);
-      currentTest = null;
-    }
+    console.log("Test already running:", currentTest.testId);
+    return res.status(400).json({
+      error: "Another test is already running",
+      message: "Please stop the current test before starting a new one",
+      currentTestId: currentTest.testId,
+      startTime: currentTest.startTime,
+    });
   }
 
   const testId = uuidv4();
@@ -381,28 +349,68 @@ export default function () {${httpRequest}
       scenario,
       dashboardEnabled: enableDashboard,
     };
+    
+    // duration을 기반으로 최대 실행 시간 설정 (duration + 30초 여유)
+    const durationInSeconds = parseDuration(duration);
+    const maxExecutionTime = (durationInSeconds + 30) * 1000; // 밀리초로 변환
+    
+    // 타임아웃 설정: 테스트가 예상 시간보다 오래 실행되면 강제 종료
+    const timeoutId = setTimeout(() => {
+      if (currentTest && currentTest.process === k6Process && !k6Process.killed) {
+        console.warn(`Test ${testId} exceeded maximum execution time (${maxExecutionTime/1000}s), forcing termination`);
+        k6Process.kill("SIGTERM");
+        
+        // 5초 후에도 종료되지 않으면 SIGKILL
+        setTimeout(() => {
+          if (!k6Process.killed) {
+            console.error(`Test ${testId} not responding to SIGTERM, forcing SIGKILL`);
+            k6Process.kill("SIGKILL");
+          }
+        }, 5000);
+      }
+    }, maxExecutionTime);
+    
+    // 프로세스가 정상 종료되면 타임아웃 취소
+    currentTest.timeoutId = timeoutId;
 
     // 프로세스 종료 처리
     k6Process.on("exit", async (code, signal) => {
       console.log(`k6 process exited with code ${code} and signal ${signal}`);
       
-      // 임시 파일 삭제 (커스텀 스크립트만)
-      if (currentTest && currentTest.scriptPath) {
-        try {
-          await fs.unlink(currentTest.scriptPath);
-          console.log("Temp script deleted:", currentTest.scriptPath);
-        } catch (err) {
-          console.error("Failed to delete temp script:", err);
+      // 타임아웃 취소
+      if (currentTest && currentTest.timeoutId) {
+        clearTimeout(currentTest.timeoutId);
+      }
+      
+      // 약간의 지연을 추가하여 k6가 완전히 종료되도록 보장
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      // currentTest가 현재 프로세스와 일치하는 경우에만 정리
+      // (stop API에서 이미 정리된 경우 방지)
+      if (currentTest && currentTest.process === k6Process) {
+        // 임시 파일 삭제 (아직 존재하는 경우에만)
+        if (currentTest.scriptPath) {
+          try {
+            // 파일이 존재하는지 먼저 확인
+            await fs.access(currentTest.scriptPath);
+            await fs.unlink(currentTest.scriptPath);
+            console.log("Temp script deleted:", currentTest.scriptPath);
+          } catch (err) {
+            // 파일이 이미 삭제되었거나 접근할 수 없는 경우는 무시
+            if (err.code !== 'ENOENT') {
+              console.error("Failed to delete temp script:", err);
+            }
+          }
         }
-      }
 
-      // Dashboard가 사용된 경우 포트 해제 대기
-      if (currentTest && currentTest.dashboardEnabled) {
-        console.log("Dashboard was enabled, waiting for port release...");
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
+        // Dashboard가 사용된 경우 포트 해제 대기
+        if (currentTest.dashboardEnabled) {
+          console.log("Dashboard was enabled, waiting for port release...");
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
 
-      currentTest = null;
+        currentTest = null;
+      }
     });
 
     const response = {
@@ -439,6 +447,11 @@ app.post("/api/test/stop", async (req, res) => {
     console.log("Stopping test:", currentTest.testId);
     const dashboardEnabled = currentTest.dashboardEnabled;
     
+    // 타임아웃 취소
+    if (currentTest.timeoutId) {
+      clearTimeout(currentTest.timeoutId);
+    }
+    
     // 프로세스가 아직 실행 중인지 확인
     if (currentTest.process && !currentTest.process.killed) {
       currentTest.process.kill("SIGTERM");
@@ -457,12 +470,18 @@ app.post("/api/test/stop", async (req, res) => {
       }
     }
 
-    // 임시 파일 삭제
+    // 임시 파일 삭제 (파일이 존재하는 경우에만)
     if (currentTest.scriptPath) {
       try {
+        // 파일이 존재하는지 먼저 확인
+        await fs.access(currentTest.scriptPath);
         await fs.unlink(currentTest.scriptPath);
+        console.log("Temp script deleted by stop API:", currentTest.scriptPath);
       } catch (err) {
-        console.error("Failed to delete temp script:", err);
+        // 파일이 이미 삭제되었거나 접근할 수 없는 경우는 무시
+        if (err.code !== 'ENOENT') {
+          console.error("Failed to delete temp script:", err);
+        }
       }
     }
 

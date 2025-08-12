@@ -1,23 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import config from '@/lib/config';
 
 export async function POST(request: NextRequest) {
   try {
-    // Stop all running K6 containers
-    const command = 'docker ps -q --filter "ancestor=grafana/k6:latest" | xargs -r docker stop';
-    
-    await execAsync(command);
+    // k6-runner 서비스의 stop API 호출
+    const response = await fetch(config.k6RunnerTestStopUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return NextResponse.json(
+        { 
+          error: error.error || 'Failed to stop test',
+          message: error.message || 'Failed to stop test',
+          details: error 
+        },
+        { status: response.status }
+      );
+    }
+
+    const result = await response.json();
 
     return NextResponse.json({
-      message: 'All tests stopped successfully',
+      message: result.message || 'Test stopped successfully',
+      status: result.status || 'stopped',
     });
   } catch (error) {
-    console.error('Failed to stop tests:', error);
+    console.error('Failed to stop test:', error);
     return NextResponse.json(
-      { error: 'Failed to stop tests', details: error },
+      { error: 'Failed to stop test', details: error },
       { status: 500 }
     );
   }

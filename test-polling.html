@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Polling Monitor</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        #log { background: #f0f0f0; padding: 10px; height: 400px; overflow-y: auto; }
+        .log-entry { margin: 2px 0; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>K6 Test Polling Monitor</h1>
+    <div>
+        <button onclick="startTest()">Start Test</button>
+        <button onclick="stopPolling()">Stop Polling</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    <div id="status">Status: Idle</div>
+    <div id="log"></div>
+
+    <script>
+        let pollingInterval = null;
+        let testId = null;
+        let isPolling = false;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status').textContent = `Status: ${text}`;
+        }
+
+        async function startTest() {
+            log('Starting test...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/k6/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scenario: 'smoke',
+                        vus: 3,
+                        duration: '15s',
+                        executionMode: 'duration',
+                        targetUrl: 'http://mock-server:3001',
+                        urlPath: '/success',
+                        httpMethod: 'GET'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.testId) {
+                    testId = data.testId;
+                    log(`Test started successfully with ID: ${testId}`, 'success');
+                    updateStatus('Running');
+                    startPolling();
+                } else {
+                    log(`Failed to start test: ${data.error || data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`Error starting test: ${error.message}`, 'error');
+            }
+        }
+
+        function startPolling() {
+            if (isPolling) {
+                log('Already polling', 'info');
+                return;
+            }
+            
+            isPolling = true;
+            log('Starting status polling...', 'info');
+            
+            // Check immediately
+            checkStatus();
+            
+            // Then check every 2 seconds
+            pollingInterval = setInterval(checkStatus, 2000);
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('http://localhost:3000/api/k6/status');
+                const data = await response.json();
+                
+                log(`Status check: running=${data.running}, testId=${data.testId}`, 'info');
+                
+                if (!data.running) {
+                    log('Test completed, stopping polling', 'success');
+                    stopPolling();
+                    updateStatus('Idle');
+                    testId = null;
+                }
+            } catch (error) {
+                log(`Error checking status: ${error.message}`, 'error');
+            }
+        }
+
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                isPolling = false;
+                log('Polling stopped', 'info');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Check initial status on load
+        window.addEventListener('load', async () => {
+            log('Page loaded, checking initial status...', 'info');
+            await checkStatus();
+        });
+    </script>
+</body>
+</html>

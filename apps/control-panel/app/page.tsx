@@ -6,35 +6,91 @@ import TestStatus from '@/components/TestStatus';
 import TestResults from '@/components/TestResults';
 
 export default function Home() {
-  const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'stopped'>('idle');
+  const [testStatus, setTestStatus] = useState<'idle' | 'running'>('idle');
   const [testId, setTestId] = useState<string | null>(null);
+
+  // 컴포넌트 마운트 시 실제 상태 확인
+  useEffect(() => {
+    const checkInitialStatus = async () => {
+      try {
+        const response = await fetch('/api/k6/status');
+        const data = await response.json();
+        console.log('Initial status check on mount:', data);
+        
+        if (data.running && data.testId) {
+          console.log('Found running test on mount, setting status to running');
+          setTestStatus('running');
+          setTestId(data.testId);
+        } else {
+          // 실행 중인 테스트가 없으면 확실히 idle 상태로 설정
+          setTestStatus('idle');
+          setTestId(null);
+        }
+      } catch (error) {
+        console.error('Failed to check initial status:', error);
+      }
+    };
+    
+    checkInitialStatus();
+  }, []); // 빈 배열로 마운트 시 한 번만 실행
 
   // k6-runner의 실제 상태를 폴링
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let intervalId: NodeJS.Timeout | null = null;
+    let errorCount = 0;
     
     if (testStatus === 'running') {
-      interval = setInterval(async () => {
+      console.log('Starting status polling for running test');
+      
+      const checkStatus = async () => {
         try {
           const response = await fetch('/api/k6/status');
           const data = await response.json();
           
+          console.log('Status check result:', data);
+          
+          // 성공하면 에러 카운트 리셋
+          errorCount = 0;
+          
           // 테스트가 더 이상 실행 중이지 않으면
           if (!data.running) {
             // 테스트가 자동으로 종료된 경우 idle 상태로 변경
+            console.log('Test completed, stopping polling and setting status to idle');
             setTestStatus('idle');
             setTestId(null); // testId도 초기화
+            // interval은 testStatus가 idle로 변경되면서 useEffect cleanup에서 자동으로 정리됨
+            return;
           }
         } catch (error) {
           console.error('Failed to check test status:', error);
+          errorCount++;
+          
+          // 연속 에러가 10번 이상 발생하면 폴링 중지
+          if (errorCount >= 10) {
+            console.error('Too many consecutive errors, stopping status polling');
+            setTestStatus('idle');
+            setTestId(null);
+            alert('Lost connection to test runner. Please check the status manually.');
+            return;
+          }
         }
-      }, 2000); // 2초마다 상태 확인 (metrics와 동일한 간격)
+      };
+      
+      // 첫 체크를 즉시 실행
+      checkStatus();
+      
+      // 주기적 체크 설정
+      intervalId = setInterval(checkStatus, 2000); // 2초마다 상태 확인
+      console.log('Interval created:', intervalId);
+    } else {
+      console.log('Test status is not running:', testStatus);
     }
 
     // cleanup 함수 - testStatus가 변경되거나 컴포넌트가 unmount될 때 실행
     return () => {
-      if (interval) {
-        clearInterval(interval);
+      if (intervalId) {
+        clearInterval(intervalId);
+        console.log('Cleaning up status polling interval from useEffect cleanup');
       }
     };
   }, [testStatus]);

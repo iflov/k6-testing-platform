@@ -8,7 +8,7 @@ import configModule from "@/lib/config";
 interface TestControllerProps {
   onTestStart: (testId: string) => void;
   onTestStop: () => void;
-  testStatus: "idle" | "running" | "stopped";
+  testStatus: "idle" | "running";
 }
 
 const scenarios = [
@@ -102,11 +102,23 @@ export default function TestController({
         body: JSON.stringify(config),
       });
       const data = await response.json();
-      if (data.testId) {
-        onTestStart(data.testId);
+      
+      if (response.ok) {
+        // 성공 응답
+        if (data.testId) {
+          onTestStart(data.testId);
+        } else {
+          // 성공했지만 testId가 없는 경우 (이상한 경우)
+          console.error("Test started but no testId received:", data);
+        }
+      } else {
+        // 실패 응답 (4xx, 5xx)
+        console.error("Failed to start test:", data.error, data.message);
+        alert(data.message || "Failed to start test. Please try again.");
       }
     } catch (error) {
       console.error("Failed to start test:", error);
+      alert("Failed to start test. Please check the connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -115,10 +127,21 @@ export default function TestController({
   const handleStop = async () => {
     setLoading(true);
     try {
-      await fetch("/api/k6/stop", { method: "POST" });
-      onTestStop();
+      const response = await fetch("/api/k6/stop", { method: "POST" });
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log("Test stopped successfully:", data);
+        onTestStop();
+      } else {
+        console.error("Failed to stop test:", data.error, data.message);
+        // 그래도 UI 상태는 업데이트 (백엔드와 동기화)
+        onTestStop();
+      }
     } catch (error) {
       console.error("Failed to stop test:", error);
+      // 에러가 발생해도 UI 상태는 업데이트
+      onTestStop();
     } finally {
       setLoading(false);
     }

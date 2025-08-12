@@ -11,6 +11,9 @@ export async function POST(request: NextRequest) {
       iterations,
       executionMode,
       targetUrl,
+      urlPath,
+      httpMethod,
+      requestBody,
       enableDashboard = false,
     } = await request.json();
 
@@ -27,6 +30,9 @@ export async function POST(request: NextRequest) {
         iterations: iterations,
         executionMode: executionMode || "duration",
         targetUrl: targetUrl || config.mockServerUrl,
+        urlPath: urlPath,
+        httpMethod: httpMethod || "GET",
+        requestBody: requestBody,
         enableDashboard: enableDashboard, // Dashboard는 필요시에만 활성화
       }),
     });
@@ -34,7 +40,11 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const error = await response.json();
       return NextResponse.json(
-        { error: error.error || "Failed to start test" },
+        { 
+          error: error.error || "Failed to start test",
+          message: error.message || "Failed to start test",
+          details: error 
+        },
         { status: response.status }
       );
     }
