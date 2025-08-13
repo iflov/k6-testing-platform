@@ -10,6 +10,7 @@ K6 Testing Platform은 마이크로서비스 아키텍처 기반의 종합적인
 ### 주요 특징
 
 - **통합 웹 대시보드**: Next.js 기반 실시간 테스트 제어 및 모니터링
+- **중앙 집중식 시나리오 관리**: 단일 소스로부터 모든 시나리오 설정 관리
 - **다양한 테스트 시나리오**: Smoke, Load, Stress, Spike, Soak 등 7가지 내장 시나리오
 - **실시간 메트릭 시각화**: K6 Web Dashboard를 통한 실시간 성능 지표 확인
 - **유연한 테스트 타겟**: Mock 서버 제공 및 외부 서비스 테스트 지원
@@ -23,9 +24,13 @@ K6 Testing Platform은 마이크로서비스 아키텍처 기반의 종합적인
 k6-testing-platform/
 ├── apps/
 │   ├── control-panel/      # Next.js 15 기반 웹 UI (React 19, TypeScript 5)
+│   │   ├── lib/
+│   │   │   └── scenario.ts    # 📌 중앙 시나리오 설정 (TypeScript)
+│   │   └── components/
+│   │       └── TestController.tsx  # 시나리오 설정 소비자
 │   ├── mock-server/        # NestJS 10 기반 테스트 타겟 서버
 │   └── k6-runner/          # Express 기반 K6 테스트 실행 서비스
-│       └── k6-scripts/     # K6 테스트 시나리오 (JavaScript)
+│       └── scenario-config.js  # 📌 중앙 시나리오 설정 (JavaScript)
 ├── services/
 │   └── influxdb/          # 시계열 메트릭 데이터베이스
 ├── docker-compose.yml      # 컨테이너 오케스트레이션
@@ -48,6 +53,30 @@ k6-testing-platform/
 | **Testing Engine** | K6          | Latest | 부하 테스트 엔진     |
 | **Database**       | InfluxDB    | 1.8    | 메트릭 저장          |
 | **Container**      | Docker      | 20+    | 컨테이너화           |
+
+### 아키텍처 특징
+
+#### 🎯 중앙 집중식 시나리오 관리
+
+시나리오 설정이 중앙에서 관리되어 일관성과 유지보수성이 향상되었습니다:
+
+- **단일 진실 공급원 (Single Source of Truth)**: 모든 시나리오 메타데이터가 한 곳에서 정의
+- **타입 안정성**: TypeScript 인터페이스로 시나리오 설정 검증
+- **동적 설정**: 실행 시간에 시나리오별 설정 동적 적용
+- **코드 중복 제거**: ~200줄의 중복 코드 제거로 유지보수성 향상
+
+```typescript
+// apps/control-panel/lib/scenario.ts
+export interface ScenarioMetadata {
+  id: ScenarioId;
+  name: string;
+  description: string;
+  defaultVus: number;
+  defaultDuration: string;
+  supportedModes: ExecutionModes;
+  rampPattern?: RampPattern;
+}
+```
 
 ## 🚀 빠른 시작
 
@@ -169,17 +198,26 @@ npm run test:cov  # 커버리지 확인
 
 플랫폼에서 제공하는 7가지 사전 정의된 테스트 시나리오:
 
+### 시나리오 관리 시스템
+
+모든 시나리오는 중앙 설정 파일에서 관리되며, 각 시나리오마다 다음 속성들이 정의됩니다:
+
+- **기본 설정**: VUs 수, 실행 시간, 반복 횟수
+- **실행 모드**: Duration, Iterations, Hybrid 지원 여부
+- **Ramp 패턴**: none, standard, aggressive, gradual
+- **Stage 사용**: 단계적 부하 증가 여부
+
 ### 📊 시나리오 비교표
 
-| 시나리오       | 용도             | VU 범위     | 기간        | 주요 지표             |
-| -------------- | ---------------- | ----------- | ----------- | --------------------- |
-| **Smoke**      | 기본 동작 확인   | 1-5         | 1분         | 기능 정상 작동        |
-| **Load**       | 일반 부하 테스트 | 10-100      | 5-30분      | 평균 응답시간, 처리량 |
-| **Stress**     | 한계 테스트      | 50-500      | 10-60분     | Breaking point        |
-| **Spike**      | 급증 대응        | 10-1000     | 5-20분      | 복구 시간             |
-| **Soak**       | 장기 안정성      | 10-100      | 2-24시간    | 메모리 누수           |
-| **Breakpoint** | 최대 용량        | 100-5000    | 20-60분     | 최대 처리량           |
-| **Simple**     | 커스텀 테스트    | 사용자 정의 | 사용자 정의 | 사용자 정의           |
+| 시나리오       | 용도             | 기본 VUs | 기본 기간 | 실행 모드           | Ramp 패턴   |
+| -------------- | ---------------- | -------- | --------- | ------------------- | ----------- |
+| **Smoke**      | 기본 동작 확인   | 1        | 1m        | ✅ All              | none        |
+| **Load**       | 일반 부하 테스트 | 20       | 5m        | Duration, Hybrid    | standard    |
+| **Stress**     | 한계 테스트      | 50       | 10m       | Duration only       | gradual     |
+| **Spike**      | 급증 대응        | 100      | 5m        | Duration only       | aggressive  |
+| **Soak**       | 장기 안정성      | 30       | 30m       | ✅ All              | none        |
+| **Breakpoint** | 최대 용량        | 100      | 20m       | Duration only       | gradual     |
+| **Simple**     | 커스텀 테스트    | 10       | 2m        | ✅ All              | none        |
 
 ### 상세 시나리오 설명
 
@@ -187,97 +225,112 @@ npm run test:cov  # 커버리지 확인
 
 ```javascript
 // 최소 부하로 시스템 정상 작동 확인
-stages: [
-  { duration: "30s", target: 1 }, // 워밍업
-  { duration: "30s", target: 1 }, // 유지
-];
+executor: 'constant-vus',
+vus: 1,
+duration: '1m'
 ```
 
 - **용도**: 배포 후 기본 기능 검증
+- **실행 모드**: Duration, Iterations, Hybrid 모두 지원
 - **성공 기준**: 에러율 0%, 응답시간 < 1초
 
 #### 2. 📈 Load Test
 
 ```javascript
-// 예상 평균 부하 시뮬레이션
+// 표준 ramp 패턴 적용 (15% up, 70% steady, 15% down)
+executor: 'ramping-vus',
+startVUs: 1,
 stages: [
-  { duration: "2m", target: 20 }, // Ramp-up
-  { duration: "5m", target: 20 }, // Stay
-  { duration: "2m", target: 0 }, // Ramp-down
-];
+  { duration: '45s', target: 20 },  // Ramp-up (15%)
+  { duration: '3m30s', target: 20 }, // Steady (70%)
+  { duration: '45s', target: 0 }     // Ramp-down (15%)
+]
 ```
 
 - **용도**: 일상적인 트래픽 처리 능력 평가
+- **실행 모드**: Duration, Hybrid (Iterations 미지원 - ramp 패턴 때문)
 - **성공 기준**: 에러율 < 1%, P95 < 500ms
 
 #### 3. 💪 Stress Test
 
 ```javascript
-// 시스템 한계점까지 부하 증가
+// 점진적(gradual) 부하 증가 패턴
+executor: 'ramping-vus',
 stages: [
-  { duration: "2m", target: 50 },
-  { duration: "5m", target: 50 },
-  { duration: "2m", target: 100 },
-  { duration: "5m", target: 100 },
-  { duration: "2m", target: 200 },
-  { duration: "5m", target: 200 },
-  { duration: "2m", target: 300 },
-  { duration: "5m", target: 300 },
-  { duration: "2m", target: 0 },
-];
+  { duration: '2m', target: 12 },  // Step 1 (25%)
+  { duration: '2m', target: 25 },  // Step 2 (50%)
+  { duration: '2m', target: 37 },  // Step 3 (75%)
+  { duration: '2m', target: 50 },  // Step 4 (100%)
+  { duration: '2m', target: 0 }    // Ramp-down
+]
 ```
 
 - **용도**: Breaking point 발견 및 복구 능력 테스트
+- **실행 모드**: Duration만 지원 (단계적 부하 증가 필요)
 - **관찰 포인트**: CPU/메모리 사용률, 에러 발생 시점
 
 #### 4. ⚡ Spike Test
 
 ```javascript
-// 갑작스런 트래픽 급증 시뮬레이션
+// 공격적(aggressive) 스파이크 패턴
+executor: 'ramping-vus',
+startVUs: 10,  // 기본 VUs의 10%에서 시작
 stages: [
-  { duration: "1m", target: 10 },
-  { duration: "30s", target: 200 }, // 급증!
-  { duration: "3m", target: 200 },
-  { duration: "30s", target: 10 }, // 급감!
-  { duration: "3m", target: 10 },
-  { duration: "30s", target: 300 }, // 더 큰 급증!
-  { duration: "3m", target: 300 },
-  { duration: "1m", target: 0 },
-];
+  { duration: '1m30s', target: 20 },   // 평상시 (20%)
+  { duration: '15s', target: 100 },    // 급증! (5%)
+  { duration: '1m30s', target: 100 },  // 스파이크 유지 (30%)
+  { duration: '15s', target: 20 },     // 급감! (5%)
+  { duration: '1m30s', target: 20 }    // 평상시 복귀 (30%)
+]
 ```
 
 - **용도**: 블랙프라이데이, 이벤트 트래픽 대응 능력
+- **실행 모드**: Duration만 지원 (정밀한 타이밍 제어 필요)
 - **성공 기준**: 복구 시간 < 1분, 데이터 무결성 유지
 
 #### 5. 🏊 Soak Test
 
 ```javascript
 // 장시간 일정 부하 유지
-stages: [
-  { duration: "5m", target: 50 },
-  { duration: "4h", target: 50 }, // 4시간 유지
-  { duration: "5m", target: 0 },
-];
+executor: 'constant-vus',
+vus: 30,
+duration: '30m'  // 기본 30분, 최대 24시간까지 확장 가능
 ```
 
 - **용도**: 메모리 누수, 리소스 고갈 검증
+- **실행 모드**: Duration, Iterations, Hybrid 모두 지원
 - **관찰 포인트**: 메모리 사용 추세, 응답시간 변화
 
 #### 6. 🎯 Breakpoint Test
 
 ```javascript
-// 시스템이 견딜 수 있는 최대 부하 탐색
+// 점진적(gradual) 부하 증가로 한계점 탐색
+executor: 'ramping-vus',
 stages: [
-  { duration: "5m", target: 100 },
-  { duration: "5m", target: 200 },
-  { duration: "5m", target: 500 },
-  { duration: "5m", target: 1000 },
-  // 에러율 급증 시점까지 계속
-];
+  { duration: '4m', target: 25 },   // Step 1 (25%)
+  { duration: '4m', target: 50 },   // Step 2 (50%)
+  { duration: '4m', target: 75 },   // Step 3 (75%)
+  { duration: '4m', target: 100 },  // Step 4 (100%)
+  { duration: '4m', target: 0 }     // Ramp-down
+]
 ```
 
 - **용도**: 최대 처리 용량 확인
+- **실행 모드**: Duration만 지원 (연속적인 부하 증가 필요)
 - **중단 조건**: 에러율 > 5% 또는 P95 > 2초
+
+#### 7. 🎯 Simple Test
+
+```javascript
+// 사용자 정의 가능한 기본 테스트
+executor: 'constant-vus',
+vus: 10,
+duration: '2m'
+```
+
+- **용도**: 커스터마이징 가능한 기본 부하 테스트
+- **실행 모드**: Duration, Iterations, Hybrid 모두 지원
+- **특징**: 가장 유연한 설정 가능
 
 ## ⚙️ 설정 및 환경 변수
 

@@ -4,6 +4,7 @@ const fs = require("fs").promises;
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const config = require("./config");
+const { getScenarioConfig, calculateStages } = require("./scenario-config");
 
 const app = express();
 app.use(express.json());
@@ -53,148 +54,26 @@ function formatDuration(seconds) {
 
 // Executor 매핑 함수
 function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
-  // 사용자가 설정한 값 우선 적용
-  const userVus = vus || 10;
-  const userDuration = duration || "30s";
-  const userIterations = iterations || 100;
+  // 시나리오 설정 가져오기
+  const scenarioConfig = getScenarioConfig(scenario);
+  
+  // 사용자가 설정한 값 우선 적용, 없으면 시나리오 기본값 사용
+  const userVus = vus || scenarioConfig.defaultVus || 10;
+  const userDuration = duration || scenarioConfig.defaultDuration || "30s";
+  const userIterations = iterations || scenarioConfig.defaultIterations || 100;
   
   // Duration을 초 단위로 변환
   const totalSeconds = parseDuration(userDuration);
   
-  // Ramp up/down 비율 (각각 15%)
-  // 최소 1초 보장 (너무 짧은 duration에서 0초가 되는 것 방지)
-  // totalSeconds가 10초 미만이면 최소 1초, 그 이상이면 15% 적용
-  const rampUpSeconds = totalSeconds < 10 ? Math.max(1, Math.floor(totalSeconds * 0.15)) : Math.floor(totalSeconds * 0.15);
-  const rampDownSeconds = totalSeconds < 10 ? Math.max(1, Math.floor(totalSeconds * 0.15)) : Math.floor(totalSeconds * 0.15);
-  const steadySeconds = totalSeconds - rampUpSeconds - rampDownSeconds;
+  // Stage 계산 (시나리오의 rampPattern 사용)
+  const stages = scenarioConfig.useStages ? 
+    calculateStages(scenarioConfig.rampPattern, userVus, totalSeconds) : null;
   
-  // 시나리오별 executor 매핑
-  const executorConfigs = {
-    smoke: {
-      // Smoke Test: 최소한의 부하로 빠른 검증 (ramp up/down 불필요)
-      scenarios: {
-        smoke_test: {
-          executor: 'constant-vus',
-          vus: userVus,
-          duration: userDuration,
-        },
-      },
-    },
-    load: {
-      // Load Test: 15% ramp up, 70% steady, 15% ramp down
-      scenarios: {
-        load_test: {
-          executor: 'ramping-vus',
-          startVUs: 1,
-          stages: [
-            { duration: formatDuration(rampUpSeconds), target: userVus }, // 15% 시간 동안 ramp up
-            { duration: formatDuration(steadySeconds), target: userVus }, // 70% 시간 동안 유지
-            { duration: formatDuration(rampDownSeconds), target: 0 }, // 15% 시간 동안 ramp down
-          ],
-        },
-      },
-    },
-    stress: {
-      // Stress Test: 단계적 증가 (총 시간을 6단계로 분할)
-      scenarios: {
-        stress_test: {
-          executor: 'ramping-vus',
-          startVUs: 1,
-          stages: [
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus }, // 10%: 1x 부하로 증가
-            { duration: formatDuration(Math.floor(totalSeconds * 0.2)), target: userVus }, // 20%: 1x 부하 유지
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 2 }, // 10%: 2x 부하로 증가
-            { duration: formatDuration(Math.floor(totalSeconds * 0.2)), target: userVus * 2 }, // 20%: 2x 부하 유지
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 3 }, // 10%: 3x 부하로 증가
-            { duration: formatDuration(Math.floor(totalSeconds * 0.2)), target: userVus * 3 }, // 20%: 3x 부하 유지
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: 0 }, // 10%: 종료
-          ],
-        },
-      },
-    },
-    soak: {
-      // Soak Test: 장시간 일정 부하 (ramp up/down 불필요)
-      scenarios: {
-        soak_test: {
-          executor: 'constant-vus',
-          vus: userVus,
-          duration: userDuration,
-        },
-      },
-    },
-    spike: {
-      // Spike Test: 급격한 부하 증가 (총 시간 비율 배분)
-      scenarios: {
-        spike_test: {
-          executor: 'ramping-vus',
-          startVUs: Math.floor(userVus * 0.1),
-          stages: [
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: Math.floor(userVus * 0.1) }, // 10%: 낮은 부하
-            { duration: formatDuration(Math.floor(totalSeconds * 0.05)), target: userVus * 2 }, // 5%: 급격히 증가
-            { duration: formatDuration(Math.floor(totalSeconds * 0.7)), target: userVus * 2 }, // 70%: 높은 부하 유지
-            { duration: formatDuration(Math.floor(totalSeconds * 0.05)), target: Math.floor(userVus * 0.1) }, // 5%: 급격히 감소
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: 0 }, // 10%: 종료
-          ],
-        },
-      },
-    },
-    breakpoint: {
-      // Breakpoint Test: 시스템 한계점 찾기 (총 시간을 8단계로 분할)
-      scenarios: {
-        breakpoint_test: {
-          executor: 'ramping-arrival-rate',
-          startRate: 10,
-          timeUnit: '1s',
-          preAllocatedVUs: userVus,
-          maxVUs: userVus * 10,
-          stages: [
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 5 }, // 10%: 첫 번째 레벨
-            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 5 }, // 15%: 유지
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 10 }, // 10%: 두 번째 레벨
-            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 10 }, // 15%: 유지
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 15 }, // 10%: 세 번째 레벨
-            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 15 }, // 15%: 유지
-            { duration: formatDuration(Math.floor(totalSeconds * 0.1)), target: userVus * 20 }, // 10%: 네 번째 레벨
-            { duration: formatDuration(Math.floor(totalSeconds * 0.15)), target: userVus * 20 }, // 15%: 유지
-          ],
-        },
-      },
-    },
-  };
-
-  // 시나리오별 executor 반환
-  if (executorConfigs[scenario]) {
-    // executionMode가 iterations인 경우 shared-iterations executor 사용
-    if (executionMode === 'iterations') {
-      return {
-        scenarios: {
-          [`${scenario}_iterations`]: {
-            executor: 'shared-iterations',
-            vus: userVus,
-            iterations: userIterations,
-            maxDuration: userDuration,
-          },
-        },
-      };
-    }
-    return executorConfigs[scenario];
-  }
-
-  // Custom 시나리오 또는 기본 설정
+  // executionMode별 처리
   if (executionMode === 'iterations') {
     return {
       scenarios: {
-        custom_iterations: {
-          executor: 'shared-iterations',
-          vus: userVus,
-          iterations: userIterations,
-        },
-      },
-    };
-  } else if (executionMode === 'hybrid') {
-    return {
-      scenarios: {
-        hybrid_scenario: {
+        [`${scenario}_iterations`]: {
           executor: 'shared-iterations',
           vus: userVus,
           iterations: userIterations,
@@ -202,19 +81,50 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
         },
       },
     };
-  } else {
-    // Duration mode (default)
+  }
+  
+  if (executionMode === 'hybrid') {
     return {
       scenarios: {
-        custom_constant: {
-          executor: 'constant-vus',
+        [`${scenario}_hybrid`]: {
+          executor: 'shared-iterations',
           vus: userVus,
-          duration: userDuration,
+          iterations: userIterations,
+          maxDuration: userDuration,
         },
       },
     };
   }
+  
+  // Duration mode (default)
+  // Stage 사용 여부에 따라 다른 executor 사용
+  if (stages) {
+    return {
+      scenarios: {
+        [`${scenario}_test`]: {
+          executor: 'ramping-vus',
+          startVUs: scenario === 'spike' ? Math.floor(userVus * 0.1) : 1,
+          stages: stages.map(stage => ({
+            duration: stage.duration,
+            target: stage.target,
+          })),
+        },
+      },
+    };
+  }
+  
+  // Stage가 없는 경우 constant-vus 사용
+  return {
+    scenarios: {
+      [`${scenario}_test`]: {
+        executor: 'constant-vus',
+        vus: userVus,
+        duration: userDuration,
+      },
+    },
+  };
 }
+
 
 // 포트가 사용 중인지 확인하는 함수
 async function isPortInUse(port) {

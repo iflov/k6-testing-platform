@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-import { ScenarioId } from "@/lib/scenario";
+import {
+  ScenarioId,
+  ExecutionMode,
+  getScenarioList,
+  getScenarioConfig,
+} from "@/lib/scenario";
 import configModule from "@/lib/config";
 
 interface TestControllerProps {
@@ -11,22 +16,8 @@ interface TestControllerProps {
   testStatus: "idle" | "running";
 }
 
-const scenarios = [
-  {
-    id: "smoke",
-    name: "Smoke Test",
-    description: "Quick test to check if the system is working",
-  },
-  { id: "load", name: "Load Test", description: "Constant load over time" },
-  { id: "stress", name: "Stress Test", description: "Gradually increase load" },
-  { id: "soak", name: "Soak Test", description: "Extended duration test" },
-  { id: "spike", name: "Spike Test", description: "Sudden increase in load" },
-  {
-    id: "breakpoint",
-    name: "Breakpoint Test",
-    description: "Test to check if the system is working",
-  },
-];
+// 중앙 설정에서 시나리오 목록 가져오기
+const scenarios = getScenarioList();
 
 // Mock 서버의 사용 가능한 엔드포인트 목록
 const availableEndpoints = [
@@ -40,51 +31,21 @@ const availableEndpoints = [
   { method: "GET", path: "/performance/concurrency-issue", description: "Concurrency test" },
 ];
 
-// 시나리오별 Execution Mode 호환성 정의
-const scenarioExecutionModes = {
-  smoke: {
-    duration: { enabled: true, tooltip: "" },
-    iterations: { enabled: true, tooltip: "" },
-    hybrid: { enabled: true, tooltip: "" },
-  },
-  load: {
-    duration: { enabled: true, tooltip: "" },
-    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without ramping stages" },
-    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
-  },
-  stress: {
-    duration: { enabled: true, tooltip: "" },
-    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without gradual increase" },
-    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
-  },
-  soak: {
-    duration: { enabled: true, tooltip: "" },
-    iterations: { enabled: true, tooltip: "Runs specified iterations for endurance testing" },
-    hybrid: { enabled: true, tooltip: "Runs iterations with maximum duration limit" },
-  },
-  spike: {
-    duration: { enabled: true, tooltip: "" },
-    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without spike pattern" },
-    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
-  },
-  breakpoint: {
-    duration: { enabled: true, tooltip: "" },
-    iterations: { enabled: true, tooltip: "In iterations mode, runs with constant VUs without arrival rate ramping" },
-    hybrid: { enabled: true, tooltip: "Runs iterations with time limit using constant VUs" },
-  },
-};
 
 export default function TestController({
   onTestStart,
   onTestStop,
   testStatus,
 }: TestControllerProps) {
+  // 초기 시나리오 설정 가져오기
+  const initialScenario = getScenarioConfig("load");
+  
   const [config, setConfig] = useState({
     scenario: "load" as ScenarioId,
-    vus: 10,
-    duration: "30s",
-    iterations: 100,
-    executionMode: "duration" as "duration" | "iterations" | "hybrid",
+    vus: initialScenario.defaultVus,
+    duration: initialScenario.defaultDuration,
+    iterations: initialScenario.defaultIterations || 100,
+    executionMode: "duration" as ExecutionMode,
     targetUrl: configModule.mockServerUrl,
     selectedEndpoint: "GET /success",
     urlPath: "/success",
@@ -163,7 +124,8 @@ export default function TestController({
             value={config.scenario}
             onChange={(e) => {
               const newScenario = e.target.value as ScenarioId;
-              const modes = scenarioExecutionModes[newScenario];
+              const newScenarioConfig = getScenarioConfig(newScenario);
+              const modes = newScenarioConfig.supportedModes;
               
               // 현재 execution mode가 새 시나리오에서 사용 불가능하면 duration으로 변경
               let newExecutionMode = config.executionMode;
@@ -174,7 +136,11 @@ export default function TestController({
               setConfig({ 
                 ...config, 
                 scenario: newScenario,
-                executionMode: newExecutionMode
+                executionMode: newExecutionMode,
+                // 시나리오 기본값으로 업데이트
+                vus: newScenarioConfig.defaultVus,
+                duration: newScenarioConfig.defaultDuration,
+                iterations: newScenarioConfig.defaultIterations || config.iterations,
               });
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
@@ -243,18 +209,18 @@ export default function TestController({
               <button
                 type="button"
                 onClick={() =>
-                  scenarioExecutionModes[config.scenario].duration.enabled &&
+                  getScenarioConfig(config.scenario).supportedModes.duration.enabled &&
                   setConfig({ ...config, executionMode: "duration" })
                 }
                 className={`w-full px-3 py-2 rounded-md border transition-colors ${
                   config.executionMode === "duration"
                     ? "bg-blue-600 text-white border-blue-600"
-                    : scenarioExecutionModes[config.scenario].duration.enabled
+                    : getScenarioConfig(config.scenario).supportedModes.duration.enabled
                     ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={testStatus === "running" || !scenarioExecutionModes[config.scenario].duration.enabled}
-                title={scenarioExecutionModes[config.scenario].duration.tooltip}
+                disabled={testStatus === "running" || !getScenarioConfig(config.scenario).supportedModes.duration.enabled}
+                title={getScenarioConfig(config.scenario).supportedModes.duration.tooltip}
               >
                 Duration
               </button>
@@ -263,25 +229,25 @@ export default function TestController({
               <button
                 type="button"
                 onClick={() =>
-                  scenarioExecutionModes[config.scenario].iterations.enabled &&
+                  getScenarioConfig(config.scenario).supportedModes.iterations.enabled &&
                   setConfig({ ...config, executionMode: "iterations" })
                 }
                 className={`w-full px-3 py-2 rounded-md border transition-colors ${
                   config.executionMode === "iterations"
                     ? "bg-blue-600 text-white border-blue-600"
-                    : scenarioExecutionModes[config.scenario].iterations.enabled
+                    : getScenarioConfig(config.scenario).supportedModes.iterations.enabled
                     ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={testStatus === "running" || !scenarioExecutionModes[config.scenario].iterations.enabled}
-                title={scenarioExecutionModes[config.scenario].iterations.tooltip}
+                disabled={testStatus === "running" || !getScenarioConfig(config.scenario).supportedModes.iterations.enabled}
+                title={getScenarioConfig(config.scenario).supportedModes.iterations.tooltip}
               >
                 Iterations
               </button>
-              {!scenarioExecutionModes[config.scenario].iterations.enabled && scenarioExecutionModes[config.scenario].iterations.tooltip && (
+              {!getScenarioConfig(config.scenario).supportedModes.iterations.enabled && getScenarioConfig(config.scenario).supportedModes.iterations.tooltip && (
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
                   <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
-                    {scenarioExecutionModes[config.scenario].iterations.tooltip}
+                    {getScenarioConfig(config.scenario).supportedModes.iterations.tooltip}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                       <div className="border-4 border-transparent border-t-gray-900"></div>
                     </div>
@@ -293,25 +259,25 @@ export default function TestController({
               <button
                 type="button"
                 onClick={() => 
-                  scenarioExecutionModes[config.scenario].hybrid.enabled &&
+                  getScenarioConfig(config.scenario).supportedModes.hybrid.enabled &&
                   setConfig({ ...config, executionMode: "hybrid" })
                 }
                 className={`w-full px-3 py-2 rounded-md border transition-colors ${
                   config.executionMode === "hybrid"
                     ? "bg-blue-600 text-white border-blue-600"
-                    : scenarioExecutionModes[config.scenario].hybrid.enabled
+                    : getScenarioConfig(config.scenario).supportedModes.hybrid.enabled
                     ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={testStatus === "running" || !scenarioExecutionModes[config.scenario].hybrid.enabled}
-                title={scenarioExecutionModes[config.scenario].hybrid.tooltip}
+                disabled={testStatus === "running" || !getScenarioConfig(config.scenario).supportedModes.hybrid.enabled}
+                title={getScenarioConfig(config.scenario).supportedModes.hybrid.tooltip}
               >
                 Hybrid
               </button>
-              {!scenarioExecutionModes[config.scenario].hybrid.enabled && scenarioExecutionModes[config.scenario].hybrid.tooltip && (
+              {!getScenarioConfig(config.scenario).supportedModes.hybrid.enabled && getScenarioConfig(config.scenario).supportedModes.hybrid.tooltip && (
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
                   <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
-                    {scenarioExecutionModes[config.scenario].hybrid.tooltip}
+                    {getScenarioConfig(config.scenario).supportedModes.hybrid.tooltip}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                       <div className="border-4 border-transparent border-t-gray-900"></div>
                     </div>
