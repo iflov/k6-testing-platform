@@ -5,8 +5,7 @@ export type ScenarioId =
   | "stress"
   | "spike"
   | "soak"
-  | "breakpoint"
-  | "simple";
+  | "breakpoint";
 
 // 실행 모드 타입
 export type ExecutionMode = "duration" | "iterations" | "hybrid";
@@ -136,21 +135,6 @@ export const scenarioConfigs: Record<ScenarioId, ScenarioMetadata> = {
     },
     useStages: true,
     rampPattern: "gradual",
-  },
-  simple: {
-    id: "simple",
-    name: "Simple Load Test",
-    description: "Basic customizable load test",
-    defaultVus: 10,
-    defaultDuration: "2m",
-    defaultIterations: 100,
-    supportedModes: {
-      duration: { enabled: true },
-      iterations: { enabled: true },
-      hybrid: { enabled: true },
-    },
-    useStages: false,
-    rampPattern: "none",
   },
 };
 

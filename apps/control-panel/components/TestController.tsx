@@ -29,6 +29,8 @@ const availableEndpoints = [
   { method: "GET", path: "/performance/timeout", description: "Timeout simulation" },
   { method: "GET", path: "/performance/variable-latency", description: "Random latency" },
   { method: "GET", path: "/performance/concurrency-issue", description: "Concurrency test" },
+  { method: "GET", path: "/chaos/random", description: "Random errors (configurable)" },
+  { method: "POST", path: "/chaos/random", description: "Random errors with body" },
 ];
 
 
@@ -52,6 +54,19 @@ export default function TestController({
     httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
     requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
     enableDashboard: false,
+    // Error simulation settings
+    enableErrorSimulation: false,
+    errorRate: 10, // percentage
+    errorTypes: {
+      400: false,
+      401: false,
+      403: false,
+      404: false,
+      429: false,
+      500: false,
+      502: false,
+      503: false,
+    },
     useCustomEndpoint: false,
   });
   const [loading, setLoading] = useState(false);
@@ -601,6 +616,73 @@ export default function TestController({
             />
           </div>
         )}
+
+        {/* Error Simulation Section */}
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-medium text-gray-700">
+              Error Simulation
+            </label>
+            <input
+              type="checkbox"
+              checked={config.enableErrorSimulation}
+              onChange={(e) =>
+                setConfig({ ...config, enableErrorSimulation: e.target.checked })
+              }
+              disabled={testStatus === "running"}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+          </div>
+          
+          {config.enableErrorSimulation && (
+            <div className="space-y-3 pl-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Error Rate: {config.errorRate}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={config.errorRate}
+                  onChange={(e) =>
+                    setConfig({ ...config, errorRate: parseInt(e.target.value) })
+                  }
+                  disabled={testStatus === "running"}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Error Types
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {Object.entries(config.errorTypes).map(([code, enabled]) => (
+                    <label key={code} className="flex items-center space-x-1">
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            errorTypes: {
+                              ...config.errorTypes,
+                              [code]: e.target.checked,
+                            },
+                          })
+                        }
+                        disabled={testStatus === "running"}
+                        className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <span className="text-xs text-gray-600">{code}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex gap-2 pt-4">
           {testStatus !== "running" ? (

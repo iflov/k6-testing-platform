@@ -88,26 +88,11 @@ const scenarioConfigs = {
     useStages: true,
     rampPattern: "gradual",
   },
-  simple: {
-    id: "simple",
-    name: "Simple Load Test",
-    description: "Basic customizable load test",
-    defaultVus: 10,
-    defaultDuration: "2m",
-    defaultIterations: 100,
-    supportedModes: {
-      duration: { enabled: true },
-      iterations: { enabled: true },
-      hybrid: { enabled: true },
-    },
-    useStages: false,
-    rampPattern: "none",
-  },
 };
 
 // 시나리오 설정 가져오기
 function getScenarioConfig(scenarioId) {
-  return scenarioConfigs[scenarioId] || scenarioConfigs.simple;
+  return scenarioConfigs[scenarioId] || scenarioConfigs.smoke;
 }
 
 // Ramp 패턴에 따른 stage 계산

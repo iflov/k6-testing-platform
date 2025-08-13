@@ -156,6 +156,10 @@ app.post("/api/test/start", async (req, res) => {
     scenario = "custom",
     httpMethod = "GET",
     requestBody = null,
+    // Error simulation settings
+    enableErrorSimulation = false,
+    errorRate = 10,
+    errorTypes = {},
   } = req.body;
 
   // 이전 테스트가 있으면 에러 반환 (동시에 여러 테스트 실행 방지)
@@ -179,7 +183,27 @@ app.post("/api/test/start", async (req, res) => {
 
     // 완전한 URL 구성 (baseUrl + path)
     const baseUrl = targetUrl || config.mockServerUrl;
-    const fullUrl = urlPath ? `${baseUrl}${urlPath}` : baseUrl;
+    let fullUrl = urlPath ? `${baseUrl}${urlPath}` : baseUrl;
+    
+    // 에러 시뮬레이션이 활성화된 경우 chaos 엔드포인트로 변경
+    if (enableErrorSimulation && baseUrl.includes('mock-server')) {
+      // 활성화된 에러 타입들 수집
+      const enabledErrorTypes = Object.entries(errorTypes)
+        .filter(([code, enabled]) => enabled)
+        .map(([code]) => code);
+      
+      // 에러 타입이 선택되지 않은 경우 기본값 사용
+      const statusCodes = enabledErrorTypes.length > 0 
+        ? enabledErrorTypes.join(',')
+        : '400,500,503';
+      
+      // chaos 엔드포인트로 URL 변경
+      const chaosPath = httpMethod === 'POST' || httpMethod === 'PUT' || httpMethod === 'PATCH' 
+        ? '/chaos/random'
+        : '/chaos/random';
+      
+      fullUrl = `${baseUrl}${chaosPath}?errorRate=${errorRate / 100}&statusCodes=${statusCodes}`;
+    }
 
     // HTTP 메서드에 따른 스크립트 생성
     let httpRequest;
