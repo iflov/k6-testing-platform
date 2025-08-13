@@ -13,7 +13,8 @@ K6 Testing Platform은 마이크로서비스 아키텍처 기반의 종합적인
 - **중앙 집중식 시나리오 관리**: 단일 소스로부터 모든 시나리오 설정 관리
 - **다양한 테스트 시나리오**: Smoke, Load, Stress, Spike, Soak 등 7가지 내장 시나리오
 - **실시간 메트릭 시각화**: K6 Web Dashboard를 통한 실시간 성능 지표 확인
-- **유연한 테스트 타겟**: Mock 서버 제공 및 외부 서비스 테스트 지원
+- **유연한 테스트 타겟**: Mock 서버 제공 및 커스텀 URL 테스트 지원
+- **다양한 HTTP 메서드 지원**: GET, POST, PUT, DELETE, PATCH 지원
 - **컨테이너 기반 아키텍처**: Docker Compose를 통한 쉬운 배포 및 확장
 
 ## 🏗️ 시스템 아키텍처
@@ -127,9 +128,15 @@ make logs  # 또는 docker-compose logs -f
 #### 방법 1: Control Panel UI 사용 (권장)
 
 1. http://localhost:3000 접속
-2. 테스트 시나리오 선택
-3. VU 수와 기간 설정
-4. "Start Test" 클릭
+2. **Target Server 선택**:
+   - **Mock Server**: 내장된 테스트 서버 사용 (기본값)
+   - **Custom URL**: 외부 API 테스트 (예: https://api.example.com)
+3. **Endpoint 설정**:
+   - Mock Server: 미리 정의된 엔드포인트 선택
+   - Custom URL: HTTP 메서드와 경로 직접 입력
+4. 테스트 시나리오 선택
+5. VU 수와 기간 설정
+6. "Start Test" 클릭
 
 #### 방법 2: Docker Compose 사용
 
@@ -138,9 +145,91 @@ make logs  # 또는 docker-compose logs -f
 VUS=50 DURATION=5m docker-compose --profile test up k6
 ```
 
+## 🎯 사용 가이드
+
+### 커스텀 URL 테스트
+
+Control Panel에서 외부 API를 테스트하는 방법:
+
+1. **Target Server 설정**
+   - "Custom URL" 버튼 클릭
+   - 대상 서버 URL 입력 (예: `https://api.github.com`)
+
+2. **Endpoint 구성**
+   - HTTP 메서드 선택: GET, POST, PUT, DELETE, PATCH
+   - 엔드포인트 경로 입력 (예: `/users/octocat`)
+   - 전체 URL 미리보기 확인
+
+3. **Request Body 설정** (POST/PUT/PATCH)
+   ```json
+   {
+     "name": "Test User",
+     "email": "test@example.com",
+     "age": 25
+   }
+   ```
+
+4. **테스트 시나리오 선택**
+   - 시나리오 타입 선택
+   - VUs와 Duration 설정
+   - 실행 모드 선택
+
+### Mock Server vs Custom URL
+
+| 구분          | Mock Server                      | Custom URL                        |
+| ------------- | -------------------------------- | --------------------------------- |
+| **용도**      | 개발/테스트 환경                 | 실제 API 테스트                  |
+| **엔드포인트**| 사전 정의된 목록에서 선택        | 자유롭게 입력                    |
+| **HTTP 메서드**| GET, POST                       | GET, POST, PUT, DELETE, PATCH    |
+| **응답 시간** | 시뮬레이션 (0-5초)              | 실제 서버 응답 시간               |
+| **에러 처리** | 시뮬레이션된 에러                | 실제 서버 에러                    |
+
+### HTTP 상태 코드 검증
+
+플랫폼은 HTTP 메서드별로 적절한 성공 상태 코드를 자동으로 검증합니다:
+
+| HTTP 메서드 | 성공으로 간주되는 상태 코드 | 설명                              |
+| ----------- | --------------------------- | --------------------------------- |
+| **GET**     | 200                         | OK                                |
+| **POST**    | 200, 201                    | OK, Created                       |
+| **PUT**     | 200, 204                    | OK, No Content                    |
+| **PATCH**   | 200, 204                    | OK, No Content                    |
+| **DELETE**  | 200, 202, 204               | OK, Accepted, No Content          |
+
+### 실전 예시
+
+#### 1. GitHub API 테스트
+```javascript
+// Target Server: https://api.github.com
+// Method: GET
+// Path: /users/torvalds
+// VUs: 10
+// Duration: 1m
+```
+
+#### 2. REST API CRUD 테스트
+```javascript
+// Target Server: https://jsonplaceholder.typicode.com
+// Method: POST
+// Path: /posts
+// Body: {"title": "foo", "body": "bar", "userId": 1}
+// VUs: 50
+// Duration: 5m
+```
+
+#### 3. GraphQL API 테스트
+```javascript
+// Target Server: https://api.example.com
+// Method: POST
+// Path: /graphql
+// Body: {"query": "{ user(id: 1) { name email } }"}
+// VUs: 100
+// Duration: 10m
+```
+
 ## 💻 개발 환경
 
-### 로컬 개발 환경 설정
+### 로컬 개발 환경 구성
 
 ```bash
 # 전체 프로젝트 의존성 설치
@@ -492,23 +581,60 @@ make clean-all     # 이미지 포함 전체 정리
 
 ### Control Panel API
 
-| 엔드포인트        | 메소드 | 설명             | 요청 본문                              |
-| ----------------- | ------ | ---------------- | -------------------------------------- |
-| `/api/k6/run`     | POST   | 테스트 시작      | `{scenario, vus, duration, targetUrl}` |
-| `/api/k6/stop`    | POST   | 테스트 중지      | -                                      |
-| `/api/k6/status`  | GET    | 테스트 상태 조회 | -                                      |
-| `/api/k6/metrics` | GET    | 메트릭 조회      | -                                      |
+| 엔드포인트        | 메소드 | 설명             | 요청 본문                                       |
+| ----------------- | ------ | ---------------- | ----------------------------------------------- |
+| `/api/k6/run`     | POST   | 테스트 시작      | 아래 상세 설명 참조                            |
+| `/api/k6/stop`    | POST   | 테스트 중지      | -                                               |
+| `/api/k6/status`  | GET    | 테스트 상태 조회 | -                                               |
+| `/api/k6/metrics` | GET    | 메트릭 조회      | -                                               |
+
+#### 테스트 시작 요청 본문
+
+```typescript
+{
+  scenario: string;           // 시나리오 타입
+  vus: number;               // Virtual Users 수
+  duration: string;          // 테스트 기간 (예: "5m", "1h")
+  iterations?: number;       // 반복 횟수 (iterations 모드)
+  executionMode: string;     // "duration" | "iterations" | "hybrid"
+  targetUrl: string;         // 테스트 대상 URL
+  urlPath: string;          // 엔드포인트 경로
+  httpMethod: string;       // "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
+  requestBody?: string;     // POST/PUT/PATCH 요청 시 body (JSON)
+  enableDashboard?: boolean; // K6 대시보드 활성화 여부
+}
+```
 
 #### 테스트 시작 예시
 
+##### Mock Server 테스트
 ```bash
 curl -X POST http://localhost:3000/api/k6/run \
   -H "Content-Type: application/json" \
   -d '{
-    "scenario": "load-test",
+    "scenario": "load",
     "vus": 50,
     "duration": "5m",
-    "targetUrl": "http://api.example.com"
+    "executionMode": "duration",
+    "targetUrl": "http://mock-server:3001",
+    "urlPath": "/api/users",
+    "httpMethod": "GET"
+  }'
+```
+
+##### 외부 API 테스트
+```bash
+curl -X POST http://localhost:3000/api/k6/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scenario": "stress",
+    "vus": 100,
+    "duration": "10m",
+    "executionMode": "duration",
+    "targetUrl": "https://api.example.com",
+    "urlPath": "/v1/products",
+    "httpMethod": "POST",
+    "requestBody": "{\"category\":\"electronics\",\"limit\":100}"
   }'
 ```
 
@@ -618,6 +744,31 @@ sudo ufw allow 5665/tcp
 
 - [K6 Examples](https://github.com/grafana/k6-examples)
 - [K6 Extensions](https://k6.io/docs/extensions/)
+
+## 🐳 Docker Hub 이미지 사용
+
+Mock Server는 Docker Hub에서 제공됩니다:
+
+```bash
+# 이미지 pull (public repository - 로그인 불필요)
+docker pull leehyeontae/k6-testing-platform-mock-server:latest
+
+# 단독 실행
+docker run -p 3001:3001 leehyeontae/k6-testing-platform-mock-server:latest
+```
+
+### 이미지 업데이트 방법 (관리자용)
+
+```bash
+# 1. 로컬에서 이미지 빌드
+docker-compose build --no-cache mock-server
+
+# 2. Docker Hub 태그 지정
+docker tag k6-testing-platform-mock-server:latest leehyeontae/k6-testing-platform-mock-server:latest
+
+# 3. Docker Hub에 푸시 (로그인 필요)
+docker push leehyeontae/k6-testing-platform-mock-server:latest
+```
 
 ### 튜토리얼
 

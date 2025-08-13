@@ -34,12 +34,10 @@ services:
       - "3001:3001"
     env_file:
       - ./apps/mock-server/.env
-    volumes:
-      # 개발용 소스 코드 마운트 (hot reload)
-      - ./apps/mock-server:/app
-      - /app/node_modules # node_modules 제외
     networks:
       - k6-network
+    # 로컬 개발 시에는 빌드된 이미지를 그대로 사용
+    # 소스 코드 변경 시 docker-compose up --build mock-server로 재빌드
 
   # InfluxDB - Metrics storage
   influxdb:

@@ -183,18 +183,80 @@ app.post("/api/test/start", async (req, res) => {
 
     // HTTP 메서드에 따른 스크립트 생성
     let httpRequest;
-    if (httpMethod === "POST") {
-      // POST 요청의 경우
-      const bodyData = requestBody ? requestBody : '{"message": "test"}';
+    
+    // Body가 있는 메서드들
+    const methodsWithBody = ["POST", "PUT", "PATCH"];
+    
+    if (methodsWithBody.includes(httpMethod)) {
+      // Body가 있는 요청의 경우
+      let bodyData = requestBody || '{"message": "test"}';
+      
+      // JSON 문자열인지 확인하고 파싱 시도
+      try {
+        // JSON 파싱을 통해 유효성 검증
+        const parsedBody = JSON.parse(bodyData);
+        // 다시 문자열화하여 일관된 형식 보장
+        bodyData = JSON.stringify(parsedBody);
+      } catch (e) {
+        console.log("Invalid JSON in request body, using as-is:", bodyData);
+      }
+      
+      // 백틱과 달러 기호를 이스케이프
+      const escapedBody = bodyData
+        .replace(/\\/g, '\\\\')  // 백슬래시를 먼저 이스케이프
+        .replace(/`/g, '\\`')    // 백틱 이스케이프
+        .replace(/\$/g, '\\$');  // 달러 기호 이스케이프
+      
+      const method = httpMethod.toLowerCase();
       httpRequest = `
   const params = {
     headers: { 'Content-Type': 'application/json' },
   };
-  const res = http.post('${fullUrl}', '${bodyData.replace(/'/g, "\\'")}', params);`;
+  const res = http.${method}('${fullUrl}', \`${escapedBody}\`, params);`;
+    } else if (httpMethod === "DELETE") {
+      // DELETE 요청의 경우
+      httpRequest = `
+  const params = {
+    headers: { 'Content-Type': 'application/json' },
+  };
+  const res = http.del('${fullUrl}', null, params);`;
     } else {
       // GET 요청의 경우 (기본값)
       httpRequest = `
   const res = http.get('${fullUrl}');`;
+    }
+
+    // 메서드별 성공 상태 코드 정의
+    let successCheck;
+    if (httpMethod === "POST") {
+      // POST는 200 또는 201을 성공으로 간주
+      successCheck = `
+  // 응답 상태 로깅 (디버깅용)
+  if (res.status !== 200 && res.status !== 201) {
+    console.log(\`POST request failed: Status=\${res.status}, Body=\${res.body}\`);
+  }
+  
+  check(res, {
+    'status is successful (200 or 201)': (r) => r.status === 200 || r.status === 201,
+  });`;
+    } else if (httpMethod === "DELETE") {
+      // DELETE는 200, 202, 204를 성공으로 간주
+      successCheck = `
+  check(res, {
+    'status is successful (200/202/204)': (r) => r.status === 200 || r.status === 202 || r.status === 204,
+  });`;
+    } else if (httpMethod === "PUT" || httpMethod === "PATCH") {
+      // PUT/PATCH는 200 또는 204를 성공으로 간주
+      successCheck = `
+  check(res, {
+    'status is successful (200 or 204)': (r) => r.status === 200 || r.status === 204,
+  });`;
+    } else {
+      // GET은 200을 성공으로 간주
+      successCheck = `
+  check(res, {
+    'status is 200': (r) => r.status === 200,
+  });`;
     }
 
     // 모든 시나리오에 대해 동일한 테스트 함수 사용
@@ -204,13 +266,27 @@ import { check, sleep } from 'k6';
 
 export const options = ${optionsConfig};
 
-export default function () {${httpRequest}
-  check(res, {
-    'status is 200': (r) => r.status === 200,
-  });
+export default function () {${httpRequest}${successCheck}
   sleep(1);
 }
     `;
+
+    // 디버깅을 위한 스크립트 로깅
+    console.log("Generated K6 Script:");
+    console.log("=".repeat(50));
+    console.log(script);
+    console.log("=".repeat(50));
+    console.log("Test configuration:", {
+      scenario,
+      vus,
+      duration,
+      iterations,
+      executionMode,
+      httpMethod,
+      targetUrl: fullUrl,
+      hasBody: methodsWithBody.includes(httpMethod),
+      bodyLength: requestBody ? requestBody.length : 0
+    });
 
     // 스크립트 파일 저장
     scriptPath = `/tmp/k6-test-${testId}.js`;
@@ -259,17 +335,30 @@ export default function () {${httpRequest}
     const k6Process = spawn("k6", k6Args, { env: k6Env });
 
     // k6 stdout/stderr 로깅
+    let outputBuffer = '';
+    let errorBuffer = '';
+    
     k6Process.stdout.on('data', (data) => {
-      console.log(`k6 stdout: ${data}`);
+      const output = data.toString();
+      outputBuffer += output;
+      console.log(`k6 stdout: ${output}`);
     });
 
     k6Process.stderr.on('data', (data) => {
       const errorMessage = data.toString();
+      errorBuffer += errorMessage;
       console.error(`k6 stderr: ${errorMessage}`);
       
       // Dashboard 포트 충돌 감지
       if (errorMessage.includes('bind: address already in use') && errorMessage.includes('5665')) {
         console.warn('Dashboard port 5665 is already in use. Test will continue without dashboard.');
+      }
+      
+      // K6 스크립트 에러 감지
+      if (errorMessage.includes('SyntaxError') || errorMessage.includes('ReferenceError') || errorMessage.includes('TypeError')) {
+        console.error('K6 Script Error Detected!');
+        console.error('Full error:', errorMessage);
+        console.error('Script path:', scriptPath);
       }
     });
 
@@ -313,6 +402,31 @@ export default function () {${httpRequest}
     // 프로세스 종료 처리
     k6Process.on("exit", async (code, signal) => {
       console.log(`k6 process exited with code ${code} and signal ${signal}`);
+      
+      // 비정상 종료 시 자세한 정보 출력
+      if (code !== 0) {
+        console.error("K6 Test Failed!");
+        console.error("Exit code:", code);
+        console.error("Signal:", signal);
+        console.error("Test ID:", testId);
+        console.error("Scenario:", scenario);
+        console.error("HTTP Method:", httpMethod);
+        console.error("Target URL:", fullUrl);
+        
+        if (errorBuffer) {
+          console.error("Last errors:");
+          console.error(errorBuffer.slice(-1000)); // 마지막 1000자만 출력
+        }
+        
+        // 스크립트 내용 확인
+        try {
+          const scriptContent = await fs.readFile(scriptPath, 'utf8');
+          console.error("Script first 500 chars:");
+          console.error(scriptContent.substring(0, 500));
+        } catch (err) {
+          console.error("Could not read script file:", err);
+        }
+      }
       
       // 타임아웃 취소
       if (currentTest && currentTest.timeoutId) {

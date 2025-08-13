@@ -47,11 +47,12 @@ export default function TestController({
     iterations: initialScenario.defaultIterations || 100,
     executionMode: "duration" as ExecutionMode,
     targetUrl: configModule.mockServerUrl,
-    selectedEndpoint: "GET /success",
-    urlPath: "/success",
-    httpMethod: "GET" as "GET" | "POST",
+    selectedEndpoint: "custom",
+    urlPath: "/",
+    httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
     requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
     enableDashboard: false,
+    useCustomEndpoint: false,
   });
   const [loading, setLoading] = useState(false);
 
@@ -417,70 +418,162 @@ export default function TestController({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Target Server (Mock Server)
+            Target Server
           </label>
-          <input
-            type="text"
-            value={config.targetUrl}
-            readOnly
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
-            style={{
-              WebkitTextFillColor: "rgb(107, 114, 128)",
-            }}
-            title="Mock server URL is fixed for testing endpoints"
-          />
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfig({ 
+                  ...config, 
+                  useCustomEndpoint: false,
+                  targetUrl: configModule.mockServerUrl,
+                  selectedEndpoint: "GET /success",
+                  urlPath: "/success",
+                  httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
+                })}
+                className={`px-3 py-2 rounded-md border transition-colors ${
+                  !config.useCustomEndpoint
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={testStatus === "running"}
+              >
+                Mock Server
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfig({ 
+                  ...config, 
+                  useCustomEndpoint: true,
+                  targetUrl: "",
+                  selectedEndpoint: "custom",
+                  urlPath: "/",
+                  httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
+                })}
+                className={`px-3 py-2 rounded-md border transition-colors ${
+                  config.useCustomEndpoint
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={testStatus === "running"}
+              >
+                Custom URL
+              </button>
+            </div>
+            <input
+              type="text"
+              value={config.targetUrl}
+              onChange={(e) => setConfig({ ...config, targetUrl: e.target.value })}
+              placeholder={config.useCustomEndpoint ? "https://api.example.com" : "Mock server URL"}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                !config.useCustomEndpoint ? "bg-gray-100 cursor-not-allowed" : ""
+              } disabled:bg-gray-100`}
+              style={{
+                color: testStatus === "running" || !config.useCustomEndpoint
+                  ? "rgb(156, 163, 175)"
+                  : "rgb(0, 0, 0)",
+                WebkitTextFillColor: testStatus === "running" || !config.useCustomEndpoint
+                  ? "rgb(156, 163, 175)"
+                  : "rgb(0, 0, 0)",
+                opacity: 1,
+              }}
+              disabled={testStatus === "running" || !config.useCustomEndpoint}
+              readOnly={!config.useCustomEndpoint}
+            />
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Endpoint
           </label>
-          <select
-            value={config.selectedEndpoint}
-            onChange={(e) => {
-              const selectedValue = e.target.value;
-              const endpoint = availableEndpoints.find(
-                ep => `${ep.method} ${ep.path}` === selectedValue
-              );
-              if (endpoint) {
-                setConfig({
-                  ...config,
-                  selectedEndpoint: selectedValue,
-                  httpMethod: endpoint.method as "GET" | "POST",
-                  urlPath: endpoint.path,
-                });
-              }
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-            style={{
-              color:
-                testStatus === "running"
-                  ? "rgb(156, 163, 175)"
-                  : "rgb(0, 0, 0)",
-              WebkitTextFillColor:
-                testStatus === "running"
-                  ? "rgb(156, 163, 175)"
-                  : "rgb(0, 0, 0)",
-              opacity: 1,
-            }}
-            disabled={testStatus === "running"}
-          >
-            {availableEndpoints.map((endpoint) => (
-              <option
-                key={`${endpoint.method}-${endpoint.path}`}
-                value={`${endpoint.method} ${endpoint.path}`}
-                style={{
-                  color: "rgb(0, 0, 0)",
-                  WebkitTextFillColor: "rgb(0, 0, 0)",
-                }}
-              >
-                ({endpoint.method}) {endpoint.path} - {endpoint.description}
-              </option>
-            ))}
-          </select>
+          {!config.useCustomEndpoint ? (
+            <select
+              value={config.selectedEndpoint}
+              onChange={(e) => {
+                const selectedValue = e.target.value;
+                const endpoint = availableEndpoints.find(
+                  ep => `${ep.method} ${ep.path}` === selectedValue
+                );
+                if (endpoint) {
+                  setConfig({
+                    ...config,
+                    selectedEndpoint: selectedValue,
+                    httpMethod: endpoint.method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
+                    urlPath: endpoint.path,
+                  });
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+              style={{
+                color:
+                  testStatus === "running"
+                    ? "rgb(156, 163, 175)"
+                    : "rgb(0, 0, 0)",
+                WebkitTextFillColor:
+                  testStatus === "running"
+                    ? "rgb(156, 163, 175)"
+                    : "rgb(0, 0, 0)",
+                opacity: 1,
+              }}
+              disabled={testStatus === "running"}
+            >
+              {availableEndpoints.map((endpoint) => (
+                <option
+                  key={`${endpoint.method}-${endpoint.path}`}
+                  value={`${endpoint.method} ${endpoint.path}`}
+                  style={{
+                    color: "rgb(0, 0, 0)",
+                    WebkitTextFillColor: "rgb(0, 0, 0)",
+                  }}
+                >
+                  ({endpoint.method}) {endpoint.path} - {endpoint.description}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <select
+                  value={config.httpMethod}
+                  onChange={(e) => setConfig({ ...config, httpMethod: e.target.value as "GET" | "POST" | "PUT" | "DELETE" | "PATCH" })}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                  style={{
+                    color: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
+                    WebkitTextFillColor: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
+                    opacity: 1,
+                  }}
+                  disabled={testStatus === "running"}
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+                <input
+                  type="text"
+                  value={config.urlPath}
+                  onChange={(e) => setConfig({ ...config, urlPath: e.target.value })}
+                  placeholder="/api/endpoint"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                  style={{
+                    color: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
+                    WebkitTextFillColor: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
+                    opacity: 1,
+                  }}
+                  disabled={testStatus === "running"}
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                Full URL: {config.targetUrl}{config.urlPath}
+              </p>
+            </div>
+          )}
         </div>
 
-        {config.httpMethod === "POST" && (
+        {(config.httpMethod === "POST" || config.httpMethod === "PUT" || config.httpMethod === "PATCH") && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Request Body (JSON)
