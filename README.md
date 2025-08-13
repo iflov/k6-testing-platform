@@ -35,7 +35,6 @@ k6-testing-platform/
 ├── services/
 │   └── influxdb/          # 시계열 메트릭 데이터베이스
 ├── docker-compose.yml      # 컨테이너 오케스트레이션
-├── run-test-with-dashboard.sh  # 웹 대시보드 포함 테스트 실행
 └── Makefile               # 빌드 및 배포 자동화
 ```
 
@@ -152,15 +151,18 @@ VUS=50 DURATION=5m docker-compose --profile test up k6
 Control Panel에서 외부 API를 테스트하는 방법:
 
 1. **Target Server 설정**
+
    - "Custom URL" 버튼 클릭
    - 대상 서버 URL 입력 (예: `https://api.github.com`)
 
 2. **Endpoint 구성**
+
    - HTTP 메서드 선택: GET, POST, PUT, DELETE, PATCH
    - 엔드포인트 경로 입력 (예: `/users/octocat`)
    - 전체 URL 미리보기 확인
 
 3. **Request Body 설정** (POST/PUT/PATCH)
+
    ```json
    {
      "name": "Test User",
@@ -176,29 +178,30 @@ Control Panel에서 외부 API를 테스트하는 방법:
 
 ### Mock Server vs Custom URL
 
-| 구분          | Mock Server                      | Custom URL                        |
-| ------------- | -------------------------------- | --------------------------------- |
-| **용도**      | 개발/테스트 환경                 | 실제 API 테스트                  |
-| **엔드포인트**| 사전 정의된 목록에서 선택        | 자유롭게 입력                    |
-| **HTTP 메서드**| GET, POST                       | GET, POST, PUT, DELETE, PATCH    |
-| **응답 시간** | 시뮬레이션 (0-5초)              | 실제 서버 응답 시간               |
-| **에러 처리** | 시뮬레이션된 에러                | 실제 서버 에러                    |
+| 구분            | Mock Server               | Custom URL                    |
+| --------------- | ------------------------- | ----------------------------- |
+| **용도**        | 개발/테스트 환경          | 실제 API 테스트               |
+| **엔드포인트**  | 사전 정의된 목록에서 선택 | 자유롭게 입력                 |
+| **HTTP 메서드** | GET, POST                 | GET, POST, PUT, DELETE, PATCH |
+| **응답 시간**   | 시뮬레이션 (0-5초)        | 실제 서버 응답 시간           |
+| **에러 처리**   | 시뮬레이션된 에러         | 실제 서버 에러                |
 
 ### HTTP 상태 코드 검증
 
 플랫폼은 HTTP 메서드별로 적절한 성공 상태 코드를 자동으로 검증합니다:
 
-| HTTP 메서드 | 성공으로 간주되는 상태 코드 | 설명                              |
-| ----------- | --------------------------- | --------------------------------- |
-| **GET**     | 200                         | OK                                |
-| **POST**    | 200, 201                    | OK, Created                       |
-| **PUT**     | 200, 204                    | OK, No Content                    |
-| **PATCH**   | 200, 204                    | OK, No Content                    |
-| **DELETE**  | 200, 202, 204               | OK, Accepted, No Content          |
+| HTTP 메서드 | 성공으로 간주되는 상태 코드 | 설명                     |
+| ----------- | --------------------------- | ------------------------ |
+| **GET**     | 200                         | OK                       |
+| **POST**    | 200, 201                    | OK, Created              |
+| **PUT**     | 200, 204                    | OK, No Content           |
+| **PATCH**   | 200, 204                    | OK, No Content           |
+| **DELETE**  | 200, 202, 204               | OK, Accepted, No Content |
 
 ### 실전 예시
 
 #### 1. GitHub API 테스트
+
 ```javascript
 // Target Server: https://api.github.com
 // Method: GET
@@ -208,6 +211,7 @@ Control Panel에서 외부 API를 테스트하는 방법:
 ```
 
 #### 2. REST API CRUD 테스트
+
 ```javascript
 // Target Server: https://jsonplaceholder.typicode.com
 // Method: POST
@@ -218,6 +222,7 @@ Control Panel에서 외부 API를 테스트하는 방법:
 ```
 
 #### 3. GraphQL API 테스트
+
 ```javascript
 // Target Server: https://api.example.com
 // Method: POST
@@ -298,15 +303,15 @@ npm run test:cov  # 커버리지 확인
 
 ### 📊 시나리오 비교표
 
-| 시나리오       | 용도             | 기본 VUs | 기본 기간 | 실행 모드           | Ramp 패턴   |
-| -------------- | ---------------- | -------- | --------- | ------------------- | ----------- |
-| **Smoke**      | 기본 동작 확인   | 1        | 1m        | ✅ All              | none        |
-| **Load**       | 일반 부하 테스트 | 20       | 5m        | Duration, Hybrid    | standard    |
-| **Stress**     | 한계 테스트      | 50       | 10m       | Duration only       | gradual     |
-| **Spike**      | 급증 대응        | 100      | 5m        | Duration only       | aggressive  |
-| **Soak**       | 장기 안정성      | 30       | 30m       | ✅ All              | none        |
-| **Breakpoint** | 최대 용량        | 100      | 20m       | Duration only       | gradual     |
-| **Simple**     | 커스텀 테스트    | 10       | 2m        | ✅ All              | none        |
+| 시나리오       | 용도             | 기본 VUs | 기본 기간 | 실행 모드        | Ramp 패턴  |
+| -------------- | ---------------- | -------- | --------- | ---------------- | ---------- |
+| **Smoke**      | 기본 동작 확인   | 1        | 1m        | ✅ All           | none       |
+| **Load**       | 일반 부하 테스트 | 20       | 5m        | Duration, Hybrid | standard   |
+| **Stress**     | 한계 테스트      | 50       | 10m       | Duration only    | gradual    |
+| **Spike**      | 급증 대응        | 100      | 5m        | Duration only    | aggressive |
+| **Soak**       | 장기 안정성      | 30       | 30m       | ✅ All           | none       |
+| **Breakpoint** | 최대 용량        | 100      | 20m       | Duration only    | gradual    |
+| **Simple**     | 커스텀 테스트    | 10       | 2m        | ✅ All           | none       |
 
 ### 상세 시나리오 설명
 
@@ -581,12 +586,12 @@ make clean-all     # 이미지 포함 전체 정리
 
 ### Control Panel API
 
-| 엔드포인트        | 메소드 | 설명             | 요청 본문                                       |
-| ----------------- | ------ | ---------------- | ----------------------------------------------- |
-| `/api/k6/run`     | POST   | 테스트 시작      | 아래 상세 설명 참조                            |
-| `/api/k6/stop`    | POST   | 테스트 중지      | -                                               |
-| `/api/k6/status`  | GET    | 테스트 상태 조회 | -                                               |
-| `/api/k6/metrics` | GET    | 메트릭 조회      | -                                               |
+| 엔드포인트        | 메소드 | 설명             | 요청 본문           |
+| ----------------- | ------ | ---------------- | ------------------- |
+| `/api/k6/run`     | POST   | 테스트 시작      | 아래 상세 설명 참조 |
+| `/api/k6/stop`    | POST   | 테스트 중지      | -                   |
+| `/api/k6/status`  | GET    | 테스트 상태 조회 | -                   |
+| `/api/k6/metrics` | GET    | 메트릭 조회      | -                   |
 
 #### 테스트 시작 요청 본문
 
@@ -608,6 +613,7 @@ make clean-all     # 이미지 포함 전체 정리
 #### 테스트 시작 예시
 
 ##### Mock Server 테스트
+
 ```bash
 curl -X POST http://localhost:3000/api/k6/run \
   -H "Content-Type: application/json" \
@@ -623,6 +629,7 @@ curl -X POST http://localhost:3000/api/k6/run \
 ```
 
 ##### 외부 API 테스트
+
 ```bash
 curl -X POST http://localhost:3000/api/k6/run \
   -H "Content-Type: application/json" \
