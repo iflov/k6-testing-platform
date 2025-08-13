@@ -1,39 +1,76 @@
 # K6 Testing Platform
 
-K6 웹 대시보드를 활용한 범용 부하 테스트 플랫폼
+웹 기반 통합 부하 테스트 플랫폼 - K6와 웹 대시보드를 활용한 성능 테스트 솔루션
 
-## 🎯 목적
+## 🎯 프로젝트 개요
 
-- 사내 모든 서비스에 대한 범용적인 부하 테스트 도구
-- K6 웹 대시보드를 통한 실시간 모니터링
-- 프로메테우스/그라파나 연동을 위한 기반 구축
-- 다양한 부하 시나리오 실행 및 분석
+K6 Testing Platform은 마이크로서비스 아키텍처 기반의 종합적인 부하 테스트 플랫폼입니다.
+실시간 모니터링, 다양한 테스트 시나리오, 그리고 직관적인 웹 인터페이스를 제공합니다.
 
-## 🏗️ Architecture
+### 주요 특징
+
+- **통합 웹 대시보드**: Next.js 기반 실시간 테스트 제어 및 모니터링
+- **다양한 테스트 시나리오**: Smoke, Load, Stress, Spike, Soak 등 7가지 내장 시나리오
+- **실시간 메트릭 시각화**: K6 Web Dashboard를 통한 실시간 성능 지표 확인
+- **유연한 테스트 타겟**: Mock 서버 제공 및 외부 서비스 테스트 지원
+- **컨테이너 기반 아키텍처**: Docker Compose를 통한 쉬운 배포 및 확장
+
+## 🏗️ 시스템 아키텍처
+
+### 프로젝트 구조
 
 ```
 k6-testing-platform/
 ├── apps/
-│   ├── control-panel/      # Next.js 컨트롤 패널
-│   ├── mock-server/        # Express Mock 서버
-│   └── k6-runner/          # K6 테스트 실행 서비스
-│       └── k6-scripts/     # K6 테스트 시나리오
+│   ├── control-panel/      # Next.js 15 기반 웹 UI (React 19, TypeScript 5)
+│   ├── mock-server/        # NestJS 10 기반 테스트 타겟 서버
+│   └── k6-runner/          # Express 기반 K6 테스트 실행 서비스
+│       └── k6-scripts/     # K6 테스트 시나리오 (JavaScript)
 ├── services/
-│   └── influxdb/          # InfluxDB 설정
-├── docker-compose.yml      # 로컬 개발 환경
-├── run-test-with-dashboard.sh  # 테스트 실행 스크립트
-└── Makefile               # 자동화 스크립트
+│   └── influxdb/          # 시계열 메트릭 데이터베이스
+├── docker-compose.yml      # 컨테이너 오케스트레이션
+├── run-test-with-dashboard.sh  # 웹 대시보드 포함 테스트 실행
+└── Makefile               # 빌드 및 배포 자동화
 ```
 
-## 🚀 Quick Start
+### 기술 스택
 
-### Prerequisites
+| 서비스             | 기술        | 버전   | 용도                 |
+| ------------------ | ----------- | ------ | -------------------- |
+| **Control Panel**  | Next.js     | 15.4.6 | 웹 UI 및 테스트 제어 |
+|                    | React       | 19.1.0 | UI 컴포넌트          |
+|                    | TypeScript  | 5.x    | 타입 안정성          |
+|                    | TailwindCSS | 4.x    | 스타일링             |
+| **Mock Server**    | NestJS      | 10.x   | RESTful API 모킹     |
+|                    | TypeScript  | 5.x    | 타입 안정성          |
+| **K6 Runner**      | Express     | 4.18.x | K6 실행 관리         |
+|                    | Node.js     | 20+    | 런타임               |
+| **Testing Engine** | K6          | Latest | 부하 테스트 엔진     |
+| **Database**       | InfluxDB    | 1.8    | 메트릭 저장          |
+| **Container**      | Docker      | 20+    | 컨테이너화           |
 
-- Docker & Docker Compose
-- Node.js 20+ (로컬 개발시)
-- Make (선택사항)
+## 🚀 빠른 시작
 
-### 1. 프로젝트 시작
+### 사전 요구사항
+
+- Docker & Docker Compose (필수)
+- Node.js 20+ & npm 10+ (로컬 개발 시)
+- Make (선택사항, 자동화 명령어용)
+- 최소 4GB RAM (Docker Desktop)
+
+### 1. 프로젝트 클론 및 설정
+
+```bash
+# 저장소 클론
+git clone https://github.com/your-org/k6-testing-platform.git
+cd k6-testing-platform
+
+# 환경 변수 설정 (선택사항)
+cp apps/control-panel/.env.example apps/control-panel/.env
+cp apps/k6-runner/.env.example apps/k6-runner/.env
+```
+
+### 2. 서비스 시작
 
 ```bash
 # 모든 서비스 시작 (포그라운드 - 로그 출력)
@@ -46,287 +83,496 @@ make up  # 또는 docker-compose up -d --build
 make logs  # 또는 docker-compose logs -f
 ```
 
-### 2. 서비스 접속
+### 3. 서비스 접속
 
-- **Control Panel**: http://localhost:3000 - 테스트 실행 UI
-- **Mock Server**: http://localhost:3001 - 테스트 타겟 서버
-- **K6 Runner API**: http://localhost:3002 - K6 테스트 실행 서비스
-- **K6 Web Dashboard**: http://localhost:5665 - 실시간 테스트 모니터링 (테스트 실행 시)
-- **InfluxDB**: http://localhost:8086 - 메트릭 저장소
+| 서비스               | URL                   | 설명                               |
+| -------------------- | --------------------- | ---------------------------------- |
+| **Control Panel**    | http://localhost:3000 | 웹 기반 테스트 관리 UI             |
+| **Mock Server**      | http://localhost:3001 | 테스트 타겟 API 서버               |
+| **K6 Runner API**    | http://localhost:3002 | K6 실행 관리 API                   |
+| **K6 Web Dashboard** | http://localhost:5665 | 실시간 메트릭 대시보드 (테스트 중) |
+| **InfluxDB**         | http://localhost:8086 | 시계열 메트릭 DB                   |
 
-### 3. 테스트 실행 (K6 웹 대시보드 포함)
+### 4. 테스트 실행
+
+#### 방법 1: Control Panel UI 사용 (권장)
+
+1. http://localhost:3000 접속
+2. 테스트 시나리오 선택
+3. VU 수와 기간 설정
+4. "Start Test" 클릭
+
+#### 방법 2: Docker Compose 사용
 
 ```bash
-# Web Dashboard와 함께 테스트 실행
-./run-test-with-dashboard.sh simple-load-test.js 50 5m
-
-# 또는 docker-compose 사용
-docker-compose --profile test up k6
-
-# Docker로 직접 실행 (Web Dashboard 포함)
-docker run --rm -it \
-  --network k6-testing-platform_k6-network \
-  -p 5665:5665 \
-  -e VUS=50 \
-  -e DURATION=5m \
-  -e TARGET_URL=http://mock-server:3001 \
-  -e K6_WEB_DASHBOARD=true \
-  -e K6_WEB_DASHBOARD_HOST=0.0.0.0 \
-  -e K6_WEB_DASHBOARD_PORT=5665 \
-  -v $(pwd)/apps/k6-runner/k6-scripts:/scripts:ro \
-  -v $(pwd)/reports:/reports \
-  grafana/k6:latest run \
-  --out influxdb=http://influxdb:8086/k6 \
-  --out web-dashboard \
-  /scripts/scenarios/simple-load-test.js
+# 환경 변수와 함께 실행
+VUS=50 DURATION=5m docker-compose --profile test up k6
 ```
 
-테스트 실행 후 http://localhost:5665 에서 K6 웹 대시보드를 확인할 수 있습니다.
-
-## 💻 Development
+## 💻 개발 환경
 
 ### 로컬 개발 환경 설정
 
 ```bash
-# 의존성 설치
+# 전체 프로젝트 의존성 설치
 make install
 
-# 개발 서버 시작
+# 개발 서버 시작 (모든 서비스)
 make dev
+
+# 서비스 상태 확인
+docker-compose ps
 ```
 
 ### 개별 서비스 개발
 
+#### Control Panel (Next.js)
+
 ```bash
-# Control Panel 개발
 cd apps/control-panel
-npm run dev
+npm install
+npm run dev  # http://localhost:3000
+```
 
-# Mock Server 개발
+#### Mock Server (NestJS)
+
+```bash
 cd apps/mock-server
-npm run dev
+npm install
+npm run start:dev  # http://localhost:3001
 ```
 
-## 📦 Build & Deploy
-
-### Docker 이미지 빌드
+#### K6 Runner (Express)
 
 ```bash
-# 모든 이미지 빌드
-make build
-
-# 개별 빌드
-make build-control  # Control Panel만
-make build-mock     # Mock Server만
+cd apps/k6-runner
+npm install
+npm run dev  # http://localhost:3002
 ```
 
-### 이미지 배포
+### 코드 품질 관리
 
 ```bash
-# Registry 설정 후 푸시
-REGISTRY=your-registry.com make push-images
-```
+# Control Panel
+cd apps/control-panel
+npm run lint
+npm run build
 
-### Kubernetes 배포 예시
-
-각 서비스를 독립적으로 배포:
-
-```yaml
-# control-panel-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: k6-control-panel
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: control-panel
-  template:
-    metadata:
-      labels:
-        app: control-panel
-    spec:
-      containers:
-      - name: control-panel
-        image: your-registry.com/k6-control-panel:latest
-        ports:
-        - containerPort: 3000
+# Mock Server
+cd apps/mock-server
+npm run lint
+npm run test
+npm run test:cov  # 커버리지 확인
 ```
 
 ## 🧪 테스트 시나리오
 
-### 1. Simple Load Test
-가장 기본적인 부하 테스트. VU 수와 기간을 자유롭게 설정 가능.
+플랫폼에서 제공하는 7가지 사전 정의된 테스트 시나리오:
 
-```bash
-docker run --rm \
-  --network k6-testing-platform_k6-network \
-  -e VUS=100 \
-  -e DURATION=10m \
-  -e TARGET_URL=http://your-service:port \
-  -e ENDPOINT=/api/endpoint \
-  -v $(pwd)/k6-scripts:/scripts:ro \
-  grafana/k6:latest run /scripts/scenarios/simple-load-test.js \
-  --out influxdb=http://influxdb:8086/k6
+### 📊 시나리오 비교표
+
+| 시나리오       | 용도             | VU 범위     | 기간        | 주요 지표             |
+| -------------- | ---------------- | ----------- | ----------- | --------------------- |
+| **Smoke**      | 기본 동작 확인   | 1-5         | 1분         | 기능 정상 작동        |
+| **Load**       | 일반 부하 테스트 | 10-100      | 5-30분      | 평균 응답시간, 처리량 |
+| **Stress**     | 한계 테스트      | 50-500      | 10-60분     | Breaking point        |
+| **Spike**      | 급증 대응        | 10-1000     | 5-20분      | 복구 시간             |
+| **Soak**       | 장기 안정성      | 10-100      | 2-24시간    | 메모리 누수           |
+| **Breakpoint** | 최대 용량        | 100-5000    | 20-60분     | 최대 처리량           |
+| **Simple**     | 커스텀 테스트    | 사용자 정의 | 사용자 정의 | 사용자 정의           |
+
+### 상세 시나리오 설명
+
+#### 1. 🚬 Smoke Test
+
+```javascript
+// 최소 부하로 시스템 정상 작동 확인
+stages: [
+  { duration: "30s", target: 1 }, // 워밍업
+  { duration: "30s", target: 1 }, // 유지
+];
 ```
 
-### 2. Breakpoint Test
-시스템 최대 처리 능력 찾기
-- Duration: 20분
-- VUs: 100 → 1000 (단계적 증가)
-- 목적: 시스템이 정상 작동하는 최대 동시 사용자 수 확인
+- **용도**: 배포 후 기본 기능 검증
+- **성공 기준**: 에러율 0%, 응답시간 < 1초
 
-### 3. Smoke Test
-최소 부하로 시스템 기본 동작 확인
-- Duration: 1분
-- VUs: 1
-- 목적: 스크립트 검증, 기본 동작 확인
+#### 2. 📈 Load Test
 
-### 4. Load Test
-일반적인 예상 부하 테스트
-- Duration: 9분 (ramp-up/steady/ramp-down)
-- VUs: 20 (조절 가능)
-- 목적: 정상 운영 부하 시뮬레이션
+```javascript
+// 예상 평균 부하 시뮬레이션
+stages: [
+  { duration: "2m", target: 20 }, // Ramp-up
+  { duration: "5m", target: 20 }, // Stay
+  { duration: "2m", target: 0 }, // Ramp-down
+];
+```
 
-### 5. Stress Test
-시스템 한계점 찾기
-- Duration: 25분
-- VUs: 최대 300
-- 목적: Breaking point 발견
+- **용도**: 일상적인 트래픽 처리 능력 평가
+- **성공 기준**: 에러율 < 1%, P95 < 500ms
 
-### 6. Spike Test
-갑작스러운 트래픽 증가 대응
-- Duration: 13분
-- VUs: 10 → 200 → 300 → 10
-- 목적: 스파이크 대응 및 회복 능력
+#### 3. 💪 Stress Test
 
-### 7. Soak Test
-장시간 안정성 테스트
-- Duration: 4시간+
-- VUs: 30-50
-- 목적: 메모리 누수, 성능 저하 감지
+```javascript
+// 시스템 한계점까지 부하 증가
+stages: [
+  { duration: "2m", target: 50 },
+  { duration: "5m", target: 50 },
+  { duration: "2m", target: 100 },
+  { duration: "5m", target: 100 },
+  { duration: "2m", target: 200 },
+  { duration: "5m", target: 200 },
+  { duration: "2m", target: 300 },
+  { duration: "5m", target: 300 },
+  { duration: "2m", target: 0 },
+];
+```
 
-## 🎛️ Configuration
+- **용도**: Breaking point 발견 및 복구 능력 테스트
+- **관찰 포인트**: CPU/메모리 사용률, 에러 발생 시점
 
-### Mock Server 환경변수
+#### 4. ⚡ Spike Test
+
+```javascript
+// 갑작스런 트래픽 급증 시뮬레이션
+stages: [
+  { duration: "1m", target: 10 },
+  { duration: "30s", target: 200 }, // 급증!
+  { duration: "3m", target: 200 },
+  { duration: "30s", target: 10 }, // 급감!
+  { duration: "3m", target: 10 },
+  { duration: "30s", target: 300 }, // 더 큰 급증!
+  { duration: "3m", target: 300 },
+  { duration: "1m", target: 0 },
+];
+```
+
+- **용도**: 블랙프라이데이, 이벤트 트래픽 대응 능력
+- **성공 기준**: 복구 시간 < 1분, 데이터 무결성 유지
+
+#### 5. 🏊 Soak Test
+
+```javascript
+// 장시간 일정 부하 유지
+stages: [
+  { duration: "5m", target: 50 },
+  { duration: "4h", target: 50 }, // 4시간 유지
+  { duration: "5m", target: 0 },
+];
+```
+
+- **용도**: 메모리 누수, 리소스 고갈 검증
+- **관찰 포인트**: 메모리 사용 추세, 응답시간 변화
+
+#### 6. 🎯 Breakpoint Test
+
+```javascript
+// 시스템이 견딜 수 있는 최대 부하 탐색
+stages: [
+  { duration: "5m", target: 100 },
+  { duration: "5m", target: 200 },
+  { duration: "5m", target: 500 },
+  { duration: "5m", target: 1000 },
+  // 에러율 급증 시점까지 계속
+];
+```
+
+- **용도**: 최대 처리 용량 확인
+- **중단 조건**: 에러율 > 5% 또는 P95 > 2초
+
+## ⚙️ 설정 및 환경 변수
+
+### 서비스별 환경 변수
+
+#### Control Panel (.env)
 
 ```env
+# K6 Runner 연결
+K6_RUNNER_BASE_URL=http://k6-runner:3002
+
+# Mock Server URL
+MOCK_SERVER_URL=http://mock-server:3001
+
+# K6 Dashboard URL
+K6_DASHBOARD_URL=http://localhost:5665
+
+# InfluxDB 설정
+K6_INFLUXDB_URL=http://influxdb:8086
+K6_INFLUXDB_DB=k6
+```
+
+#### K6 Runner (.env)
+
+```env
+# 서비스 포트
+PORT=3002
+
+# InfluxDB 설정
+INFLUXDB_URL=http://influxdb:8086
+
+# K6 Dashboard 설정
+K6_DASHBOARD_PORT=5665
+K6_DASHBOARD_HOST=0.0.0.0
+
+# Mock Server URL
+MOCK_SERVER_URL=http://mock-server:3001
+```
+
+#### Mock Server 환경 변수
+
+```env
+# 서비스 포트
 PORT=3001
+
+# 응답 지연 시뮬레이션
 ENABLE_DELAY=true          # 응답 지연 활성화
 MIN_DELAY=0                # 최소 지연 (ms)
 MAX_DELAY=100              # 최대 지연 (ms)
+
+# 에러 시뮬레이션
 ENABLE_ERROR_SIMULATION=true  # 에러 시뮬레이션
 ERROR_RATE=5               # 에러 발생률 (%)
+
+# 리소스 제한 시뮬레이션
+ENABLE_RATE_LIMIT=false    # Rate limiting
+RATE_LIMIT_MAX=100         # 분당 최대 요청 수
 ```
 
-### 환경 변수
+### K6 테스트 환경 변수
 
-| 변수명 | 설명 | 기본값 | 예시 |
-|--------|------|--------|------|
-| `VUS` | Virtual Users 수 | 10 | 50, 100, 500 |
-| `DURATION` | 테스트 기간 | 1m | 30s, 5m, 1h |
-| `TARGET_URL` | 테스트 대상 URL | http://mock-server:3001 | http://api.example.com |
-| `ENDPOINT` | 테스트 엔드포인트 | / | /api/health, /api/users |
+| 변수명                  | 설명               | 기본값                  | 예시                    |
+| ----------------------- | ------------------ | ----------------------- | ----------------------- |
+| `VUS`                   | Virtual Users 수   | 10                      | 50, 100, 500            |
+| `DURATION`              | 테스트 기간        | 1m                      | 30s, 5m, 1h             |
+| `TARGET_URL`            | 테스트 대상 URL    | http://mock-server:3001 | http://api.example.com  |
+| `ENDPOINT`              | 테스트 엔드포인트  | /                       | /api/health, /api/users |
+| `K6_WEB_DASHBOARD`      | 웹 대시보드 활성화 | true                    | true, false             |
+| `K6_WEB_DASHBOARD_PORT` | 대시보드 포트      | 5665                    | 5665, 8080              |
+| `THINK_TIME`            | 요청 간 대기 시간  | 1s                      | 0s, 500ms, 2s           |
 
 ## 📊 K6 웹 대시보드
 
-### 주요 기능
-- **실시간 메트릭**: 테스트 진행 중 실시간으로 성능 지표 확인
-- **상세 차트**: Response Time, Request Rate, Error Rate 등 다양한 차트
-- **테스트 컨트롤**: 테스트 일시정지, 재시작 가능
-- **리포트 엑스포트**: HTML 형식으로 테스트 결과 저장
+### 실시간 모니터링 기능
 
-### 접속 방법
-1. 테스트 실행 (`./run-test-with-dashboard.sh` 또는 `docker-compose --profile test up k6`)
-2. 브라우저에서 http://localhost:5665 접속
-3. 실시간 메트릭 확인
+K6 Web Dashboard는 테스트 실행 중 실시간으로 성능 메트릭을 시각화합니다.
 
-### 대시보드 탭
-- **Overview**: 전체 테스트 요약
-- **Timings**: 응답 시간 분석 (DNS, TCP, TLS, Request, Response)
-- **Thresholds**: 성공/실패 기준 표시
+#### 주요 기능
 
-## 📊 주요 메트릭
+- **🔴 실시간 메트릭 업데이트**: 1초 단위 실시간 갱신
+- **📈 인터랙티브 차트**: 줌, 패닝 가능한 시계열 그래프
+- **🎯 임계값 모니터링**: Pass/Fail 상태 실시간 표시
+- **💾 리포트 저장**: HTML/JSON 형식 내보내기
+- **⏸️ 테스트 제어**: 일시정지/재개/중지 기능
 
-### 기본 메트릭
-- `http_req_duration`: 응답 시간
-- `http_req_failed`: 실패한 요청
-- `http_reqs`: 초당 요청 수
-- `vus`: 활성 가상 사용자
-- `iterations`: 완료된 반복 수
+#### 대시보드 섹션
 
-### 성능 지표
-- **P95/P99**: 95/99 백분위 응답 시간
-- **RPS**: 초당 요청 수
-- **Error Rate**: 에러율
-- **Throughput**: 처리량
+| 섹션           | 내용             | 주요 지표                         |
+| -------------- | ---------------- | --------------------------------- |
+| **Overview**   | 테스트 요약 정보 | VUs, RPS, Error Rate, Duration    |
+| **Timings**    | 응답 시간 분해   | DNS, TCP, TLS, Waiting, Receiving |
+| **Thresholds** | 성공 기준 상태   | Pass/Fail 상태, 임계값            |
+| **HTTP**       | HTTP 메트릭      | Status Codes, Request Rate        |
+| **Checks**     | 검증 결과        | Pass Rate, Failed Checks          |
 
-## 🛠️ Makefile Commands
+### 메트릭 상세 설명
 
-```bash
-make help          # 도움말 표시
-make dev           # 개발 모드 시작
-make up            # 백그라운드 실행
-make down          # 서비스 중지
-make logs          # 로그 확인
-make clean         # 정리
-make build         # 이미지 빌드
-make test          # 테스트 실행
+#### 핵심 성능 지표
+
+| 메트릭                | 설명             | 정상 범위  | 경고 수준 |
+| --------------------- | ---------------- | ---------- | --------- |
+| **http_req_duration** | 전체 요청 시간   | < 500ms    | > 1s      |
+| **http_req_waiting**  | 서버 처리 시간   | < 200ms    | > 500ms   |
+| **http_req_failed**   | 실패율           | < 1%       | > 5%      |
+| **http_reqs**         | 초당 요청 수     | 시나리오별 | -         |
+| **vus**               | 활성 가상 사용자 | 설정값     | -         |
+| **data_received**     | 수신 데이터양    | -          | -         |
+| **data_sent**         | 송신 데이터양    | -          | -         |
+
+#### 백분위수 지표
+
+```javascript
+// K6 임계값 설정 예시
+export let options = {
+  thresholds: {
+    http_req_duration: ["p(95)<500", "p(99)<1000"],
+    http_req_failed: ["rate<0.1"],
+    http_reqs: ["rate>100"],
+  },
+};
 ```
 
-## 📝 API Endpoints
+- **P50 (Median)**: 중간값, 일반적인 사용자 경험
+- **P90**: 상위 10% 느린 요청
+- **P95**: 상위 5% 느린 요청 (SLA 기준)
+- **P99**: 상위 1% 느린 요청 (극단적 케이스)
+
+## 🛠️ CLI 명령어
+
+### Makefile 명령어
+
+```bash
+# 기본 명령어
+make help          # 사용 가능한 명령어 목록
+make dev           # 개발 모드 시작 (포그라운드)
+make up            # 백그라운드 실행
+make down          # 서비스 중지
+make restart       # 서비스 재시작
+make logs          # 실시간 로그 확인
+make ps            # 서비스 상태 확인
+
+# 빌드 명령어
+make build         # 모든 이미지 빌드
+make build-control # Control Panel 빌드
+make build-mock    # Mock Server 빌드
+make build-runner  # K6 Runner 빌드
+
+# 테스트 명령어
+make test          # 기본 테스트 실행
+make test-load     # Load 테스트 실행
+make test-stress   # Stress 테스트 실행
+
+# 정리 명령어
+make clean         # 컨테이너 및 볼륨 정리
+make clean-all     # 이미지 포함 전체 정리
+```
+
+## 📝 API 명세
 
 ### Control Panel API
 
-- `POST /api/k6/run` - 테스트 시작
-- `POST /api/k6/stop` - 테스트 중지
-- `GET /api/k6/metrics` - 메트릭 조회
+| 엔드포인트        | 메소드 | 설명             | 요청 본문                              |
+| ----------------- | ------ | ---------------- | -------------------------------------- |
+| `/api/k6/run`     | POST   | 테스트 시작      | `{scenario, vus, duration, targetUrl}` |
+| `/api/k6/stop`    | POST   | 테스트 중지      | -                                      |
+| `/api/k6/status`  | GET    | 테스트 상태 조회 | -                                      |
+| `/api/k6/metrics` | GET    | 메트릭 조회      | -                                      |
+
+#### 테스트 시작 예시
+
+```bash
+curl -X POST http://localhost:3000/api/k6/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scenario": "load-test",
+    "vus": 50,
+    "duration": "5m",
+    "targetUrl": "http://api.example.com"
+  }'
+```
 
 ### Mock Server API
 
-- `GET /health` - 헬스 체크
-- `GET /api/users` - 사용자 목록
-- `GET /api/products` - 제품 목록
-- `POST /api/orders` - 주문 생성
-- `GET /api/heavy` - CPU 집약적 작업
-- `GET /api/slow` - 느린 응답
+| 엔드포인트       | 메소드 | 설명                 | 응답 시간 |
+| ---------------- | ------ | -------------------- | --------- |
+| `/health`        | GET    | 헬스 체크            | 즉시      |
+| `/api/users`     | GET    | 사용자 목록 (페이징) | 0-100ms   |
+| `/api/users/:id` | GET    | 사용자 상세          | 0-100ms   |
+| `/api/products`  | GET    | 제품 목록            | 0-100ms   |
+| `/api/orders`    | POST   | 주문 생성            | 100-500ms |
+| `/api/heavy`     | GET    | CPU 집약 작업        | 1-3s      |
+| `/api/slow`      | GET    | 느린 응답 시뮬레이션 | 3-5s      |
+| `/api/error`     | GET    | 에러 시뮬레이션      | 5% 실패율 |
 
-## 🤝 Contributing
+### K6 Runner API
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+| 엔드포인트     | 메소드 | 설명                  |
+| -------------- | ------ | --------------------- |
+| `/test/start`  | POST   | K6 테스트 시작        |
+| `/test/stop`   | POST   | 실행 중인 테스트 중지 |
+| `/test/status` | GET    | 테스트 상태 확인      |
+| `/health`      | GET    | 서비스 헬스 체크      |
+| `/config`      | GET    | 현재 설정 확인        |
 
-## 📄 License
+### InfluxDB 데이터 쿼리
 
-MIT License
+```sql
+-- 평균 응답 시간 조회
+SELECT mean("value") FROM "http_req_duration"
+WHERE time > now() - 1h
+GROUP BY time(10s)
 
-## 🆘 Troubleshooting
+-- 에러율 계산
+SELECT sum("value") FROM "http_req_failed"
+WHERE time > now() - 1h
+```
 
-### Docker 권한 문제
+## 🐛 문제 해결
+
+### 일반적인 문제와 해결법
+
+#### 1. Docker 권한 오류
 
 ```bash
-# Docker 소켓 권한 부여
+# 해결법 1: Docker 그룹에 사용자 추가
+sudo usermod -aG docker $USER
+newgrp docker
+
+# 해결법 2: Docker 소켓 권한 변경
 sudo chmod 666 /var/run/docker.sock
 ```
 
-### 포트 충돌
+#### 2. 포트 충돌
 
-기본 포트:
-- 3000: Control Panel
-- 3001: Mock Server  
-- 5665: K6 Web Dashboard
-- 8086: InfluxDB
+```bash
+# 사용 중인 포트 확인
+lsof -i :3000
+netstat -tulpn | grep 3000
 
-필요시 docker-compose.yml에서 포트 변경
+# docker-compose.yml에서 포트 변경
+ports:
+  - "3001:3000"  # 호스트:컨테이너
+```
 
-### 메모리 부족
+#### 3. 메모리 부족
 
-Docker Desktop 설정에서 메모리 할당 증가 (최소 4GB 권장)
+- Docker Desktop: Preferences → Resources → Memory를 4GB 이상으로 설정
+- Linux: `/etc/docker/daemon.json` 수정
 
-## 📞 Support
+#### 4. 네트워크 연결 실패
 
-이슈나 질문이 있으시면 GitHub Issues를 통해 문의해주세요.
+```bash
+# 네트워크 재생성
+docker-compose down
+docker network prune
+docker-compose up -d
+```
+
+#### 5. K6 Dashboard 접속 불가
+
+```bash
+# 포트 확인
+docker-compose logs k6-runner | grep "Dashboard"
+
+# 방화벽 규칙 확인
+sudo ufw allow 5665/tcp
+```
+
+### 성능 최적화 팁
+
+1. **Docker 리소스 할당**: CPU 4코어, 메모리 8GB 권장
+2. **InfluxDB 튜닝**: Write buffer 크기 증가
+3. **K6 최적화**: `--no-thresholds --no-summary` 옵션으로 오버헤드 감소
+
+## 📚 추가 리소스
+
+### 공식 문서
+
+- [K6 Documentation](https://k6.io/docs/)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [NestJS Documentation](https://docs.nestjs.com/)
+- [Docker Documentation](https://docs.docker.com/)
+
+### 관련 프로젝트
+
+- [K6 Examples](https://github.com/grafana/k6-examples)
+- [K6 Extensions](https://k6.io/docs/extensions/)
+
+### 튜토리얼
+
+- [K6 Performance Testing Guide](https://k6.io/docs/testing-guides/)
+- [Load Testing Best Practices](https://k6.io/docs/testing-guides/load-testing-websites/)
+
+<div align="center">
+  <strong>Built with ❤️ for Performance Testing</strong>
+  <br>
+  <sub>Making load testing accessible and powerful</sub>
+</div>
