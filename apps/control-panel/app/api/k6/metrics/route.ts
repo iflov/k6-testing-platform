@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     // 시간 범위 설정 (실시간 모드일 경우 10초, 아니면 5분)
     const timeRange = realtime ? "10s" : "5m";
 
-    // 여러 메트릭을 병렬로 조회
+    // 여러 메트릭을 병렬로 조회 (testId 필터링 포함)
     const [
       httpReqDuration,
       httpReqs,
@@ -23,12 +23,12 @@ export async function GET(request: NextRequest) {
       iterationDuration,
       dataTransfer,
     ] = await Promise.all([
-      queryHttpReqDuration(timeRange),
-      queryHttpReqs(timeRange),
-      queryVUs(timeRange),
-      queryHttpReqFailed(timeRange),
-      queryIterationDuration(timeRange),
-      queryDataTransfer(timeRange),
+      queryHttpReqDuration(timeRange, testId),
+      queryHttpReqs(timeRange, testId),
+      queryVUs(timeRange, testId),
+      queryHttpReqFailed(timeRange, testId),
+      queryIterationDuration(timeRange, testId),
+      queryDataTransfer(timeRange, testId),
     ]);
 
     const metrics = {
@@ -81,7 +81,10 @@ async function queryInfluxDB(query: string) {
 }
 
 // HTTP 요청 지속 시간 메트릭
-async function queryHttpReqDuration(timeRange = "5m") {
+async function queryHttpReqDuration(timeRange = "5m", testId?: string | null) {
+  // testId 필터 추가
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
+  
   const query = `
     SELECT mean("value") as avg, 
            min("value") as min, 
@@ -89,7 +92,7 @@ async function queryHttpReqDuration(timeRange = "5m") {
            percentile("value", 95) as p95,
            percentile("value", 99) as p99
     FROM "http_req_duration"
-    WHERE time > now() - ${timeRange}
+    WHERE time > now() - ${timeRange} ${testIdFilter}
   `;
 
   const series = await queryInfluxDB(query);
@@ -111,12 +114,14 @@ async function queryHttpReqDuration(timeRange = "5m") {
 }
 
 // HTTP 요청 수 메트릭
-async function queryHttpReqs(timeRange = "5m") {
+async function queryHttpReqs(timeRange = "5m", testId?: string | null) {
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
+  
   const query = `
     SELECT count("value") as count,
            mean("value") as rate
     FROM "http_reqs"
-    WHERE time > now() - ${timeRange}
+    WHERE time > now() - ${timeRange} ${testIdFilter}
   `;
 
   const series = await queryInfluxDB(query);
@@ -135,12 +140,14 @@ async function queryHttpReqs(timeRange = "5m") {
 }
 
 // Virtual Users 메트릭
-async function queryVUs(timeRange = "5m") {
+async function queryVUs(timeRange = "5m", testId?: string | null) {
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
+  
   const query = `
     SELECT last("value") as current,
            max("value") as max
     FROM "vus"
-    WHERE time > now() - ${timeRange}
+    WHERE time > now() - ${timeRange} ${testIdFilter}
   `;
 
   const series = await queryInfluxDB(query);
@@ -159,12 +166,14 @@ async function queryVUs(timeRange = "5m") {
 }
 
 // 실패한 HTTP 요청 메트릭
-async function queryHttpReqFailed(timeRange = "5m") {
+async function queryHttpReqFailed(timeRange = "5m", testId?: string | null) {
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
+  
   const query = `
     SELECT count("value") as count,
            mean("value") as rate
     FROM "http_req_failed"
-    WHERE time > now() - ${timeRange}
+    WHERE time > now() - ${timeRange} ${testIdFilter}
   `;
 
   const series = await queryInfluxDB(query);
@@ -186,13 +195,15 @@ async function queryHttpReqFailed(timeRange = "5m") {
 }
 
 // Iteration 지속 시간 메트릭
-async function queryIterationDuration(timeRange = "5m") {
+async function queryIterationDuration(timeRange = "5m", testId?: string | null) {
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
+  
   const query = `
     SELECT mean("value") as avg,
            min("value") as min,
            max("value") as max
     FROM "iteration_duration"
-    WHERE time > now() - ${timeRange}
+    WHERE time > now() - ${timeRange} ${testIdFilter}
   `;
 
   const series = await queryInfluxDB(query);
@@ -212,17 +223,19 @@ async function queryIterationDuration(timeRange = "5m") {
 }
 
 // 데이터 전송량 메트릭
-async function queryDataTransfer(timeRange = "5m") {
+async function queryDataTransfer(timeRange = "5m", testId?: string | null) {
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
+  
   const querySent = `
     SELECT sum("value") as total
     FROM "data_sent"
-    WHERE time > now() - ${timeRange}
+    WHERE time > now() - ${timeRange} ${testIdFilter}
   `;
 
   const queryReceived = `
     SELECT sum("value") as total
     FROM "data_received"
-    WHERE time > now() - ${timeRange}
+    WHERE time > now() - ${timeRange} ${testIdFilter}
   `;
 
   const [sentSeries, receivedSeries] = await Promise.all([

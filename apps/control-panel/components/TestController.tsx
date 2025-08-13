@@ -21,7 +21,6 @@ const scenarios = getScenarioList();
 
 // Mock 서버의 사용 가능한 엔드포인트 목록
 const availableEndpoints = [
-  { method: "GET", path: "/", description: "Root endpoint" },
   { method: "GET", path: "/health", description: "Health check" },
   { method: "GET", path: "/success", description: "Success response" },
   { method: "POST", path: "/success", description: "Success with body" },

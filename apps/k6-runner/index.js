@@ -52,8 +52,8 @@ function formatDuration(seconds) {
   return `${Math.floor(seconds / 3600)}h`;
 }
 
-// Executor 매핑 함수
-function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
+// Executor 매핑 함수 - testId를 태그로 추가
+function getExecutorConfig(scenario, vus, duration, iterations, executionMode, testId) {
   // 시나리오 설정 가져오기
   const scenarioConfig = getScenarioConfig(scenario);
   
@@ -69,9 +69,19 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
   const stages = scenarioConfig.useStages ? 
     calculateStages(scenarioConfig.rampPattern, userVus, totalSeconds) : null;
   
+  // 기본 options 구조에 tags 추가
+  const baseOptions = {
+    tags: {
+      testId: testId,
+      scenario: scenario,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
   // executionMode별 처리
   if (executionMode === 'iterations') {
     return {
+      ...baseOptions,
       scenarios: {
         [`${scenario}_iterations`]: {
           executor: 'shared-iterations',
@@ -85,6 +95,7 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
   
   if (executionMode === 'hybrid') {
     return {
+      ...baseOptions,
       scenarios: {
         [`${scenario}_hybrid`]: {
           executor: 'shared-iterations',
@@ -100,6 +111,7 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
   // Stage 사용 여부에 따라 다른 executor 사용
   if (stages) {
     return {
+      ...baseOptions,
       scenarios: {
         [`${scenario}_test`]: {
           executor: 'ramping-vus',
@@ -115,6 +127,7 @@ function getExecutorConfig(scenario, vus, duration, iterations, executionMode) {
   
   // Stage가 없는 경우 constant-vus 사용
   return {
+    ...baseOptions,
     scenarios: {
       [`${scenario}_test`]: {
         executor: 'constant-vus',
@@ -177,8 +190,8 @@ app.post("/api/test/start", async (req, res) => {
   let scriptPath;
 
   try {
-    // 시나리오별 executor 설정 가져오기
-    const executorConfig = getExecutorConfig(scenario, vus, duration, iterations, executionMode);
+    // 시나리오별 executor 설정 가져오기 (testId 포함)
+    const executorConfig = getExecutorConfig(scenario, vus, duration, iterations, executionMode, testId);
     const optionsConfig = JSON.stringify(executorConfig, null, 2);
 
     // 완전한 URL 구성 (baseUrl + path)
