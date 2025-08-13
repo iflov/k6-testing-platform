@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import TestController from '@/components/TestController';
 import TestStatus from '@/components/TestStatus';
 import TestResults from '@/components/TestResults';
+import TestHistory from '@/components/TestHistory';
 
 interface Metrics {
   http_req_duration: { avg: number; min: number; max: number; p95: number };
@@ -47,6 +48,25 @@ export default function Home() {
     }
   }, []);
 
+  // 테스트 완료 시 결과 저장 함수
+  const saveTestResults = useCallback(async (testId: string, metrics: any) => {
+    try {
+      const response = await fetch('/api/tests/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testId, metrics }),
+      });
+      
+      if (response.ok) {
+        console.log('Test results saved successfully');
+      } else {
+        console.error('Failed to save test results');
+      }
+    } catch (error) {
+      console.error('Error saving test results:', error);
+    }
+  }, []);
+
   // 상태 체크 함수 (setTimeout 재귀 방식)
   const checkStatus = useCallback(async () => {
     // 현재 상태가 running이 아니면 중지
@@ -67,6 +87,18 @@ export default function Home() {
       // 테스트가 더 이상 실행 중이지 않으면
       if (!data.running) {
         console.log('Test completed, stopping all polling');
+        
+        // 테스트 완료 시 최종 메트릭을 가져와서 저장
+        if (testIdRef.current) {
+          try {
+            const metricsResponse = await fetch(`/api/k6/metrics?testId=${testIdRef.current}`);
+            const finalMetrics = await metricsResponse.json();
+            await saveTestResults(testIdRef.current, finalMetrics);
+          } catch (error) {
+            console.error('Failed to save test results:', error);
+          }
+        }
+        
         setTestStatus('idle');
         setTestId(null);
         setMetrics(null);
@@ -106,7 +138,7 @@ export default function Home() {
         pollingTimeoutRef.current = setTimeout(checkStatus, 2000);
       }
     }
-  }, []);
+  }, [saveTestResults]);
 
   // 메트릭 폴링 함수 (setTimeout 재귀 방식)
   const pollMetrics = useCallback(async () => {
@@ -234,6 +266,7 @@ export default function Home() {
                 setMetrics(null);
               }}
               testStatus={testStatus}
+              testId={testId}
             />
             
             <TestStatus status={testStatus} testId={testId} />
@@ -242,6 +275,10 @@ export default function Home() {
           <div>
             <TestResults testId={testId} status={testStatus} metrics={metrics} />
           </div>
+        </div>
+        
+        <div className="mt-6">
+          <TestHistory />
         </div>
       </div>
     </main>

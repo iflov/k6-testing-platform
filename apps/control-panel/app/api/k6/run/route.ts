@@ -50,9 +50,39 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await response.json();
+    const testId = result.testId || Date.now().toString();
+
+    // Save test run to PostgreSQL
+    try {
+      // Dynamic imports to avoid initialization issues
+      const { getTestRunRepository } = await import('@/src/lib/database');
+      const { TestStatus } = await import('@/src/entities/TestRun.entity');
+      
+      const testRunRepo = await getTestRunRepository();
+      const testRun = testRunRepo.create({
+        testId: testId,
+        scenario: scenario || 'default',
+        vus: vus || 10,
+        duration: duration || '30s',
+        iterations: iterations || null,
+        executionMode: executionMode || 'duration',
+        targetUrl: targetUrl || config.mockServerUrl,
+        urlPath: urlPath || '/',
+        httpMethod: httpMethod || 'GET',
+        requestBody: requestBody ? JSON.parse(requestBody) : null,
+        status: TestStatus.RUNNING,
+        startedAt: new Date(),
+      });
+      
+      await testRunRepo.save(testRun);
+      console.log('Test run saved to database:', testRun.id);
+    } catch (dbError) {
+      console.error('Failed to save test run to database:', dbError);
+      // Continue even if DB save fails - we don't want to stop the test
+    }
 
     return NextResponse.json({
-      testId: result.testId || Date.now().toString(),
+      testId: testId,
       message: "Test started successfully",
       dashboardUrl: result.dashboardUrl || config.k6DashboardUrl,
       status: result.status,

@@ -582,11 +582,13 @@ app.post("/api/test/stop", async (req, res) => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
+    const stoppedTestId = currentTest.testId;
     currentTest = null;
 
     res.json({
       status: "stopped",
       message: "Test stopped successfully",
+      testId: stoppedTestId,
     });
   } catch (error) {
     console.error("Failed to stop test:", error);

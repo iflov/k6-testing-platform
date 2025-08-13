@@ -3,6 +3,10 @@ import config from '@/lib/config';
 
 export async function POST(request: NextRequest) {
   try {
+    // Request body에서 testId 가져오기 (optional)
+    const body = await request.json().catch(() => ({}));
+    const { testId } = body;
+
     // k6-runner 서비스의 stop API 호출
     const response = await fetch(config.k6RunnerTestStopUrl, {
       method: 'POST',
@@ -25,9 +29,35 @@ export async function POST(request: NextRequest) {
 
     const result = await response.json();
 
+    // 테스트가 성공적으로 중지되면 DB 상태 업데이트
+    if (testId || result.testId) {
+      try {
+        const { getTestRunRepository } = await import('@/src/lib/database');
+        const { TestStatus } = await import('@/src/entities/TestRun.entity');
+        
+        const testRunRepo = await getTestRunRepository();
+        
+        // testId로 테스트 실행 찾기
+        const testRun = await testRunRepo.findOne({ 
+          where: { testId: testId || result.testId } 
+        });
+        
+        if (testRun && testRun.status === TestStatus.RUNNING) {
+          testRun.status = TestStatus.CANCELLED;
+          testRun.completedAt = new Date();
+          await testRunRepo.save(testRun);
+          console.log('Test run status updated to CANCELLED:', testRun.id);
+        }
+      } catch (dbError) {
+        console.error('Failed to update test status in database:', dbError);
+        // DB 업데이트 실패해도 stop은 성공으로 처리
+      }
+    }
+
     return NextResponse.json({
       message: result.message || 'Test stopped successfully',
       status: result.status || 'stopped',
+      testId: testId || result.testId,
     });
   } catch (error) {
     console.error('Failed to stop test:', error);

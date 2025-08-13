@@ -14,6 +14,7 @@ interface TestControllerProps {
   onTestStart: (testId: string) => void;
   onTestStop: () => void;
   testStatus: "idle" | "running";
+  testId?: string | null;
 }
 
 // 중앙 설정에서 시나리오 목록 가져오기
@@ -37,6 +38,7 @@ export default function TestController({
   onTestStart,
   onTestStop,
   testStatus,
+  testId,
 }: TestControllerProps) {
   // 초기 시나리오 설정 가져오기
   const initialScenario = getScenarioConfig("load");
@@ -48,8 +50,8 @@ export default function TestController({
     iterations: initialScenario.defaultIterations || 100,
     executionMode: "duration" as ExecutionMode,
     targetUrl: configModule.mockServerUrl,
-    selectedEndpoint: "custom",
-    urlPath: "/",
+    selectedEndpoint: "GET /health",
+    urlPath: "/health",
     httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
     requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
     enableDashboard: false,
@@ -104,7 +106,11 @@ export default function TestController({
   const handleStop = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/k6/stop", { method: "POST" });
+      const response = await fetch("/api/k6/stop", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ testId }),
+      });
       const data = await response.json();
       
       if (response.ok) {
