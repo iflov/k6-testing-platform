@@ -13,7 +13,6 @@ services:
       - influxdb
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # For Docker API access
-      - ./apps/k6-runner/k6-scripts:/scripts:ro # Mount K6 scripts as read-only
       - /tmp:/tmp # For temporary test files
       # 개발용 소스 코드 마운트 (hot reload)
       - ./apps/control-panel:/app
@@ -72,7 +71,6 @@ services:
       # 개발용 소스 코드 마운트 (hot reload)
       - ./apps/k6-runner:/app
       - /app/node_modules # node_modules 제외
-      - ./apps/k6-runner/k6-scripts:/app/k6-scripts:ro # K6 scripts 마운트
       - /tmp:/tmp # 임시 파일용
     extra_hosts:
       - "host.docker.internal:host-gateway" # Allow access to host's localhost
