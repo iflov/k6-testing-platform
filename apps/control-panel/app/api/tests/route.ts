@@ -1,31 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { test_status } from '@prisma/client';
+import { prisma } from '@/src/lib/prisma';
+
+// Custom serializer for BigInt
+function serializeBigInt(obj: any): any {
+  return JSON.parse(JSON.stringify(obj, (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  ));
+}
 
 export async function GET(request: NextRequest) {
   try {
-    // Dynamic import to avoid initialization issues
-    const { getTestRunRepository } = await import('@/src/lib/database');
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
     const status = searchParams.get('status');
 
-    const testRunRepo = await getTestRunRepository();
-    
-    const queryBuilder = testRunRepo
-      .createQueryBuilder('testRun')
-      .leftJoinAndSelect('testRun.testResult', 'testResult')
-      .orderBy('testRun.startedAt', 'DESC')
-      .take(limit)
-      .skip(offset);
+    // Build where clause
+    const where = status ? { status: status as test_status } : {};
 
-    if (status) {
-      queryBuilder.where('testRun.status = :status', { status });
-    }
-
-    const [testRuns, total] = await queryBuilder.getManyAndCount();
+    // Get test runs with pagination
+    const [testRuns, total] = await Promise.all([
+      prisma.testRun.findMany({
+        where,
+        include: {
+          testResult: true
+        },
+        orderBy: {
+          startedAt: 'desc'
+        },
+        take: limit,
+        skip: offset
+      }),
+      prisma.testRun.count({ where })
+    ]);
 
     return NextResponse.json({
-      data: testRuns,
+      data: serializeBigInt(testRuns),
       total,
       limit,
       offset,

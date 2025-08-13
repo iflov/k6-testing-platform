@@ -33,3 +33,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Prisma
+/prisma/*.db
+/prisma/*.db-journal

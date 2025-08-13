@@ -12,6 +12,10 @@ services:
       # PostgreSQL connection for Docker network
       - DB_HOST=postgres
       - DB_PORT=5432
+      # K6 Runner and Mock Server URLs for Docker network
+      - K6_RUNNER_BASE_URL=http://k6-runner:3002
+      - MOCK_SERVER_URL=http://mock-server:3001
+      - DATABASE_URL=postgresql://test_admin:TestToTheMoon101!@postgres:5432/Test?schema=public
     depends_on:
       - mock-server
       - influxdb

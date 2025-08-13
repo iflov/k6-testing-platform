@@ -8,6 +8,12 @@ COPY package*.json ./
 # Use npm install instead of npm ci since we don't have package-lock.json
 RUN npm ci
 
+# Copy Prisma schema
+COPY prisma ./prisma
+
+# Generate Prisma Client for the target platform
+RUN npx prisma generate
+
 # Copy source code
 COPY . .
 
@@ -27,6 +33,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 

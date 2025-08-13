@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import config from "@/lib/config";
+import { prisma } from "@/src/lib/prisma";
 
 // K6 Runner 서비스를 통해 테스트 실행
 export async function POST(request: NextRequest) {
@@ -54,27 +55,24 @@ export async function POST(request: NextRequest) {
 
     // Save test run to PostgreSQL
     try {
-      // Dynamic imports to avoid initialization issues
-      const { getTestRunRepository } = await import('@/src/lib/database');
-      const { TestStatus } = await import('@/src/entities/TestRun.entity');
       
-      const testRunRepo = await getTestRunRepository();
-      const testRun = testRunRepo.create({
-        testId: testId,
-        scenario: scenario || 'default',
-        vus: vus || 10,
-        duration: duration || '30s',
-        iterations: iterations || null,
-        executionMode: executionMode || 'duration',
-        targetUrl: targetUrl || config.mockServerUrl,
-        urlPath: urlPath || '/',
-        httpMethod: httpMethod || 'GET',
-        requestBody: requestBody ? JSON.parse(requestBody) : null,
-        status: TestStatus.RUNNING,
-        startedAt: new Date(),
+      const testRun = await prisma.testRun.create({
+        data: {
+          testId: testId,
+          scenario: scenario || 'default',
+          vus: vus || 10,
+          duration: duration || '30s',
+          iterations: iterations || null,
+          executionMode: executionMode || 'duration',
+          targetUrl: targetUrl || config.mockServerUrl,
+          urlPath: urlPath || '/',
+          httpMethod: httpMethod || 'GET',
+          requestBody: requestBody ? JSON.parse(requestBody) : null,
+          status: 'running',
+          startedAt: new Date(),
+        }
       });
       
-      await testRunRepo.save(testRun);
       console.log('Test run saved to database:', testRun.id);
     } catch (dbError) {
       console.error('Failed to save test run to database:', dbError);

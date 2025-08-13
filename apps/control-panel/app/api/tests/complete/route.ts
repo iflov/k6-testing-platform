@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/src/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,16 +12,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Dynamic imports to avoid initialization issues
-    const { getTestRunRepository, getTestResultRepository } = await import('@/src/lib/database');
-    const { TestStatus } = await import('@/src/entities/TestRun.entity');
-
-    // Get repositories
-    const testRunRepo = await getTestRunRepository();
-    const testResultRepo = await getTestResultRepository();
-
     // Find the test run
-    const testRun = await testRunRepo.findOne({
+    const testRun = await prisma.testRun.findUnique({
       where: { testId },
     });
 
@@ -32,9 +25,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Update test run status
-    testRun.status = TestStatus.COMPLETED;
-    testRun.completedAt = new Date();
-    await testRunRepo.save(testRun);
+    const updatedTestRun = await prisma.testRun.update({
+      where: { id: testRun.id },
+      data: {
+        status: 'completed',
+        completedAt: new Date(),
+      }
+    });
 
     // Calculate failed requests from error rate
     const totalRequests = metrics.http_reqs?.count || 0;
@@ -42,26 +39,27 @@ export async function POST(request: NextRequest) {
     const failedRequests = Math.round(totalRequests * errorRate);
 
     // Create test result
-    const testResult = testResultRepo.create({
-      testRunId: testRun.id,
-      totalRequests: totalRequests,
-      failedRequests: failedRequests,
-      avgResponseTime: metrics.http_req_duration?.avg || 0,
-      minResponseTime: metrics.http_req_duration?.min || 0,
-      maxResponseTime: metrics.http_req_duration?.max || 0,
-      p95ResponseTime: metrics.http_req_duration?.p95 || 0,
-      p99ResponseTime: metrics.http_req_duration?.p99 || 0,
-      avgRequestRate: metrics.http_reqs?.rate || 0,
-      errorRate: errorRate,
-      dataReceived: String(metrics.data_received || 0),
-      dataSent: String(metrics.data_sent || 0),
-      maxVus: metrics.vus_max || metrics.vus || 0,
-      avgIterationDuration: metrics.iteration_duration?.avg || null,
-      metricsJson: metrics,
+    const testResult = await prisma.testResult.create({
+      data: {
+        testRunId: testRun.id,
+        totalRequests: totalRequests,
+        failedRequests: failedRequests,
+        avgResponseTime: metrics.http_req_duration?.avg || 0,
+        minResponseTime: metrics.http_req_duration?.min || 0,
+        maxResponseTime: metrics.http_req_duration?.max || 0,
+        p95ResponseTime: metrics.http_req_duration?.p95 || 0,
+        p99ResponseTime: metrics.http_req_duration?.p99 || 0,
+        avgRequestRate: metrics.http_reqs?.rate || 0,
+        errorRate: errorRate,
+        dataReceived: BigInt(Math.floor(metrics.data_received || 0)),
+        dataSent: BigInt(Math.floor(metrics.data_sent || 0)),
+        maxVus: metrics.vus_max || metrics.vus || 0,
+        avgIterationDuration: metrics.iteration_duration?.avg || null,
+        metricsJson: metrics,
+      }
     });
 
-    await testResultRepo.save(testResult);
-
+    // Serialize the response to handle BigInt
     return NextResponse.json({
       success: true,
       message: 'Test results saved successfully',

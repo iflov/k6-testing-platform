@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/src/lib/prisma';
 
 type Params = {
   params: Promise<{ id: string }>;
 };
+
+// Custom serializer for BigInt
+function serializeBigInt(obj: any): any {
+  return JSON.parse(JSON.stringify(obj, (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  ));
+}
 
 export async function GET(
   request: NextRequest,
@@ -10,25 +18,22 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
-    // Dynamic import to avoid initialization issues
-    const { getTestRunRepository } = await import('@/src/lib/database');
-    
-    const testRunRepo = await getTestRunRepository();
-    
-    // Try to find by UUID first, then by testId
-    let testRun = await testRunRepo
-      .createQueryBuilder('testRun')
-      .leftJoinAndSelect('testRun.testResult', 'testResult')
-      .where('testRun.id = :id', { id })
-      .getOne();
+    // Try to find by UUID first
+    let testRun = await prisma.testRun.findUnique({
+      where: { id },
+      include: {
+        testResult: true
+      }
+    });
     
     if (!testRun) {
       // Try to find by testId
-      testRun = await testRunRepo
-        .createQueryBuilder('testRun')
-        .leftJoinAndSelect('testRun.testResult', 'testResult')
-        .where('testRun.testId = :testId', { testId: id })
-        .getOne();
+      testRun = await prisma.testRun.findUnique({
+        where: { testId: id },
+        include: {
+          testResult: true
+        }
+      });
     }
 
     if (!testRun) {
@@ -38,7 +43,8 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(testRun);
+    // Serialize to handle BigInt in testResult
+    return NextResponse.json(serializeBigInt(testRun));
   } catch (error) {
     console.error('Failed to fetch test run:', error);
     return NextResponse.json(

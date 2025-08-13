@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TestRun {
+  id            String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  testId        String       @unique @map("test_id") @db.VarChar(255)
+  scenario      String       @db.VarChar(100)
+  vus           Int
+  duration      String?      @db.VarChar(50)
+  iterations    Int?
+  executionMode String       @map("execution_mode") @db.VarChar(50)
+  targetUrl     String       @map("target_url")
+  urlPath       String       @map("url_path")
+  httpMethod    String       @map("http_method") @db.VarChar(10)
+  requestBody   Json?        @map("request_body")
+  status        test_status  @default(running)
+  startedAt     DateTime     @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime?    @map("completed_at") @db.Timestamptz(6)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  testResult    TestResult?
+
+  @@index([startedAt(sort: Desc)], map: "idx_test_runs_started_at")
+  @@index([status], map: "idx_test_runs_status")
+  @@index([testId], map: "idx_test_runs_test_id")
+  @@map("test_runs")
+}
+
+model TestResult {
+  id                   String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  testRunId            String   @unique @map("test_run_id") @db.Uuid
+  totalRequests        Int      @map("total_requests")
+  failedRequests       Int      @map("failed_requests")
+  avgResponseTime      Float    @map("avg_response_time")
+  minResponseTime      Float    @map("min_response_time")
+  maxResponseTime      Float    @map("max_response_time")
+  p95ResponseTime      Float    @map("p95_response_time")
+  p99ResponseTime      Float    @map("p99_response_time")
+  avgRequestRate       Float    @map("avg_request_rate")
+  errorRate            Float    @map("error_rate")
+  dataReceived         BigInt   @map("data_received")
+  dataSent             BigInt   @map("data_sent")
+  maxVus               Int      @map("max_vus")
+  avgIterationDuration Float?   @map("avg_iteration_duration")
+  metricsJson          Json?    @map("metrics_json")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  testRun              TestRun  @relation(fields: [testRunId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_6fdd4b95d0420867b1a0c83a045")
+
+  @@index([testRunId], map: "idx_test_results_test_run_id")
+  @@map("test_results")
+}
+
+enum test_status {
+  running
+  completed
+  failed
+  cancelled
+}

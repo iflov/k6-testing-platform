@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
+import { prisma } from '@/src/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,20 +33,20 @@ export async function POST(request: NextRequest) {
     // 테스트가 성공적으로 중지되면 DB 상태 업데이트
     if (testId || result.testId) {
       try {
-        const { getTestRunRepository } = await import('@/src/lib/database');
-        const { TestStatus } = await import('@/src/entities/TestRun.entity');
-        
-        const testRunRepo = await getTestRunRepository();
         
         // testId로 테스트 실행 찾기
-        const testRun = await testRunRepo.findOne({ 
+        const testRun = await prisma.testRun.findUnique({ 
           where: { testId: testId || result.testId } 
         });
         
-        if (testRun && testRun.status === TestStatus.RUNNING) {
-          testRun.status = TestStatus.CANCELLED;
-          testRun.completedAt = new Date();
-          await testRunRepo.save(testRun);
+        if (testRun && testRun.status === 'running') {
+          await prisma.testRun.update({
+            where: { id: testRun.id },
+            data: {
+              status: 'cancelled',
+              completedAt: new Date(),
+            }
+          });
           console.log('Test run status updated to CANCELLED:', testRun.id);
         }
       } catch (dbError) {
