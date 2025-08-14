@@ -66,6 +66,81 @@ const availableScenarios = [
   "breakpoint",
 ];
 
+// Input Validation
+const validators = {
+  isValidUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      return ['http:', 'https:'].includes(urlObj.protocol);
+    } catch {
+      return false;
+    }
+  },
+
+  isValidDuration(duration) {
+    return /^[1-9]\d*[smh]$/.test(duration);
+  },
+
+  isValidHttpMethod(method) {
+    return ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+  },
+
+  isValidScenario(scenario) {
+    return availableScenarios.includes(scenario);
+  },
+
+  sanitizeString(str) {
+    if (typeof str !== 'string') return '';
+    // Remove potential script injection patterns
+    return str
+      .replace(/[<>]/g, '') // Remove HTML brackets
+      .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+      .replace(/`/g, "'") // Replace backticks
+      .substring(0, 10000); // Limit length
+  },
+
+  validateTestConfig(config) {
+    const errors = [];
+    
+    // Validate VUs
+    if (config.vus && (config.vus < 1 || config.vus > 1000)) {
+      errors.push('VUs must be between 1 and 1000');
+    }
+    
+    // Validate duration
+    if (config.duration && !this.isValidDuration(config.duration)) {
+      errors.push('Invalid duration format. Use format like "30s", "5m", "1h"');
+    }
+    
+    // Validate iterations
+    if (config.iterations && (config.iterations < 1 || config.iterations > 100000)) {
+      errors.push('Iterations must be between 1 and 100000');
+    }
+    
+    // Validate URL
+    if (config.targetUrl && !this.isValidUrl(config.targetUrl)) {
+      errors.push('Invalid target URL');
+    }
+    
+    // Validate HTTP method
+    if (config.httpMethod && !this.isValidHttpMethod(config.httpMethod)) {
+      errors.push('Invalid HTTP method');
+    }
+    
+    // Validate scenario
+    if (config.scenario && !this.isValidScenario(config.scenario)) {
+      errors.push('Invalid scenario');
+    }
+    
+    // Validate error rate
+    if (config.errorRate !== undefined && (config.errorRate < 0 || config.errorRate > 100)) {
+      errors.push('Error rate must be between 0 and 100');
+    }
+    
+    return errors;
+  }
+};
+
 // Utility Functions
 const utils = {
   parseDuration(duration) {
@@ -624,6 +699,21 @@ app.post("/api/test/start", async (req, res) => {
     errorTypes = {},
   } = req.body;
 
+  // Validate input configuration
+  const validationErrors = validators.validateTestConfig(req.body);
+  if (validationErrors.length > 0) {
+    console.error("Validation errors:", validationErrors);
+    return res.status(400).json({
+      error: "Invalid test configuration",
+      message: validationErrors.join(", "),
+      errors: validationErrors
+    });
+  }
+
+  // Sanitize string inputs
+  const sanitizedUrlPath = validators.sanitizeString(urlPath);
+  const sanitizedRequestBody = requestBody ? validators.sanitizeString(requestBody) : null;
+
   if (currentTest) {
     console.log("Test already running:", currentTest.testId);
     return res.status(400).json({
@@ -650,14 +740,14 @@ app.post("/api/test/start", async (req, res) => {
     const baseUrl = targetUrl || config.mockServerUrl;
     const fullUrl = scriptGenerator.buildUrl(
       baseUrl,
-      urlPath,
+      sanitizedUrlPath,
       enableErrorSimulation,
       errorRate,
       errorTypes
     );
 
     const script = scriptGenerator.generateScript(
-      { fullUrl, httpMethod, requestBody },
+      { fullUrl, httpMethod, requestBody: sanitizedRequestBody },
       executorConfig
     );
 

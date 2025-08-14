@@ -5,16 +5,16 @@ import config from "@/lib/config";
 export async function GET() {
   try {
     const response = await fetch(config.k6RunnerTestStatusUrl);
-    
+
     if (!response.ok) {
       return NextResponse.json(
         { running: false, error: "Failed to get test status" },
         { status: response.status }
       );
     }
-    
+
     const status = await response.json();
-    
+
     return NextResponse.json({
       running: status.running,
       testId: status.details?.testId || null,

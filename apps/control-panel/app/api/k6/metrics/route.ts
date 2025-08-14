@@ -83,8 +83,8 @@ async function queryInfluxDB(query: string) {
 // HTTP 요청 지속 시간 메트릭
 async function queryHttpReqDuration(timeRange = "5m", testId?: string | null) {
   // testId 필터 추가
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
-  
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
+
   const query = `
     SELECT mean("value") as avg, 
            min("value") as min, 
@@ -115,8 +115,8 @@ async function queryHttpReqDuration(timeRange = "5m", testId?: string | null) {
 
 // HTTP 요청 수 메트릭
 async function queryHttpReqs(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
-  
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
+
   const query = `
     SELECT count("value") as count,
            mean("value") as rate
@@ -141,8 +141,8 @@ async function queryHttpReqs(timeRange = "5m", testId?: string | null) {
 
 // Virtual Users 메트릭
 async function queryVUs(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
-  
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
+
   const query = `
     SELECT last("value") as current,
            max("value") as max
@@ -167,8 +167,8 @@ async function queryVUs(timeRange = "5m", testId?: string | null) {
 
 // 실패한 HTTP 요청 메트릭
 async function queryHttpReqFailed(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
-  
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
+
   const query = `
     SELECT count("value") as count,
            mean("value") as rate
@@ -195,9 +195,12 @@ async function queryHttpReqFailed(timeRange = "5m", testId?: string | null) {
 }
 
 // Iteration 지속 시간 메트릭
-async function queryIterationDuration(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
-  
+async function queryIterationDuration(
+  timeRange = "5m",
+  testId?: string | null
+) {
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
+
   const query = `
     SELECT mean("value") as avg,
            min("value") as min,
@@ -224,8 +227,8 @@ async function queryIterationDuration(timeRange = "5m", testId?: string | null) 
 
 // 데이터 전송량 메트릭
 async function queryDataTransfer(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : '';
-  
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
+
   const querySent = `
     SELECT sum("value") as total
     FROM "data_sent"

@@ -47,10 +47,10 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const error = await response.json();
       return NextResponse.json(
-        { 
+        {
           error: error.error || "Failed to start test",
           message: error.message || "Failed to start test",
-          details: error 
+          details: error,
         },
         { status: response.status }
       );
@@ -61,27 +61,26 @@ export async function POST(request: NextRequest) {
 
     // Save test run to PostgreSQL
     try {
-      
       const testRun = await prisma.testRun.create({
         data: {
           testId: testId,
-          scenario: scenario || 'default',
+          scenario: scenario || "default",
           vus: vus || 10,
-          duration: duration || '30s',
+          duration: duration || "30s",
           iterations: iterations || null,
-          executionMode: executionMode || 'duration',
+          executionMode: executionMode || "duration",
           targetUrl: targetUrl || config.mockServerUrl,
-          urlPath: urlPath || '/',
-          httpMethod: httpMethod || 'GET',
+          urlPath: urlPath || "/",
+          httpMethod: httpMethod || "GET",
           requestBody: requestBody ? JSON.parse(requestBody) : null,
-          status: 'running',
+          status: "running",
           startedAt: new Date(),
-        }
+        },
       });
-      
-      console.log('Test run saved to database:', testRun.id);
+
+      console.log("Test run saved to database:", testRun.id);
     } catch (dbError) {
-      console.error('Failed to save test run to database:', dbError);
+      console.error("Failed to save test run to database:", dbError);
       // Continue even if DB save fails - we don't want to stop the test
     }
 

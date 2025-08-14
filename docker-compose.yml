@@ -15,7 +15,7 @@ services:
       # K6 Runner and Mock Server URLs for Docker network
       - K6_RUNNER_BASE_URL=http://k6-runner:3002
       - MOCK_SERVER_URL=http://mock-server:3001
-      - DATABASE_URL=postgresql://test_admin:TestToTheMoon101!@postgres:5432/Test?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-testuser}:${POSTGRES_PASSWORD:-testpassword}@postgres:5432/${POSTGRES_DB:-k6_test_history}?schema=public
     depends_on:
       - mock-server
       - influxdb
@@ -55,7 +55,7 @@ services:
     env_file:
       - ./services/influxdb/.env
     environment:
-      - INFLUXDB_DB=k6
+      - INFLUXDB_DB=${INFLUXDB_DB:-k6}
       - INFLUXDB_HTTP_AUTH_ENABLED=false
     volumes:
       - influxdb-data:/var/lib/influxdb
