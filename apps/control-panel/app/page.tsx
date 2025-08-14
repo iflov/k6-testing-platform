@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import TestController from '@/components/TestController';
 import TestStatus from '@/components/TestStatus';
 import TestResults from '@/components/TestResults';
-import TestHistory from '@/components/TestHistory';
+import TestProgress from '@/components/TestProgress';
 
 interface Metrics {
   http_req_duration: { avg: number; min: number; max: number; p95: number };
@@ -225,9 +225,13 @@ export default function Home() {
   }, [testStatus, testId, checkStatus, pollMetrics]);
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="container mx-auto py-8 px-4">
-        <h1 className="text-4xl font-bold text-gray-900 mb-8">K6 Load Testing Platform</h1>
+    <main className="container mx-auto py-8 px-4">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Test Dashboard</h1>
+        <p className="text-gray-600 mt-2">
+          Configure and run load tests, monitor real-time metrics and progress.
+        </p>
+      </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
@@ -272,15 +276,12 @@ export default function Home() {
             <TestStatus status={testStatus} testId={testId} />
           </div>
           
-          <div>
+          <div className="space-y-6">
             <TestResults testId={testId} status={testStatus} metrics={metrics} />
+            {/* Progress Component - Show when test is running */}
+            <TestProgress testId={testId || undefined} isRunning={testStatus === "running"} />
           </div>
         </div>
-        
-        <div className="mt-6">
-          <TestHistory />
-        </div>
-      </div>
     </main>
   );
 }

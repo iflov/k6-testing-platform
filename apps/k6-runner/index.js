@@ -3,6 +3,8 @@ const { spawn } = require("child_process");
 const fs = require("fs").promises;
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const { exec } = require('child_process');
+const { promisify } = require('util');
 const config = require("./config");
 const { getScenarioConfig, calculateStages } = require("./scenario-config");
 
@@ -10,16 +12,50 @@ const app = express();
 app.use(express.json());
 
 let currentTest = null;
+let testProgress = {}; // Store progress for each test
 
-// CORS 설정 (Control Panel에서 접근 가능하도록)
-app.use((req, res, next) => {
+// Constants
+const CONSTANTS = {
+  DEFAULT_VUS: 10,
+  DEFAULT_DURATION: '30s',
+  DEFAULT_ITERATIONS: 100,
+  DEFAULT_EXECUTION_MODE: 'duration',
+  DEFAULT_HTTP_METHOD: 'GET',
+  DEFAULT_ERROR_RATE: 10,
+  DEFAULT_ERROR_CODES: '400,500,503',
+  PROCESS_TIMEOUT_BUFFER: 30, // seconds
+  FORCE_KILL_TIMEOUT: 5000, // ms
+  PORT_RELEASE_WAIT: 1500, // ms
+  PROCESS_EXIT_WAIT: 500, // ms
+  PROCESS_KILL_WAIT: 100, // ms
+  MAX_KILL_ATTEMPTS: 30,
+  LOG_BUFFER_SIZE: 1000, // chars
+  SCRIPT_PREVIEW_SIZE: 500 // chars
+};
+
+// HTTP Status Codes
+const HTTP_STATUS = {
+  SUCCESS: { 
+    GET: [200], 
+    POST: [200, 201], 
+    PUT: [200, 204], 
+    PATCH: [200, 204], 
+    DELETE: [200, 202, 204] 
+  },
+  METHODS_WITH_BODY: ['POST', 'PUT', 'PATCH']
+};
+
+// CORS Middleware
+const corsMiddleware = (req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Content-Type");
   res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   next();
-});
+};
 
-// 사용 가능한 시나리오 목록 (이제 파일 경로 대신 타입만 정의)
+app.use(corsMiddleware);
+
+// Available scenarios
 const availableScenarios = [
   "smoke",
   "load", 
@@ -29,153 +65,456 @@ const availableScenarios = [
   "breakpoint"
 ];
 
-// Duration 문자열을 초 단위로 변환하는 함수
-function parseDuration(duration) {
-  const match = duration.match(/^(\d+)([smh])$/);
-  if (!match) return 30; // 기본값 30초
-  
-  const value = parseInt(match[1]);
-  const unit = match[2];
-  
-  switch(unit) {
-    case 's': return value;
-    case 'm': return value * 60;
-    case 'h': return value * 3600;
-    default: return 30;
-  }
-}
+// Utility Functions
+const utils = {
+  parseDuration(duration) {
+    const match = duration.match(/^(\d+)([smh])$/);
+    if (!match) return 30;
+    
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    const unitMultipliers = { s: 1, m: 60, h: 3600 };
+    
+    return value * (unitMultipliers[unit] || 1);
+  },
 
-// 초를 duration 문자열로 변환하는 함수
-function formatDuration(seconds) {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h`;
-}
+  formatDuration(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    return `${Math.floor(seconds / 3600)}h`;
+  },
 
-// Executor 매핑 함수 - testId를 태그로 추가
-function getExecutorConfig(scenario, vus, duration, iterations, executionMode, testId) {
-  // 시나리오 설정 가져오기
-  const scenarioConfig = getScenarioConfig(scenario);
-  
-  // 사용자가 설정한 값 우선 적용, 없으면 시나리오 기본값 사용
-  const userVus = vus || scenarioConfig.defaultVus || 10;
-  const userDuration = duration || scenarioConfig.defaultDuration || "30s";
-  const userIterations = iterations || scenarioConfig.defaultIterations || 100;
-  
-  // Duration을 초 단위로 변환
-  const totalSeconds = parseDuration(userDuration);
-  
-  // Stage 계산 (시나리오의 rampPattern 사용)
-  const stages = scenarioConfig.useStages ? 
-    calculateStages(scenarioConfig.rampPattern, userVus, totalSeconds) : null;
-  
-  // 기본 options 구조에 tags 추가
-  const baseOptions = {
-    tags: {
-      testId: testId,
-      scenario: scenario,
-      timestamp: new Date().toISOString()
+  async isPortInUse(port) {
+    const execAsync = promisify(exec);
+    try {
+      const result = await execAsync(`lsof -i :${port}`);
+      return result.stdout.length > 0;
+    } catch (error) {
+      return false;
     }
-  };
-  
-  // executionMode별 처리
-  if (executionMode === 'iterations') {
-    return {
-      ...baseOptions,
-      scenarios: {
-        [`${scenario}_iterations`]: {
-          executor: 'shared-iterations',
-          vus: userVus,
-          iterations: userIterations,
-          maxDuration: userDuration,
-        },
-      },
-    };
+  },
+
+  async safeDeleteFile(filePath) {
+    try {
+      await fs.access(filePath);
+      await fs.unlink(filePath);
+      console.log("File deleted:", filePath);
+      return true;
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        console.error("Failed to delete file:", err);
+      }
+      return false;
+    }
+  },
+
+  escapeScriptContent(content) {
+    return content
+      .replace(/\\/g, '\\\\')
+      .replace(/`/g, '\\`')
+      .replace(/\$/g, '\\$');
   }
-  
-  if (executionMode === 'hybrid') {
+};
+
+// K6 Configuration Builders
+const k6Config = {
+  createBaseTags(testId, scenario) {
     return {
-      ...baseOptions,
-      scenarios: {
-        [`${scenario}_hybrid`]: {
-          executor: 'shared-iterations',
-          vus: userVus,
-          iterations: userIterations,
-          maxDuration: userDuration,
-        },
-      },
+      testId,
+      scenario,
+      timestamp: new Date().toISOString()
     };
-  }
-  
-  // Duration mode (default)
-  // Stage 사용 여부에 따라 다른 executor 사용
-  if (stages) {
+  },
+
+  createIterationsScenario(scenario, vus, iterations, duration) {
     return {
-      ...baseOptions,
-      scenarios: {
-        [`${scenario}_test`]: {
-          executor: 'ramping-vus',
-          startVUs: scenario === 'spike' ? Math.floor(userVus * 0.1) : 1,
-          stages: stages.map(stage => ({
-            duration: stage.duration,
-            target: stage.target,
-          })),
-        },
-      },
+      [`${scenario}_iterations`]: {
+        executor: 'shared-iterations',
+        vus,
+        iterations,
+        maxDuration: duration,
+      }
     };
-  }
-  
-  // Stage가 없는 경우 constant-vus 사용
-  return {
-    ...baseOptions,
-    scenarios: {
+  },
+
+  createRampingScenario(scenario, vus, stages) {
+    return {
+      [`${scenario}_test`]: {
+        executor: 'ramping-vus',
+        startVUs: scenario === 'spike' ? Math.floor(vus * 0.1) : 1,
+        stages: stages.map(stage => ({
+          duration: stage.duration,
+          target: stage.target,
+        })),
+      }
+    };
+  },
+
+  createConstantScenario(scenario, vus, duration) {
+    return {
       [`${scenario}_test`]: {
         executor: 'constant-vus',
-        vus: userVus,
-        duration: userDuration,
-      },
-    },
-  };
-}
+        vus,
+        duration,
+      }
+    };
+  },
 
-
-// 포트가 사용 중인지 확인하는 함수
-async function isPortInUse(port) {
-  const { exec } = require('child_process');
-  const { promisify } = require('util');
-  const execAsync = promisify(exec);
-  
-  try {
-    const result = await execAsync(`lsof -i :${port}`);
-    return result.stdout.length > 0;
-  } catch (error) {
-    // lsof 명령이 실패하면 포트가 사용되지 않는 것으로 간주
-    return false;
+  getExecutorConfig(scenario, vus, duration, iterations, executionMode, testId) {
+    const scenarioConfig = getScenarioConfig(scenario);
+    
+    const userVus = vus || scenarioConfig.defaultVus || CONSTANTS.DEFAULT_VUS;
+    const userDuration = duration || scenarioConfig.defaultDuration || CONSTANTS.DEFAULT_DURATION;
+    const userIterations = iterations || scenarioConfig.defaultIterations || CONSTANTS.DEFAULT_ITERATIONS;
+    
+    const totalSeconds = utils.parseDuration(userDuration);
+    const stages = scenarioConfig.useStages ? 
+      calculateStages(scenarioConfig.rampPattern, userVus, totalSeconds) : null;
+    
+    const baseOptions = {
+      tags: this.createBaseTags(testId, scenario)
+    };
+    
+    let scenarios;
+    
+    if (executionMode === 'iterations' || executionMode === 'hybrid') {
+      scenarios = this.createIterationsScenario(scenario, userVus, userIterations, userDuration);
+    } else if (stages) {
+      scenarios = this.createRampingScenario(scenario, userVus, stages);
+    } else {
+      scenarios = this.createConstantScenario(scenario, userVus, userDuration);
+    }
+    
+    return { ...baseOptions, scenarios };
   }
-}
+};
 
-// 테스트 시작 API
+// Script Generation
+const scriptGenerator = {
+  buildUrl(baseUrl, urlPath, enableErrorSimulation, errorRate, errorTypes, httpMethod) {
+    let fullUrl = urlPath ? `${baseUrl}${urlPath}` : baseUrl;
+    
+    if (enableErrorSimulation && baseUrl.includes('mock-server')) {
+      const enabledErrorTypes = Object.entries(errorTypes)
+        .filter(([code, enabled]) => enabled)
+        .map(([code]) => code);
+      
+      const statusCodes = enabledErrorTypes.length > 0 
+        ? enabledErrorTypes.join(',')
+        : CONSTANTS.DEFAULT_ERROR_CODES;
+      
+      const chaosPath = '/chaos/random';
+      fullUrl = `${baseUrl}${chaosPath}?errorRate=${errorRate / 100}&statusCodes=${statusCodes}`;
+    }
+    
+    return fullUrl;
+  },
+
+  createHttpRequest(httpMethod, fullUrl, requestBody) {
+    const method = httpMethod.toLowerCase();
+    
+    if (HTTP_STATUS.METHODS_WITH_BODY.includes(httpMethod)) {
+      let bodyData = requestBody || '{"message": "test"}';
+      
+      try {
+        const parsedBody = JSON.parse(bodyData);
+        bodyData = JSON.stringify(parsedBody);
+      } catch (e) {
+        console.log("Invalid JSON in request body, using as-is:", bodyData);
+      }
+      
+      const escapedBody = utils.escapeScriptContent(bodyData);
+      
+      return `
+  const params = {
+    headers: { 'Content-Type': 'application/json' },
+  };
+  const res = http.${method}('${fullUrl}', \`${escapedBody}\`, params);`;
+    } else if (httpMethod === "DELETE") {
+      return `
+  const params = {
+    headers: { 'Content-Type': 'application/json' },
+  };
+  const res = http.del('${fullUrl}', null, params);`;
+    } else {
+      return `
+  const res = http.get('${fullUrl}');`;
+    }
+  },
+
+  createSuccessCheck(httpMethod) {
+    const statusCodes = HTTP_STATUS.SUCCESS[httpMethod] || HTTP_STATUS.SUCCESS.GET;
+    const statusDescription = statusCodes.join('/');
+    
+    if (httpMethod === "POST") {
+      return `
+  // Response status logging for debugging
+  if (res.status !== 200 && res.status !== 201) {
+    console.log(\`POST request failed: Status=\${res.status}, Body=\${res.body}\`);
+  }
+  
+  check(res, {
+    'status is successful (${statusDescription})': (r) => ${statusCodes.map(code => `r.status === ${code}`).join(' || ')},
+  });`;
+    }
+    
+    return `
+  check(res, {
+    'status is successful (${statusDescription})': (r) => ${statusCodes.map(code => `r.status === ${code}`).join(' || ')},
+  });`;
+  },
+
+  generateScript(config, executorConfig) {
+    const { fullUrl, httpMethod, requestBody } = config;
+    const optionsConfig = JSON.stringify(executorConfig, null, 2);
+    const httpRequest = this.createHttpRequest(httpMethod, fullUrl, requestBody);
+    const successCheck = this.createSuccessCheck(httpMethod);
+    
+    return `
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+export const options = ${optionsConfig};
+
+export default function () {${httpRequest}${successCheck}
+  sleep(1);
+}
+    `;
+  }
+};
+
+// Test Management
+const testManager = {
+  async setupTimeout(k6Process, testId, duration) {
+    const durationInSeconds = utils.parseDuration(duration);
+    const maxExecutionTime = (durationInSeconds + CONSTANTS.PROCESS_TIMEOUT_BUFFER) * 1000;
+    
+    return setTimeout(() => {
+      if (currentTest && currentTest.process === k6Process && !k6Process.killed) {
+        console.warn(`Test ${testId} exceeded maximum execution time (${maxExecutionTime/1000}s), forcing termination`);
+        k6Process.kill("SIGTERM");
+        
+        setTimeout(() => {
+          if (!k6Process.killed) {
+            console.error(`Test ${testId} not responding to SIGTERM, forcing SIGKILL`);
+            k6Process.kill("SIGKILL");
+          }
+        }, CONSTANTS.FORCE_KILL_TIMEOUT);
+      }
+    }, maxExecutionTime);
+  },
+
+  async cleanupTest(test) {
+    if (test.timeoutId) {
+      clearTimeout(test.timeoutId);
+    }
+    
+    if (test.scriptPath) {
+      await utils.safeDeleteFile(test.scriptPath);
+    }
+    
+    if (test.dashboardEnabled) {
+      console.log("Dashboard was enabled, waiting for port release...");
+      await new Promise(resolve => setTimeout(resolve, CONSTANTS.PORT_RELEASE_WAIT));
+    }
+  },
+
+  async setupDashboard(enableDashboard, k6Args, k6Env) {
+    if (!enableDashboard) return false;
+    
+    const portInUse = await utils.isPortInUse(config.k6DashboardPort);
+    
+    if (portInUse) {
+      console.warn(`Dashboard port ${config.k6DashboardPort} is already in use. Running test without dashboard.`);
+      return false;
+    }
+    
+    k6Args.push("--out", `web-dashboard=host=${config.k6DashboardHost}&port=${config.k6DashboardPort}`);
+    
+    k6Env.K6_WEB_DASHBOARD = "true";
+    k6Env.K6_WEB_DASHBOARD_HOST = config.k6DashboardHost;
+    k6Env.K6_WEB_DASHBOARD_PORT = config.k6DashboardPort;
+    
+    console.log(`Dashboard will be available on port ${config.k6DashboardPort}`);
+    return true;
+  },
+
+  parseK6Progress(output, testId) {
+    // K6 progress output pattern examples:
+    // running (05m00.0s), 000/100 VUs, 26 complete and 0 interrupted iterations
+    // running (1m30.0s), 00/10 VUs, 5 complete and 0 interrupted iterations
+    // ✓ status is successful
+    
+    // Parse running time and VUs
+    const runningPattern = /running \(([0-9hms.]+)\), (\d+)\/(\d+) VUs/;
+    const runningMatch = output.match(runningPattern);
+    
+    // Parse iterations
+    const iterationPattern = /(\d+) complete and (\d+) interrupted iterations/;
+    const iterationMatch = output.match(iterationPattern);
+    
+    // Parse percentage from progress bar if present
+    const percentPattern = /\[(=*)>?\s*\]\s*(\d+)%/;
+    const percentMatch = output.match(percentPattern);
+    
+    // Alternative percentage pattern (some k6 versions)
+    const altPercentPattern = /(\d+)%\s+\[/;
+    const altPercentMatch = output.match(altPercentPattern);
+    
+    if (runningMatch || iterationMatch || percentMatch || altPercentMatch) {
+      if (!testProgress[testId]) {
+        testProgress[testId] = {
+          startTime: new Date(),
+          currentTime: '0s',
+          currentVUs: 0,
+          totalVUs: 0,
+          completedIterations: 0,
+          interruptedIterations: 0,
+          percentage: 0,
+          status: 'running'
+        };
+      }
+      
+      if (runningMatch) {
+        testProgress[testId].currentTime = runningMatch[1];
+        testProgress[testId].currentVUs = parseInt(runningMatch[2]);
+        testProgress[testId].totalVUs = parseInt(runningMatch[3]);
+      }
+      
+      if (iterationMatch) {
+        testProgress[testId].completedIterations = parseInt(iterationMatch[1]);
+        testProgress[testId].interruptedIterations = parseInt(iterationMatch[2]);
+      }
+      
+      if (percentMatch) {
+        testProgress[testId].percentage = parseInt(percentMatch[2]);
+      } else if (altPercentMatch) {
+        testProgress[testId].percentage = parseInt(altPercentMatch[1]);
+      }
+      
+      // Estimate percentage based on time if not explicitly provided
+      if (!percentMatch && !altPercentMatch && currentTest && currentTest.duration) {
+        const durationSeconds = utils.parseDuration(currentTest.duration);
+        const currentSeconds = this.parseTimeString(testProgress[testId].currentTime);
+        if (durationSeconds > 0) {
+          testProgress[testId].percentage = Math.min(100, Math.round((currentSeconds / durationSeconds) * 100));
+        }
+      }
+      
+      console.log(`Test ${testId} progress:`, testProgress[testId]);
+    }
+    
+    // Check for completion
+    if (output.includes('✓') || output.includes('✗') || output.includes('done')) {
+      if (testProgress[testId]) {
+        testProgress[testId].status = 'completed';
+        testProgress[testId].percentage = 100;
+      }
+    }
+  },
+  
+  parseTimeString(timeStr) {
+    // Parse time strings like "5m30.0s", "30s", "1h5m30s"
+    if (!timeStr) return 0;
+    
+    let totalSeconds = 0;
+    
+    // Hours
+    const hourMatch = timeStr.match(/(\d+)h/);
+    if (hourMatch) totalSeconds += parseInt(hourMatch[1]) * 3600;
+    
+    // Minutes
+    const minMatch = timeStr.match(/(\d+)m/);
+    if (minMatch) totalSeconds += parseInt(minMatch[1]) * 60;
+    
+    // Seconds
+    const secMatch = timeStr.match(/(\d+(?:\.\d+)?)s/);
+    if (secMatch) totalSeconds += parseFloat(secMatch[1]);
+    
+    return totalSeconds;
+  },
+
+  handleProcessOutput(k6Process, testId) {
+    let outputBuffer = '';
+    let errorBuffer = '';
+    
+    k6Process.stdout.on('data', (data) => {
+      const output = data.toString();
+      outputBuffer += output;
+      console.log(`k6 stdout: ${output}`);
+      
+      // Parse progress from output
+      this.parseK6Progress(output, testId);
+    });
+
+    k6Process.stderr.on('data', (data) => {
+      const errorMessage = data.toString();
+      errorBuffer += errorMessage;
+      console.error(`k6 stderr: ${errorMessage}`);
+      
+      // Sometimes progress is in stderr
+      this.parseK6Progress(errorMessage, testId);
+      
+      if (errorMessage.includes('bind: address already in use') && errorMessage.includes('5665')) {
+        console.warn('Dashboard port 5665 is already in use. Test will continue without dashboard.');
+      }
+      
+      if (errorMessage.includes('SyntaxError') || errorMessage.includes('ReferenceError') || errorMessage.includes('TypeError')) {
+        console.error('K6 Script Error Detected!');
+        console.error('Full error:', errorMessage);
+      }
+    });
+    
+    return { outputBuffer, errorBuffer };
+  },
+
+  async handleProcessExit(code, signal, testId, scenario, httpMethod, fullUrl, errorBuffer, scriptPath) {
+    console.log(`k6 process exited with code ${code} and signal ${signal}`);
+    
+    if (code !== 0) {
+      console.error("K6 Test Failed!", {
+        exitCode: code,
+        signal,
+        testId,
+        scenario,
+        httpMethod,
+        targetUrl: fullUrl
+      });
+      
+      if (errorBuffer) {
+        console.error("Last errors:", errorBuffer.slice(-CONSTANTS.LOG_BUFFER_SIZE));
+      }
+      
+      try {
+        const scriptContent = await fs.readFile(scriptPath, 'utf8');
+        console.error("Script preview:", scriptContent.substring(0, CONSTANTS.SCRIPT_PREVIEW_SIZE));
+      } catch (err) {
+        console.error("Could not read script file:", err);
+      }
+    }
+  }
+};
+
+// API Routes
 app.post("/api/test/start", async (req, res) => {
   console.log("Starting test with config:", req.body);
   
   const {
-    vus = 10,
-    duration = "30s",
+    vus = CONSTANTS.DEFAULT_VUS,
+    duration = CONSTANTS.DEFAULT_DURATION,
     iterations,
-    executionMode = "duration",
+    executionMode = CONSTANTS.DEFAULT_EXECUTION_MODE,
     targetUrl,
     urlPath = "",
     enableDashboard = false,
     scenario = "custom",
-    httpMethod = "GET",
+    httpMethod = CONSTANTS.DEFAULT_HTTP_METHOD,
     requestBody = null,
-    // Error simulation settings
     enableErrorSimulation = false,
-    errorRate = 10,
+    errorRate = CONSTANTS.DEFAULT_ERROR_RATE,
     errorTypes = {},
   } = req.body;
 
-  // 이전 테스트가 있으면 에러 반환 (동시에 여러 테스트 실행 방지)
   if (currentTest) {
     console.log("Test already running:", currentTest.testId);
     return res.status(400).json({
@@ -190,129 +529,16 @@ app.post("/api/test/start", async (req, res) => {
   let scriptPath;
 
   try {
-    // 시나리오별 executor 설정 가져오기 (testId 포함)
-    const executorConfig = getExecutorConfig(scenario, vus, duration, iterations, executionMode, testId);
-    const optionsConfig = JSON.stringify(executorConfig, null, 2);
-
-    // 완전한 URL 구성 (baseUrl + path)
+    const executorConfig = k6Config.getExecutorConfig(scenario, vus, duration, iterations, executionMode, testId);
+    
     const baseUrl = targetUrl || config.mockServerUrl;
-    let fullUrl = urlPath ? `${baseUrl}${urlPath}` : baseUrl;
+    const fullUrl = scriptGenerator.buildUrl(baseUrl, urlPath, enableErrorSimulation, errorRate, errorTypes, httpMethod);
     
-    // 에러 시뮬레이션이 활성화된 경우 chaos 엔드포인트로 변경
-    if (enableErrorSimulation && baseUrl.includes('mock-server')) {
-      // 활성화된 에러 타입들 수집
-      const enabledErrorTypes = Object.entries(errorTypes)
-        .filter(([code, enabled]) => enabled)
-        .map(([code]) => code);
-      
-      // 에러 타입이 선택되지 않은 경우 기본값 사용
-      const statusCodes = enabledErrorTypes.length > 0 
-        ? enabledErrorTypes.join(',')
-        : '400,500,503';
-      
-      // chaos 엔드포인트로 URL 변경
-      const chaosPath = httpMethod === 'POST' || httpMethod === 'PUT' || httpMethod === 'PATCH' 
-        ? '/chaos/random'
-        : '/chaos/random';
-      
-      fullUrl = `${baseUrl}${chaosPath}?errorRate=${errorRate / 100}&statusCodes=${statusCodes}`;
-    }
+    const script = scriptGenerator.generateScript(
+      { fullUrl, httpMethod, requestBody },
+      executorConfig
+    );
 
-    // HTTP 메서드에 따른 스크립트 생성
-    let httpRequest;
-    
-    // Body가 있는 메서드들
-    const methodsWithBody = ["POST", "PUT", "PATCH"];
-    
-    if (methodsWithBody.includes(httpMethod)) {
-      // Body가 있는 요청의 경우
-      let bodyData = requestBody || '{"message": "test"}';
-      
-      // JSON 문자열인지 확인하고 파싱 시도
-      try {
-        // JSON 파싱을 통해 유효성 검증
-        const parsedBody = JSON.parse(bodyData);
-        // 다시 문자열화하여 일관된 형식 보장
-        bodyData = JSON.stringify(parsedBody);
-      } catch (e) {
-        console.log("Invalid JSON in request body, using as-is:", bodyData);
-      }
-      
-      // 백틱과 달러 기호를 이스케이프
-      const escapedBody = bodyData
-        .replace(/\\/g, '\\\\')  // 백슬래시를 먼저 이스케이프
-        .replace(/`/g, '\\`')    // 백틱 이스케이프
-        .replace(/\$/g, '\\$');  // 달러 기호 이스케이프
-      
-      const method = httpMethod.toLowerCase();
-      httpRequest = `
-  const params = {
-    headers: { 'Content-Type': 'application/json' },
-  };
-  const res = http.${method}('${fullUrl}', \`${escapedBody}\`, params);`;
-    } else if (httpMethod === "DELETE") {
-      // DELETE 요청의 경우
-      httpRequest = `
-  const params = {
-    headers: { 'Content-Type': 'application/json' },
-  };
-  const res = http.del('${fullUrl}', null, params);`;
-    } else {
-      // GET 요청의 경우 (기본값)
-      httpRequest = `
-  const res = http.get('${fullUrl}');`;
-    }
-
-    // 메서드별 성공 상태 코드 정의
-    let successCheck;
-    if (httpMethod === "POST") {
-      // POST는 200 또는 201을 성공으로 간주
-      successCheck = `
-  // 응답 상태 로깅 (디버깅용)
-  if (res.status !== 200 && res.status !== 201) {
-    console.log(\`POST request failed: Status=\${res.status}, Body=\${res.body}\`);
-  }
-  
-  check(res, {
-    'status is successful (200 or 201)': (r) => r.status === 200 || r.status === 201,
-  });`;
-    } else if (httpMethod === "DELETE") {
-      // DELETE는 200, 202, 204를 성공으로 간주
-      successCheck = `
-  check(res, {
-    'status is successful (200/202/204)': (r) => r.status === 200 || r.status === 202 || r.status === 204,
-  });`;
-    } else if (httpMethod === "PUT" || httpMethod === "PATCH") {
-      // PUT/PATCH는 200 또는 204를 성공으로 간주
-      successCheck = `
-  check(res, {
-    'status is successful (200 or 204)': (r) => r.status === 200 || r.status === 204,
-  });`;
-    } else {
-      // GET은 200을 성공으로 간주
-      successCheck = `
-  check(res, {
-    'status is 200': (r) => r.status === 200,
-  });`;
-    }
-
-    // 모든 시나리오에 대해 동일한 테스트 함수 사용
-    const script = `
-import http from 'k6/http';
-import { check, sleep } from 'k6';
-
-export const options = ${optionsConfig};
-
-export default function () {${httpRequest}${successCheck}
-  sleep(1);
-}
-    `;
-
-    // 디버깅을 위한 스크립트 로깅
-    console.log("Generated K6 Script:");
-    console.log("=".repeat(50));
-    console.log(script);
-    console.log("=".repeat(50));
     console.log("Test configuration:", {
       scenario,
       vus,
@@ -321,83 +547,26 @@ export default function () {${httpRequest}${successCheck}
       executionMode,
       httpMethod,
       targetUrl: fullUrl,
-      hasBody: methodsWithBody.includes(httpMethod),
+      hasBody: HTTP_STATUS.METHODS_WITH_BODY.includes(httpMethod),
       bodyLength: requestBody ? requestBody.length : 0
     });
 
-    // 스크립트 파일 저장
     scriptPath = `/tmp/k6-test-${testId}.js`;
     await fs.writeFile(scriptPath, script);
 
-    // K6 실행 옵션 설정
     const k6Args = ["run", "--out", `influxdb=${config.influxdbK6Url}`];
-
     const k6Env = {
       ...process.env,
       TARGET_URL: targetUrl || config.mockServerUrl,
     };
 
-    // Dashboard 활성화 여부 결정
-    let dashboardActuallyEnabled = false;
-    
-    if (enableDashboard) {
-      // 포트가 사용 중인지 확인
-      const portInUse = await isPortInUse(config.k6DashboardPort);
-      
-      if (portInUse) {
-        console.warn(`Dashboard port ${config.k6DashboardPort} is already in use. Running test without dashboard.`);
-      } else {
-        // 포트가 사용 가능한 경우에만 대시보드 활성화
-        dashboardActuallyEnabled = true;
-        
-        // web-dashboard output 설정을 파라미터로 전달
-        k6Args.push("--out", `web-dashboard=host=${config.k6DashboardHost}&port=${config.k6DashboardPort}`);
-
-        // 환경변수도 설정 (백업)
-        k6Env.K6_WEB_DASHBOARD = "true";
-        k6Env.K6_WEB_DASHBOARD_HOST = config.k6DashboardHost;
-        k6Env.K6_WEB_DASHBOARD_PORT = config.k6DashboardPort;
-        
-        console.log(`Dashboard will be available on port ${config.k6DashboardPort}`);
-      }
-    }
-
+    const dashboardActuallyEnabled = await testManager.setupDashboard(enableDashboard, k6Args, k6Env);
     k6Args.push(scriptPath);
 
     console.log("Executing k6 with args:", k6Args);
-    console.log("K6 environment TARGET_URL:", k6Env.TARGET_URL);
-    console.log("Script path:", scriptPath);
-
-    // k6 실행
     const k6Process = spawn("k6", k6Args, { env: k6Env });
 
-    // k6 stdout/stderr 로깅
-    let outputBuffer = '';
-    let errorBuffer = '';
-    
-    k6Process.stdout.on('data', (data) => {
-      const output = data.toString();
-      outputBuffer += output;
-      console.log(`k6 stdout: ${output}`);
-    });
-
-    k6Process.stderr.on('data', (data) => {
-      const errorMessage = data.toString();
-      errorBuffer += errorMessage;
-      console.error(`k6 stderr: ${errorMessage}`);
-      
-      // Dashboard 포트 충돌 감지
-      if (errorMessage.includes('bind: address already in use') && errorMessage.includes('5665')) {
-        console.warn('Dashboard port 5665 is already in use. Test will continue without dashboard.');
-      }
-      
-      // K6 스크립트 에러 감지
-      if (errorMessage.includes('SyntaxError') || errorMessage.includes('ReferenceError') || errorMessage.includes('TypeError')) {
-        console.error('K6 Script Error Detected!');
-        console.error('Full error:', errorMessage);
-        console.error('Script path:', scriptPath);
-      }
-    });
+    const { errorBuffer } = testManager.handleProcessOutput(k6Process, testId);
 
     currentTest = {
       process: k6Process,
@@ -407,96 +576,30 @@ export default function () {${httpRequest}${successCheck}
       duration,
       iterations,
       executionMode,
-      targetUrl,
-      scriptPath, // 모든 시나리오에 대해 임시 파일 사용
+      targetUrl: fullUrl,
+      scriptPath,
       scenario,
-      dashboardEnabled: enableDashboard,
+      dashboardEnabled: dashboardActuallyEnabled,
     };
     
-    // duration을 기반으로 최대 실행 시간 설정 (duration + 30초 여유)
-    const durationInSeconds = parseDuration(duration);
-    const maxExecutionTime = (durationInSeconds + 30) * 1000; // 밀리초로 변환
-    
-    // 타임아웃 설정: 테스트가 예상 시간보다 오래 실행되면 강제 종료
-    const timeoutId = setTimeout(() => {
-      if (currentTest && currentTest.process === k6Process && !k6Process.killed) {
-        console.warn(`Test ${testId} exceeded maximum execution time (${maxExecutionTime/1000}s), forcing termination`);
-        k6Process.kill("SIGTERM");
-        
-        // 5초 후에도 종료되지 않으면 SIGKILL
-        setTimeout(() => {
-          if (!k6Process.killed) {
-            console.error(`Test ${testId} not responding to SIGTERM, forcing SIGKILL`);
-            k6Process.kill("SIGKILL");
-          }
-        }, 5000);
-      }
-    }, maxExecutionTime);
-    
-    // 프로세스가 정상 종료되면 타임아웃 취소
-    currentTest.timeoutId = timeoutId;
+    currentTest.timeoutId = await testManager.setupTimeout(k6Process, testId, duration);
 
-    // 프로세스 종료 처리
     k6Process.on("exit", async (code, signal) => {
-      console.log(`k6 process exited with code ${code} and signal ${signal}`);
+      await testManager.handleProcessExit(code, signal, testId, scenario, httpMethod, fullUrl, errorBuffer, scriptPath);
       
-      // 비정상 종료 시 자세한 정보 출력
-      if (code !== 0) {
-        console.error("K6 Test Failed!");
-        console.error("Exit code:", code);
-        console.error("Signal:", signal);
-        console.error("Test ID:", testId);
-        console.error("Scenario:", scenario);
-        console.error("HTTP Method:", httpMethod);
-        console.error("Target URL:", fullUrl);
-        
-        if (errorBuffer) {
-          console.error("Last errors:");
-          console.error(errorBuffer.slice(-1000)); // 마지막 1000자만 출력
-        }
-        
-        // 스크립트 내용 확인
-        try {
-          const scriptContent = await fs.readFile(scriptPath, 'utf8');
-          console.error("Script first 500 chars:");
-          console.error(scriptContent.substring(0, 500));
-        } catch (err) {
-          console.error("Could not read script file:", err);
-        }
-      }
+      await new Promise(resolve => setTimeout(resolve, CONSTANTS.PROCESS_EXIT_WAIT));
       
-      // 타임아웃 취소
-      if (currentTest && currentTest.timeoutId) {
-        clearTimeout(currentTest.timeoutId);
-      }
-      
-      // 약간의 지연을 추가하여 k6가 완전히 종료되도록 보장
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
-      // currentTest가 현재 프로세스와 일치하는 경우에만 정리
-      // (stop API에서 이미 정리된 경우 방지)
       if (currentTest && currentTest.process === k6Process) {
-        // 임시 파일 삭제 (아직 존재하는 경우에만)
-        if (currentTest.scriptPath) {
-          try {
-            // 파일이 존재하는지 먼저 확인
-            await fs.access(currentTest.scriptPath);
-            await fs.unlink(currentTest.scriptPath);
-            console.log("Temp script deleted:", currentTest.scriptPath);
-          } catch (err) {
-            // 파일이 이미 삭제되었거나 접근할 수 없는 경우는 무시
-            if (err.code !== 'ENOENT') {
-              console.error("Failed to delete temp script:", err);
-            }
-          }
+        await testManager.cleanupTest(currentTest);
+        // Mark progress as completed and cleanup after a delay
+        if (testProgress[testId]) {
+          testProgress[testId].status = 'completed';
+          testProgress[testId].percentage = 100;
+          // Keep progress data for 5 minutes after completion
+          setTimeout(() => {
+            delete testProgress[testId];
+          }, 5 * 60 * 1000);
         }
-
-        // Dashboard가 사용된 경우 포트 해제 대기
-        if (currentTest.dashboardEnabled) {
-          console.log("Dashboard was enabled, waiting for port release...");
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-        }
-
         currentTest = null;
       }
     });
@@ -528,7 +631,6 @@ export default function () {${httpRequest}${successCheck}
   }
 });
 
-// 테스트 중지 API
 app.post("/api/test/stop", async (req, res) => {
   if (!currentTest) {
     return res.status(400).json({ error: "No test running" });
@@ -536,53 +638,37 @@ app.post("/api/test/stop", async (req, res) => {
 
   try {
     console.log("Stopping test:", currentTest.testId);
-    const dashboardEnabled = currentTest.dashboardEnabled;
+    const stoppedTestId = currentTest.testId;
     
-    // 타임아웃 취소
     if (currentTest.timeoutId) {
       clearTimeout(currentTest.timeoutId);
     }
     
-    // 프로세스가 아직 실행 중인지 확인
     if (currentTest.process && !currentTest.process.killed) {
       currentTest.process.kill("SIGTERM");
 
-      // 프로세스가 종료될 때까지 대기 (최대 3초)
       let waitCount = 0;
-      while (!currentTest.process.killed && waitCount < 30) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      while (!currentTest.process.killed && waitCount < CONSTANTS.MAX_KILL_ATTEMPTS) {
+        await new Promise(resolve => setTimeout(resolve, CONSTANTS.PROCESS_KILL_WAIT));
         waitCount++;
       }
 
-      // 여전히 살아있으면 강제 종료
       if (!currentTest.process.killed) {
         console.log("Force killing k6 process");
         currentTest.process.kill("SIGKILL");
       }
     }
 
-    // 임시 파일 삭제 (파일이 존재하는 경우에만)
-    if (currentTest.scriptPath) {
-      try {
-        // 파일이 존재하는지 먼저 확인
-        await fs.access(currentTest.scriptPath);
-        await fs.unlink(currentTest.scriptPath);
-        console.log("Temp script deleted by stop API:", currentTest.scriptPath);
-      } catch (err) {
-        // 파일이 이미 삭제되었거나 접근할 수 없는 경우는 무시
-        if (err.code !== 'ENOENT') {
-          console.error("Failed to delete temp script:", err);
-        }
-      }
+    await testManager.cleanupTest(currentTest);
+    
+    // Clean up progress data
+    if (testProgress[stoppedTestId]) {
+      testProgress[stoppedTestId].status = 'stopped';
+      setTimeout(() => {
+        delete testProgress[stoppedTestId];
+      }, 60 * 1000); // Keep for 1 minute after stop
     }
-
-    // Dashboard가 활성화되어 있었다면 포트가 해제될 때까지 추가 대기
-    if (dashboardEnabled) {
-      console.log("Waiting for dashboard port to be released...");
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-
-    const stoppedTestId = currentTest.testId;
+    
     currentTest = null;
 
     res.json({
@@ -600,7 +686,6 @@ app.post("/api/test/stop", async (req, res) => {
   }
 });
 
-// 사용 가능한 시나리오 목록 API
 app.get("/api/scenarios", (req, res) => {
   res.json({
     scenarios: availableScenarios,
@@ -624,8 +709,10 @@ app.get("/api/scenarios", (req, res) => {
   });
 });
 
-// 테스트 상태 확인 API
 app.get("/api/test/status", (req, res) => {
+  const testId = currentTest?.testId;
+  const progress = testId ? testProgress[testId] : null;
+  
   res.json({
     running: !!currentTest,
     details: currentTest
@@ -640,15 +727,34 @@ app.get("/api/test/status", (req, res) => {
           scenario: currentTest.scenario,
         }
       : null,
+    progress: progress || null
   });
 });
 
-// 헬스 체크
+// New endpoint specifically for progress
+app.get("/api/test/progress/:testId?", (req, res) => {
+  const { testId } = req.params;
+  
+  if (testId) {
+    // Get progress for specific test
+    res.json({
+      testId,
+      progress: testProgress[testId] || null
+    });
+  } else {
+    // Get progress for current test
+    const currentTestId = currentTest?.testId;
+    res.json({
+      testId: currentTestId,
+      progress: currentTestId ? testProgress[currentTestId] : null
+    });
+  }
+});
+
 app.get("/health", (req, res) => {
   res.json(config.getHealthInfo());
 });
 
-// Config 정보 엔드포인트 (디버깅용)
 app.get("/config", (req, res) => {
   res.json(config.getConfigInfo());
 });

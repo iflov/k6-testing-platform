@@ -132,9 +132,9 @@ export default function TestController({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-        Test Configuration
-      </h2>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+          Test Configuration
+        </h2>
 
       <div className="space-y-4">
         <div>
@@ -624,69 +624,139 @@ export default function TestController({
 
         {/* Error Simulation Section */}
         <div className="border-t pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-medium text-gray-700">
-              Error Simulation
-            </label>
-            <input
-              type="checkbox"
-              checked={config.enableErrorSimulation}
-              onChange={(e) =>
-                setConfig({ ...config, enableErrorSimulation: e.target.checked })
-              }
-              disabled={testStatus === "running"}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-          </div>
-          
-          {config.enableErrorSimulation && (
-            <div className="space-y-3 pl-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Error Rate: {config.errorRate}%
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <label className="text-base font-semibold text-gray-800 cursor-pointer" 
+                  htmlFor="error-simulation-toggle">
+                  Error Simulation
                 </label>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
                 <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={config.errorRate}
+                  id="error-simulation-toggle"
+                  type="checkbox"
+                  checked={config.enableErrorSimulation}
                   onChange={(e) =>
-                    setConfig({ ...config, errorRate: parseInt(e.target.value) })
+                    setConfig({ ...config, enableErrorSimulation: e.target.checked })
                   }
                   disabled={testStatus === "running"}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                  className="sr-only peer"
                 />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Error Types
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {Object.entries(config.errorTypes).map(([code, enabled]) => (
-                    <label key={code} className="flex items-center space-x-1">
-                      <input
-                        type="checkbox"
-                        checked={enabled}
-                        onChange={(e) =>
-                          setConfig({
-                            ...config,
-                            errorTypes: {
-                              ...config.errorTypes,
-                              [code]: e.target.checked,
-                            },
-                          })
-                        }
-                        disabled={testStatus === "running"}
-                        className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="text-xs text-gray-600">{code}</span>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+              </label>
+            </div>
+          
+            {config.enableErrorSimulation && (
+              <div className="space-y-4 mt-4">
+                <div className="bg-white rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-semibold text-gray-700">
+                      Error Rate
                     </label>
-                  ))}
+                    <span className="text-lg font-bold text-orange-600">
+                      {config.errorRate}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500">0%</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={config.errorRate}
+                      onChange={(e) =>
+                        setConfig({ ...config, errorRate: parseInt(e.target.value) })
+                      }
+                      disabled={testStatus === "running"}
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, rgb(251, 146, 60) 0%, rgb(251, 146, 60) ${config.errorRate}%, rgb(229, 231, 235) ${config.errorRate}%, rgb(229, 231, 235) 100%)`
+                      }}
+                    />
+                    <span className="text-xs text-gray-500">100%</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {config.errorRate === 0 ? "No errors will be simulated" :
+                     config.errorRate <= 10 ? "Low error rate - realistic scenario" :
+                     config.errorRate <= 30 ? "Moderate error rate - degraded service" :
+                     config.errorRate <= 50 ? "High error rate - major issues" :
+                     "Extreme error rate - service failure"}
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg p-3">
+                  <label className="text-sm font-semibold text-gray-700 mb-3 block">
+                    Error Types to Simulate
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {Object.entries(config.errorTypes).map(([code, enabled]) => {
+                      const errorInfo: Record<string, { name: string; color: string }> = {
+                        '400': { name: 'Bad Request', color: 'yellow' },
+                        '401': { name: 'Unauthorized', color: 'red' },
+                        '403': { name: 'Forbidden', color: 'red' },
+                        '404': { name: 'Not Found', color: 'gray' },
+                        '429': { name: 'Too Many Requests', color: 'orange' },
+                        '500': { name: 'Internal Error', color: 'red' },
+                        '502': { name: 'Bad Gateway', color: 'purple' },
+                        '503': { name: 'Service Unavailable', color: 'orange' }
+                      };
+                      const info = errorInfo[code] || { name: code, color: 'gray' };
+                      
+                      return (
+                        <label 
+                          key={code} 
+                          className={`
+                            flex items-center space-x-2 p-2 rounded-lg border cursor-pointer
+                            transition-all duration-200
+                            ${enabled 
+                              ? `bg-${info.color}-50 border-${info.color}-300` 
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            }
+                            ${testStatus === "running" ? 'opacity-50 cursor-not-allowed' : ''}
+                          `}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                errorTypes: {
+                                  ...config.errorTypes,
+                                  [code]: e.target.checked,
+                                },
+                              })
+                            }
+                            disabled={testStatus === "running"}
+                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                          />
+                          <div className="flex-1">
+                            <span className="font-semibold text-sm">{code}</span>
+                            <span className="text-xs text-gray-600 ml-1">{info.name}</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                <div className="text-xs text-gray-500 flex items-start gap-1">
+                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <span>
+                    Error simulation works with Mock Server endpoints. 
+                    Selected error types will be randomly returned based on the error rate.
+                  </span>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 pt-4">
