@@ -104,7 +104,7 @@ function calculateStages(pattern, vus, totalSeconds) {
   switch (pattern) {
     case "none":
       return null; // stages 사용 안함
-    
+
     case "standard":
       // 15% ramp up, 70% steady, 15% ramp down
       return [
@@ -112,14 +112,14 @@ function calculateStages(pattern, vus, totalSeconds) {
         { duration: `${steadySeconds}s`, target: vus },
         { duration: `${rampDownSeconds}s`, target: 0 },
       ];
-    
+
     case "aggressive":
       // Spike 패턴: 급격한 증가와 감소
       const spikeUpSeconds = Math.max(1, Math.floor(totalSeconds * 0.05));
       const spikeHoldSeconds = Math.floor(totalSeconds * 0.3);
       const normalSeconds = Math.floor(totalSeconds * 0.3);
       const spikeDownSeconds = Math.max(1, Math.floor(totalSeconds * 0.05));
-      
+
       return [
         { duration: `${normalSeconds}s`, target: Math.floor(vus * 0.2) },
         { duration: `${spikeUpSeconds}s`, target: vus }, // 급증
@@ -127,13 +127,13 @@ function calculateStages(pattern, vus, totalSeconds) {
         { duration: `${spikeDownSeconds}s`, target: Math.floor(vus * 0.2) }, // 급감
         { duration: `${normalSeconds}s`, target: Math.floor(vus * 0.2) },
       ];
-    
+
     case "gradual":
       // Stress/Breakpoint 패턴: 단계적 증가
       const steps = 4;
       const stepDuration = Math.floor(totalSeconds / (steps + 1));
       const stages = [];
-      
+
       for (let i = 1; i <= steps; i++) {
         stages.push({
           duration: `${stepDuration}s`,
@@ -141,9 +141,9 @@ function calculateStages(pattern, vus, totalSeconds) {
         });
       }
       stages.push({ duration: `${stepDuration}s`, target: 0 });
-      
+
       return stages;
-    
+
     default:
       return null;
   }
