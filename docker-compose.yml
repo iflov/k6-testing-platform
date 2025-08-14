@@ -101,7 +101,7 @@ services:
       - k6-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U test_admin -d Test"]
+      test: ["CMD-SHELL", "pg_isready -U test_admin -d k6_test_history"]
       interval: 10s
       timeout: 5s
       retries: 5
