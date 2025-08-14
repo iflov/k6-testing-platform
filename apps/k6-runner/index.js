@@ -194,17 +194,29 @@ const scriptGenerator = {
   buildUrl(baseUrl, urlPath, enableErrorSimulation, errorRate, errorTypes, httpMethod) {
     let fullUrl = urlPath ? `${baseUrl}${urlPath}` : baseUrl;
     
-    if (enableErrorSimulation && baseUrl.includes('mock-server')) {
-      const enabledErrorTypes = Object.entries(errorTypes)
-        .filter(([code, enabled]) => enabled)
-        .map(([code]) => code);
-      
-      const statusCodes = enabledErrorTypes.length > 0 
-        ? enabledErrorTypes.join(',')
-        : CONSTANTS.DEFAULT_ERROR_CODES;
-      
-      const chaosPath = '/chaos/random';
-      fullUrl = `${baseUrl}${chaosPath}?errorRate=${errorRate / 100}&statusCodes=${statusCodes}`;
+    // Check if it's mock server (either by 'mock-server' or port 3001)
+    const isMockServer = baseUrl.includes('mock-server') || baseUrl.includes(':3001');
+    
+    if (enableErrorSimulation) {
+      if (isMockServer) {
+        const enabledErrorTypes = Object.entries(errorTypes)
+          .filter(([code, enabled]) => enabled)
+          .map(([code]) => code);
+        
+        const statusCodes = enabledErrorTypes.length > 0 
+          ? enabledErrorTypes.join(',')
+          : CONSTANTS.DEFAULT_ERROR_CODES;
+        
+        const chaosPath = '/chaos/random';
+        fullUrl = `${baseUrl}${chaosPath}?errorRate=${errorRate / 100}&statusCodes=${statusCodes}`;
+        
+        console.log(`[Error Simulation] Enabled with ${errorRate}% error rate`);
+        console.log(`[Error Simulation] URL: ${fullUrl}`);
+      } else {
+        console.warn('[Error Simulation] Warning: Error simulation is only available with Mock Server (port 3001)');
+        console.warn('[Error Simulation] Current URL:', baseUrl);
+        console.warn('[Error Simulation] Error simulation will be ignored for this test');
+      }
     }
     
     return fullUrl;
