@@ -191,7 +191,7 @@ const k6Config = {
 
 // Script Generation
 const scriptGenerator = {
-  buildUrl(baseUrl, urlPath, enableErrorSimulation, errorRate, errorTypes, httpMethod) {
+  buildUrl(baseUrl, urlPath, enableErrorSimulation, errorRate, errorTypes) {
     let fullUrl = urlPath ? `${baseUrl}${urlPath}` : baseUrl;
     
     // Check if it's mock server (either by 'mock-server' or port 3001)
@@ -546,7 +546,7 @@ app.post("/api/test/start", async (req, res) => {
     const executorConfig = k6Config.getExecutorConfig(scenario, vus, duration, iterations, executionMode, testId);
     
     const baseUrl = targetUrl || config.mockServerUrl;
-    const fullUrl = scriptGenerator.buildUrl(baseUrl, urlPath, enableErrorSimulation, errorRate, errorTypes, httpMethod);
+    const fullUrl = scriptGenerator.buildUrl(baseUrl, urlPath, enableErrorSimulation, errorRate, errorTypes);
     
     const script = scriptGenerator.generateScript(
       { fullUrl, httpMethod, requestBody },
