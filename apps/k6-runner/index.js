@@ -207,11 +207,13 @@ const scriptGenerator = {
           ? enabledErrorTypes.join(',')
           : CONSTANTS.DEFAULT_ERROR_CODES;
         
-        const chaosPath = '/chaos/random';
-        fullUrl = `${baseUrl}${chaosPath}?errorRate=${errorRate / 100}&statusCodes=${statusCodes}`;
+        // Add chaos parameters to the original endpoint URL
+        const separator = fullUrl.includes('?') ? '&' : '?';
+        fullUrl = `${fullUrl}${separator}chaos=true&errorRate=${errorRate / 100}&statusCodes=${statusCodes}`;
         
         console.log(`[Error Simulation] Enabled with ${errorRate}% error rate`);
         console.log(`[Error Simulation] URL: ${fullUrl}`);
+        console.log(`[Error Simulation] Will apply to endpoint: ${urlPath}`);
       } else {
         console.warn('[Error Simulation] Warning: Error simulation is only available with Mock Server (port 3001)');
         console.warn('[Error Simulation] Current URL:', baseUrl);

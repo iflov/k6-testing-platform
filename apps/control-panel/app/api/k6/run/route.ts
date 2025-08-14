@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
       httpMethod,
       requestBody,
       enableDashboard = false,
+      enableErrorSimulation = false,
+      errorRate = 10,
+      errorTypes = {},
     } = await request.json();
 
     // k6-runner 서비스로 요청 전달
@@ -35,6 +38,9 @@ export async function POST(request: NextRequest) {
         httpMethod: httpMethod || "GET",
         requestBody: requestBody,
         enableDashboard: enableDashboard, // Dashboard는 필요시에만 활성화
+        enableErrorSimulation: enableErrorSimulation,
+        errorRate: errorRate,
+        errorTypes: errorTypes,
       }),
     });
 
