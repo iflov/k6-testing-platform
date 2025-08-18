@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 
 import { makeUrl } from './utils/makeUrl';
+import testRouter from './routes/route';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -15,7 +16,7 @@ app.use(
   }),
 );
 
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'healthy',
     environment: process.env.NODE_ENV,
@@ -28,7 +29,7 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-app.get('/config', (req: Request, res: Response) => {
+app.get('/config', (_req: Request, res: Response) => {
   res.status(200).json({
     environment: process.env.NODE_ENV,
     isDevelopment: process.env.NODE_ENV === 'development',
@@ -44,6 +45,8 @@ app.get('/config', (req: Request, res: Response) => {
     },
   });
 });
+
+app.use('/api', testRouter);
 
 app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
