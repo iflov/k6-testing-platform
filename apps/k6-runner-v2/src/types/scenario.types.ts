@@ -12,4 +12,7 @@ export interface Scenario {
   };
   useStages: boolean;
   rampPattern: string;
+  executor: string;
 }
+
+export type RampPattern = 'none' | 'standard' | 'aggressive' | 'gradual';

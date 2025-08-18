@@ -16,4 +16,11 @@ describe('ScenarioService', () => {
     expect(scenarios.description).toEqual(_.mapValues(SCENARIO, 'description'));
     expect(scenarios.executors).toEqual(_.mapValues(SCENARIO, 'executor'));
   });
+
+  it('should return scenario config', () => {});
+  it('should error not scenario is not exist', () => {});
+  it('should return calculateStages - pattern: none', () => {});
+  it('should return calculateStages - pattern: standard', () => {});
+  it('should return calculateStages - pattern: aggressive', () => {});
+  it('should return calculateStages - pattern: gradual', () => {});
 });
