@@ -1,0 +1,51 @@
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+
+import { makeUrl } from './utils/makeUrl';
+
+const app = express();
+const PORT = Number(process.env.PORT) || 3001;
+
+app.use(express.json());
+app.use(
+  cors({
+    origin: '*', // Control Panel에서 접근
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+  }),
+);
+
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'healthy',
+    environment: process.env.NODE_ENV,
+    uptime: process.uptime(),
+    config: {
+      influxdbConfigured: !!process.env.INFLUXDB_URL,
+      mockServerConfigured: !!process.env.MOCK_SERVER_URL,
+      dashboardEnabled: !!process.env.K6_DASHBOARD_PORT,
+    },
+  });
+});
+
+app.get('/config', (req: Request, res: Response) => {
+  res.status(200).json({
+    environment: process.env.NODE_ENV,
+    isDevelopment: process.env.NODE_ENV === 'development',
+    isProduction: process.env.NODE_ENV === 'production',
+    port: process.env.PORT,
+    urls: {
+      influxdb: makeUrl(process.env.INFLUXDB_URL || ''),
+      mockServer: makeUrl(process.env.MOCK_SERVER_URL || ''),
+      dashboard: {
+        host: process.env.K6_DASHBOARD_HOST,
+        port: process.env.K6_DASHBOARD_PORT,
+      },
+    },
+  });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  // eslint-disable-next-line no-console
+  console.log(`🚀 Server is running on ${PORT} port`);
+});
