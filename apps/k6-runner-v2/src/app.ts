@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 
-import { makeUrl } from './utils/makeUrl';
+import { maskUrl } from './utils/maskURL';
 import testRouter from './routes/route';
 
 const app = express();
@@ -36,8 +36,8 @@ app.get('/config', (_req: Request, res: Response) => {
     isProduction: process.env.NODE_ENV === 'production',
     port: process.env.PORT,
     urls: {
-      influxdb: makeUrl(process.env.INFLUXDB_URL || ''),
-      mockServer: makeUrl(process.env.MOCK_SERVER_URL || ''),
+      influxdb: maskUrl(process.env.INFLUXDB_URL || ''),
+      mockServer: maskUrl(process.env.MOCK_SERVER_URL || ''),
       dashboard: {
         host: process.env.K6_DASHBOARD_HOST,
         port: process.env.K6_DASHBOARD_PORT,

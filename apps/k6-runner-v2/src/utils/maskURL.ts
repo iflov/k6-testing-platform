@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-export const makeUrl = (url: string) => {
+export const maskUrl = (url: string) => {
   if (_.isEmpty(url) || _.isNil(url) || url === '') {
     throw new Error('URL is required');
   }
@@ -11,8 +11,8 @@ export const makeUrl = (url: string) => {
   }
 
   try {
-    const u = new URL(url);
-    return `${u.protocol}//*****${u.pathname}`;
+    const urlObj = new URL(url);
+    return `${urlObj.protocol}//*****${urlObj.pathname}`;
   } catch {
     return '*****';
   }
