@@ -9,7 +9,7 @@ import { ConfigService } from '../modules/config/config.service';
  * 모든 서비스와 컨트롤러의 인스턴스를 중앙에서 관리
  */
 class Container {
-  private static instance: Container;
+  private static instance: Container | undefined;
 
   // Services - 순수 비즈니스 로직
   public readonly configService: ConfigService;
@@ -48,7 +48,7 @@ class Container {
    * 테스트용 - Container 인스턴스 리셋
    */
   public static resetInstance(): void {
-    Container.instance = null as any;
+    Container.instance = undefined;
   }
 }
 

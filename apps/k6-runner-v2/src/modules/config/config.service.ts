@@ -1,6 +1,6 @@
 export class ConfigService {
   private static instance: ConfigService;
-  
+
   environment: string;
   isDevelopment: boolean;
   isProduction: boolean;
@@ -31,7 +31,7 @@ export class ConfigService {
     this.logConfiguration();
   }
 
-  assertEnvVar(key: string): string {
+  public assertEnvVar(key: string): string {
     const value = process.env[key];
     if (!value) {
       throw new Error(`Missing required environment variable in ${this.environment}: ${key}`);
@@ -39,7 +39,7 @@ export class ConfigService {
     return value;
   }
 
-  initializeConfig() {
+  private initializeConfig() {
     if (this.isDevelopment) {
       this.port = process.env.PORT || '3002';
       this.influxdbUrl = process.env.INFLUXDB_URL || 'http://host.docker.internal:8086';
@@ -55,7 +55,7 @@ export class ConfigService {
     }
   }
 
-  logConfiguration() {
+  private logConfiguration() {
     // eslint-disable-next-line no-console
     console.log(`[Config] K6 Runner initialized with:`, {
       environment: this.environment,
