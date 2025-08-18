@@ -1,6 +1,6 @@
 FROM grafana/k6:0.52.0 AS k6-binary
 
-FROM node:18-alpine
+FROM node:22-alpine
 
 # k6 바이너리 복사
 COPY --from=k6-binary /usr/bin/k6 /usr/bin/k6
