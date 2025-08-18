@@ -9,7 +9,7 @@ export class TestService {
   private testProgress: Map<string, TestProgress> = new Map();
 
   async startTest(body: TestConfig) {
-    if (_.isNil(this.currentTest)) {
+    if (!_.isNil(this.currentTest)) {
       throw new Error('Another test is already running');
     }
 
@@ -37,4 +37,7 @@ export class TestService {
   async stopTest() {}
   async getStatus() {}
   async getProgress() {}
+  getCurrentTest(): CurrentTest | null {
+    return this.currentTest;
+  }
 }

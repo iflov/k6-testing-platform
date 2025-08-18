@@ -47,9 +47,12 @@ export class TestController {
       res.status(200).json(result);
     } catch (error: any) {
       if (error.message === 'Another test is already running') {
+        const currentTest = this.testService.getCurrentTest();
         return res.status(400).json({
           error: 'Another test is already running',
           message: 'Please stop the current test before starting a new one',
+          currentTestId: currentTest?.testId,
+          startTime: currentTest?.startTime,
         });
       }
       res.status(500).json({
