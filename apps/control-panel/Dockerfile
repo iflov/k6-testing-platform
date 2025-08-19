@@ -1,6 +1,9 @@
 # Build stage
 FROM node:22-slim AS builder
 
+# Install OpenSSL for Prisma
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy package files
@@ -23,8 +26,10 @@ RUN npm run build
 # Production stage
 FROM node:22-slim
 
-# Install Docker CLI to communicate with Docker daemon
-RUN apt-get update && apt-get install -y docker.io && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL for Prisma and Docker CLI to communicate with Docker daemon
+RUN apt-get update && \
+    apt-get install -y openssl docker.io && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
