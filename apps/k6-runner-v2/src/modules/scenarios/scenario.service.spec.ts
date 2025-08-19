@@ -125,20 +125,12 @@ describe('ScenarioService', () => {
     describe('edge cases', () => {
       it('should handle zero VUs', () => {
         const stages = scenarioService.calculateStages('standard', 0, TEST_DATA.DURATION);
-        expect(stages).toEqual([
-          { duration: '15s', target: 0 },
-          { duration: '70s', target: 0 },
-          { duration: '15s', target: 0 },
-        ]);
+        expect(stages).toBeNull();
       });
 
       it('should handle zero duration', () => {
         const stages = scenarioService.calculateStages('standard', TEST_DATA.VU, 0);
-        expect(stages).toEqual([
-          { duration: '0s', target: 100 },
-          { duration: '0s', target: 100 },
-          { duration: '0s', target: 0 },
-        ]);
+        expect(stages).toBeNull();
       });
 
       it('should handle very small duration', () => {
@@ -151,16 +143,12 @@ describe('ScenarioService', () => {
 
       it('should handle negative VUs gracefully', () => {
         const stages = scenarioService.calculateStages('standard', -100, TEST_DATA.DURATION);
-        expect(stages).toEqual([
-          { duration: '15s', target: -100 },
-          { duration: '70s', target: -100 },
-          { duration: '15s', target: 0 },
-        ]);
+        expect(stages).toBeNull();
       });
 
       it('should handle negative duration', () => {
         const stages = scenarioService.calculateStages('standard', TEST_DATA.VU, -100);
-        expect(stages).toBeDefined();
+        expect(stages).toBeNull();
       });
 
       it('should return null for invalid pattern', () => {

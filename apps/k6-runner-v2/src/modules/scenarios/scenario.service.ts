@@ -24,6 +24,10 @@ export class ScenarioService {
   }
 
   calculateStages(pattern: RampPattern, vus: number, totalSeconds: number) {
+    if (vus === 0 || totalSeconds === 0 || totalSeconds < 1 || vus < 1) {
+      return null;
+    }
+
     switch (pattern) {
       case 'none':
         return null;

@@ -8,24 +8,31 @@ describe('ConfigService', () => {
     // 각 테스트 전에 깨끗한 환경변수로 시작
     jest.resetModules();
     process.env = { ...originalEnv };
+    // 테스트 환경으로 설정
+    process.env.NODE_ENV = 'test';
     // 싱글톤 인스턴스 리셋
     ConfigService.resetInstance();
+    // console.log를 mock하여 테스트 중 출력 방지
+    jest.spyOn(console, 'log').mockImplementation();
   });
 
   afterEach(() => {
     // 테스트 후 원래대로 복원
     process.env = originalEnv;
     jest.clearAllMocks();
+    jest.restoreAllMocks();
     // 싱글톤 인스턴스 리셋
     ConfigService.resetInstance();
   });
 
   it('should be defined', () => {
+    process.env.NODE_ENV = 'development';
     const service = ConfigService.getInstance();
     expect(service).toBeDefined();
   });
 
   it('should return the same instance', () => {
+    process.env.NODE_ENV = 'development';
     const instance1 = ConfigService.getInstance();
     const instance2 = ConfigService.getInstance();
     expect(instance1).toBe(instance2);
@@ -137,6 +144,7 @@ describe('ConfigService', () => {
 
   describe('Method calls', () => {
     it('should call initializeConfig during construction', () => {
+      process.env.NODE_ENV = 'development';
       // TypeScript에서 private 메서드를 테스트하기 위해 'any' 타입 캐스팅 사용
       const initSpy = jest.spyOn(ConfigService.prototype as any, 'initializeConfig');
 
@@ -148,6 +156,7 @@ describe('ConfigService', () => {
     });
 
     it('should call logConfiguration during construction', () => {
+      process.env.NODE_ENV = 'development';
       // TypeScript에서 private 메서드를 테스트하기 위해 'any' 타입 캐스팅 사용
       const logSpy = jest.spyOn(ConfigService.prototype as any, 'logConfiguration');
 
@@ -159,12 +168,12 @@ describe('ConfigService', () => {
     });
 
     it('should log configuration with correct format', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      // 이미 beforeEach에서 mock되어 있으므로 호출만 확인
       process.env.NODE_ENV = 'development';
 
       ConfigService.getInstance();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(console.log).toHaveBeenCalledWith(
         '[Config] K6 Runner initialized with:',
         expect.objectContaining({
           environment: 'development',
@@ -172,13 +181,12 @@ describe('ConfigService', () => {
           isProduction: false,
         }),
       );
-
-      consoleSpy.mockRestore();
     });
   });
 
   describe('Configuration validation', () => {
     it('should have all required properties after initialization', () => {
+      process.env.NODE_ENV = 'development';
       const service = ConfigService.getInstance();
 
       const requiredProps: (keyof ConfigService)[] = [
@@ -199,6 +207,7 @@ describe('ConfigService', () => {
     });
 
     it('should validate port is a valid number string', () => {
+      process.env.NODE_ENV = 'development';
       process.env.PORT = '3002';
 
       const service = ConfigService.getInstance();
@@ -209,6 +218,7 @@ describe('ConfigService', () => {
     });
 
     it('should validate URLs are valid format', () => {
+      process.env.NODE_ENV = 'development';
       const service = ConfigService.getInstance();
 
       // URL 형식 검증
@@ -219,6 +229,7 @@ describe('ConfigService', () => {
 
   describe('assertEnvVar', () => {
     it('should return value when env var exists', () => {
+      process.env.NODE_ENV = 'development';
       process.env.TEST_VAR = 'test-value';
       const service = ConfigService.getInstance();
 
@@ -226,6 +237,7 @@ describe('ConfigService', () => {
     });
 
     it('should throw when env var is missing', () => {
+      process.env.NODE_ENV = 'development';
       const service = ConfigService.getInstance();
 
       expect(() => service.assertEnvVar('MISSING_VAR')).toThrow('Missing required environment variable in development: MISSING_VAR');
