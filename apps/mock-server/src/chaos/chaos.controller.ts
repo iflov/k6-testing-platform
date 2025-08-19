@@ -41,4 +41,10 @@ export class ChaosController {
   async setConfig(@Body() config: Partial<ChaosConfig>): Promise<ChaosConfig> {
     return this.chaosService.setConfig(config);
   }
+
+  @Get('/shutdown')
+  async shutdown() {
+    this.chaosService.crashApplication();
+    return { message: 'Server is shutting down...' };
+  }
 }

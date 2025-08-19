@@ -1,4 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import _ from 'lodash';
+
+import { SCENARIO } from '../utils/constants';
+
+export const AVAILABLE_SCENARIOS = _.keys(SCENARIO);
+export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 
 export const validateTestConfig = (config: any) => {
   const errors = [];
@@ -55,13 +61,11 @@ const isValidUrl = (url: string) => {
 };
 
 const isValidHttpMethod = (method: string) => {
-  return ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+  return HTTP_METHODS.includes(method);
 };
 
-const availableScenarios = ['smoke', 'load', 'stress', 'spike', 'soak', 'breakpoint'];
-
 const isValidScenario = (scenario: string) => {
-  return availableScenarios.includes(scenario);
+  return AVAILABLE_SCENARIOS.includes(scenario);
 };
 
 export const validateTestRequest = (req: Request, res: Response, next: NextFunction): void => {
@@ -75,18 +79,4 @@ export const validateTestRequest = (req: Request, res: Response, next: NextFunct
     return;
   }
   next();
-};
-
-export const sanitizeString = (str: string) => {
-  if (typeof str !== 'string') return '';
-  // Remove potential script injection patterns
-  // 보안상 제어 문자 제거가 필요하므로 ESLint 규칙 비활성화
-  return (
-    str
-      .replace(/[<>]/g, '') // Remove HTML brackets
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
-      .replace(/`/g, "'") // Replace backticks
-      .substring(0, 10000)
-  ); // Limit length
 };

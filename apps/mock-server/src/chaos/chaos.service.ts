@@ -1,4 +1,4 @@
-import { Injectable, HttpException } from '@nestjs/common';
+import { Injectable, HttpException, OnModuleDestroy } from '@nestjs/common';
 import { ApiResponse } from '../common/types/response.type';
 
 export interface ChaosConfig {
@@ -10,7 +10,7 @@ export interface ChaosConfig {
 }
 
 @Injectable()
-export class ChaosService {
+export class ChaosService implements OnModuleDestroy {
   private config: ChaosConfig = {
     enabled: false,
     errorRate: 0.1, // 10% default
@@ -95,5 +95,16 @@ export class ChaosService {
   getRandomErrorCode(): number {
     const codes = this.config.statusCodes;
     return codes[Math.floor(Math.random() * codes.length)];
+  }
+
+  async onModuleDestroy() {
+    console.log('ChaosService destroyed');
+  }
+
+  crashApplication(delay: number = 0): void {
+    setTimeout(() => {
+      console.log('💥 Crashing application...');
+      process.exit(1); // 즉시 프로세스 종료
+    }, delay);
   }
 }
