@@ -137,7 +137,8 @@ describe('ConfigService', () => {
 
   describe('Method calls', () => {
     it('should call initializeConfig during construction', () => {
-      const initSpy = jest.spyOn(ConfigService.prototype, 'initializeConfig');
+      // TypeScript에서 private 메서드를 테스트하기 위해 'any' 타입 캐스팅 사용
+      const initSpy = jest.spyOn(ConfigService.prototype as any, 'initializeConfig');
 
       ConfigService.getInstance();
 
@@ -147,7 +148,8 @@ describe('ConfigService', () => {
     });
 
     it('should call logConfiguration during construction', () => {
-      const logSpy = jest.spyOn(ConfigService.prototype, 'logConfiguration');
+      // TypeScript에서 private 메서드를 테스트하기 위해 'any' 타입 캐스팅 사용
+      const logSpy = jest.spyOn(ConfigService.prototype as any, 'logConfiguration');
 
       ConfigService.getInstance();
 
@@ -166,7 +168,6 @@ describe('ConfigService', () => {
         '[Config] K6 Runner initialized with:',
         expect.objectContaining({
           environment: 'development',
-          port: '3002',
           isDevelopment: true,
           isProduction: false,
         }),

@@ -11,13 +11,28 @@ describe('TestService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should test start', async () => {});
+  it('should test start', async () => {
+    // TODO: Implement test
+    expect(service).toBeDefined();
+  });
 
-  it('should test start with body', async () => {});
+  it('should test start with body', async () => {
+    // TODO: Implement test
+    expect(service).toBeDefined();
+  });
 
-  it('should test stop', async () => {});
+  it('should test stop', async () => {
+    // TODO: Implement test
+    expect(service).toBeDefined();
+  });
 
-  it('should test get status', async () => {});
+  it('should test get status', async () => {
+    // TODO: Implement test
+    expect(service).toBeDefined();
+  });
 
-  it('should test get progress', async () => {});
+  it('should test get progress', async () => {
+    // TODO: Implement test
+    expect(service).toBeDefined();
+  });
 });
