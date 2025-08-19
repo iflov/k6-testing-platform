@@ -1,5 +1,4 @@
 import { v4 as uuidv4 } from 'uuid';
-import _ from 'lodash';
 
 import { CONSTANTS } from '../../utils/constants';
 import { CurrentTest, TestProgress, TestConfig } from '../../types/test.types';
@@ -9,7 +8,7 @@ export class TestService {
   private testProgress: Map<string, TestProgress> = new Map();
 
   async startTest(body: TestConfig) {
-    if (!_.isNil(this.currentTest)) {
+    if (this.currentTest != null) {
       throw new Error('Another test is already running');
     }
 

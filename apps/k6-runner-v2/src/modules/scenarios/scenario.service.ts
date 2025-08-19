@@ -1,5 +1,3 @@
-import _ from 'lodash';
-
 import { SCENARIO } from '../../utils/constants';
 import { RampPattern } from '../../types/scenario.types';
 
@@ -8,9 +6,13 @@ export class ScenarioService {
 
   getScenarios() {
     return {
-      scenarios: _.keys(SCENARIO),
-      description: _.mapValues(SCENARIO, 'description'),
-      executors: _.mapValues(SCENARIO, 'executor'),
+      scenarios: Object.keys(SCENARIO),
+      description: Object.fromEntries(
+        Object.entries(SCENARIO).map(([key, value]) => [key, value.description]),
+      ),
+      executors: Object.fromEntries(
+        Object.entries(SCENARIO).map(([key, value]) => [key, value.executor]),
+      ),
     };
   }
 

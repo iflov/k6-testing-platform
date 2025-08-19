@@ -1,7 +1,5 @@
-import _ from 'lodash';
-
-export const maskUrl = (url: string) => {
-  if (_.isEmpty(url) || _.isNil(url) || url === '') {
+export const maskUrl = (url: string): string => {
+  if (!url || url.trim() === '') {
     throw new Error('URL is required');
   }
 
