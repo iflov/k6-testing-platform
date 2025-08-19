@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 
-import { maskUrl } from './utils/maskURL';
+import { maskUrl } from './utils';
 import testRouter from './routes/route';
 
 const app = express();

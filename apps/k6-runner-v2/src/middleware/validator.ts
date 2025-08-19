@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { validateTestConfig } from '../utils/validation';
+import { validateTestConfig } from '../utils';
 
 export const validateTestRequest = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validateTestConfig(req.body);

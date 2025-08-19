@@ -63,4 +63,13 @@ export class ConfigService {
       isProduction: this.isProduction,
     });
   }
+
+  // Getter methods
+  getMockServerUrl(): string {
+    return this.mockServerUrl;
+  }
+
+  getInfluxDbUrl(): string {
+    return this.influxdbUrl;
+  }
 }

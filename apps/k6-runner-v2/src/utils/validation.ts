@@ -1,19 +1,42 @@
-import { isValidUrl } from './url.validator';
-import { isValidDuration } from './duration.validator';
-import { isValidHttpMethod } from './http.validator';
-import { SCENARIO } from '../../utils/constants';
+import { SCENARIO } from './constants';
 
+// URL validation
+export const isValidUrl = (url: string): boolean => {
+  try {
+    const urlObj = new URL(url);
+    return ['http:', 'https:'].includes(urlObj.protocol);
+  } catch {
+    return false;
+  }
+};
+
+// Duration validation
+export const isValidDuration = (duration: string): boolean => {
+  return /^[1-9]\d*[smh]$/.test(duration);
+};
+
+// HTTP method validation
+const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+export type HttpMethod = typeof HTTP_METHODS[number];
+
+export const isValidHttpMethod = (method: string): method is HttpMethod => {
+  return HTTP_METHODS.includes(method as HttpMethod);
+};
+
+// Scenario validation
 const AVAILABLE_SCENARIOS = Object.keys(SCENARIO);
 
 export const isValidScenario = (scenario: string): boolean => {
   return AVAILABLE_SCENARIOS.includes(scenario);
 };
 
+// Validation error interface
 export interface ValidationError {
   field: string;
   message: string;
 }
 
+// Test config validation
 export const validateTestConfig = (config: any): ValidationError[] => {
   const errors: ValidationError[] = [];
 
