@@ -102,9 +102,18 @@ export class ChaosService implements OnModuleDestroy {
   }
 
   crashApplication(delay: number = 0): void {
+    console.log(`⏱️ Shutdown scheduled in ${delay}ms`);
+    console.log(`📍 Current time: ${new Date().toISOString()}`);
+
     setTimeout(() => {
-      console.log('💥 Crashing application...');
-      process.exit(1); // 즉시 프로세스 종료
+      console.log('💥 Crashing application NOW!');
+      console.log(`📍 Shutdown time: ${new Date().toISOString()}`);
+      console.log(`🔴 Process PID: ${process.pid}`);
+
+      // Force immediate exit
+      process.exit(1);
     }, delay);
+
+    console.log('✅ Shutdown timer set successfully');
   }
 }

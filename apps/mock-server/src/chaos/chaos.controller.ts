@@ -43,8 +43,15 @@ export class ChaosController {
   }
 
   @Get('/shutdown')
-  async shutdown() {
-    this.chaosService.crashApplication();
-    return { message: 'Server is shutting down...' };
+  async shutdownWithDelay() {
+    const delayMs = 1000;
+
+    this.chaosService.crashApplication(delayMs);
+
+    return {
+      message: `Server will shutdown in ${delayMs}ms`,
+      warning: 'This will kill the server process!',
+      delay: delayMs,
+    };
   }
 }

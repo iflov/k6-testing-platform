@@ -248,7 +248,8 @@ const k6Config = {
     duration,
     iterations,
     executionMode,
-    testId
+    testId,
+    urlPath
   ) {
     const scenarioConfig = getScenarioConfig(scenario);
 
@@ -268,6 +269,14 @@ const k6Config = {
     const baseOptions = {
       tags: this.createBaseTags(testId, scenario),
     };
+
+    // Only add strict thresholds for chaos/shutdown endpoint
+    if (urlPath && urlPath.includes("/chaos/shutdown")) {
+      baseOptions.thresholds = {
+        // For shutdown endpoint, abort on high failure rate
+        http_req_failed: [{ threshold: "rate<0.5", abortOnFail: true }],
+      };
+    }
 
     let scenarios;
 
@@ -391,7 +400,7 @@ const scriptGenerator = {
   },
 
   generateScript(config, executorConfig) {
-    const { fullUrl, httpMethod, requestBody } = config;
+    const { fullUrl, httpMethod, requestBody, urlPath } = config;
     const optionsConfig = JSON.stringify(executorConfig, null, 2);
     const httpRequest = this.createHttpRequest(
       httpMethod,
@@ -400,13 +409,38 @@ const scriptGenerator = {
     );
     const successCheck = this.createSuccessCheck(httpMethod);
 
+    // Special handling for shutdown endpoint
+    const isShutdownEndpoint = urlPath && urlPath.includes("/chaos/shutdown");
+
+    const connectionErrorHandling = isShutdownEndpoint
+      ? `
+  // Special handling for chaos/shutdown endpoint
+  if (res.error_code) {
+    console.error(\`Connection failed after shutdown: \${res.error} (Code: \${res.error_code})\`);
+    console.log('Server shutdown detected as expected. Stopping test gracefully...');
+    // For shutdown endpoint, this is expected behavior
+    return; // Skip this iteration but don't fail the entire test
+  }
+  
+  if (res.status === 0) {
+    console.log('Server connection lost after shutdown request - this is expected');
+    return; // Skip this iteration
+  }`
+      : `
+  // Standard connection error handling
+  if (res.error_code && res.error_code >= 1000 && res.error_code <= 1999) {
+    console.error(\`Critical connection error: \${res.error} (Code: \${res.error_code})\`);
+    // Log error but continue test for resilience testing
+  }`;
+
     return `
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check, sleep, fail } from 'k6';
 
 export const options = ${optionsConfig};
 
-export default function () {${httpRequest}${successCheck}
+export default function () {${httpRequest}
+${connectionErrorHandling}${successCheck}
   sleep(1);
 }
     `;
@@ -742,7 +776,8 @@ app.post("/api/test/start", async (req, res) => {
       duration,
       iterations,
       executionMode,
-      testId
+      testId,
+      urlPath
     );
 
     const baseUrl = targetUrl || config.mockServerUrl;
@@ -755,7 +790,7 @@ app.post("/api/test/start", async (req, res) => {
     );
 
     const script = scriptGenerator.generateScript(
-      { fullUrl, httpMethod, requestBody: sanitizedRequestBody },
+      { fullUrl, httpMethod, requestBody: sanitizedRequestBody, urlPath },
       executorConfig
     );
 

@@ -79,6 +79,15 @@ export async function POST(request: NextRequest) {
       });
 
       console.log("Test run saved to database:", testRun.id);
+
+      // If this is a chaos/shutdown endpoint, log it
+      if (urlPath && urlPath.includes('/chaos/shutdown')) {
+        console.log("⚠️ CHAOS SHUTDOWN TEST STARTED!");
+        console.log("  - Test ID:", testId);
+        console.log("  - Target URL:", targetUrl || config.mockServerUrl);
+        console.log("  - Endpoint:", urlPath);
+        console.log("  - Expected behavior: Mock server will shutdown after first request");
+      }
     } catch (dbError) {
       console.error("Failed to save test run to database:", dbError);
       // Continue even if DB save fails - we don't want to stop the test

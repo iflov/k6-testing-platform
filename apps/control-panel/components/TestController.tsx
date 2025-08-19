@@ -25,14 +25,38 @@ const availableEndpoints = [
   { method: "GET", path: "/health", description: "Health check" },
   { method: "GET", path: "/success", description: "Success response" },
   { method: "POST", path: "/success", description: "Success with body" },
-  { method: "GET", path: "/performance/slow", description: "Slow response (2s delay)" },
-  { method: "GET", path: "/performance/timeout", description: "Timeout simulation" },
-  { method: "GET", path: "/performance/variable-latency", description: "Random latency" },
-  { method: "GET", path: "/performance/concurrency-issue", description: "Concurrency test" },
-  { method: "GET", path: "/chaos/random", description: "Random errors (configurable)" },
-  { method: "POST", path: "/chaos/random", description: "Random errors with body" },
+  {
+    method: "GET",
+    path: "/performance/slow",
+    description: "Slow response (2s delay)",
+  },
+  {
+    method: "GET",
+    path: "/performance/timeout",
+    description: "Timeout simulation",
+  },
+  {
+    method: "GET",
+    path: "/performance/variable-latency",
+    description: "Random latency",
+  },
+  {
+    method: "GET",
+    path: "/performance/concurrency-issue",
+    description: "Concurrency test",
+  },
+  {
+    method: "GET",
+    path: "/chaos/random",
+    description: "Random errors (configurable)",
+  },
+  {
+    method: "POST",
+    path: "/chaos/random",
+    description: "Random errors with body",
+  },
+  { method: "GET", path: "/chaos/shutdown", description: "Shutdown server" },
 ];
-
 
 export default function TestController({
   onTestStart,
@@ -42,7 +66,7 @@ export default function TestController({
 }: TestControllerProps) {
   // 초기 시나리오 설정 가져오기
   const initialScenario = getScenarioConfig("load");
-  
+
   const [config, setConfig] = useState({
     scenario: "load" as ScenarioId,
     vus: initialScenario.defaultVus,
@@ -73,6 +97,16 @@ export default function TestController({
   const [loading, setLoading] = useState(false);
 
   const handleStart = async () => {
+    // Warning for chaos shutdown endpoint
+    if (config.urlPath === '/chaos/shutdown') {
+      const confirmed = confirm(
+        '⚠️ 경고: 이 엔드포인트는 Mock 서버를 종료시킵니다!\n' +
+        '서버가 종료되면 진행 중인 테스트는 실패하게 됩니다.\n' +
+        '정말로 계속하시겠습니까?'
+      );
+      if (!confirmed) return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch("/api/k6/run", {
@@ -81,7 +115,7 @@ export default function TestController({
         body: JSON.stringify(config),
       });
       const data = await response.json();
-      
+
       if (response.ok) {
         // 성공 응답
         if (data.testId) {
@@ -106,13 +140,13 @@ export default function TestController({
   const handleStop = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/k6/stop", { 
+      const response = await fetch("/api/k6/stop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ testId }),
       });
       const data = await response.json();
-      
+
       if (response.ok) {
         console.log("Test stopped successfully:", data);
         onTestStop();
@@ -132,9 +166,9 @@ export default function TestController({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-          Test Configuration
-        </h2>
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+        Test Configuration
+      </h2>
 
       <div className="space-y-4">
         <div>
@@ -147,21 +181,22 @@ export default function TestController({
               const newScenario = e.target.value as ScenarioId;
               const newScenarioConfig = getScenarioConfig(newScenario);
               const modes = newScenarioConfig.supportedModes;
-              
+
               // 현재 execution mode가 새 시나리오에서 사용 불가능하면 duration으로 변경
               let newExecutionMode = config.executionMode;
               if (!modes[config.executionMode].enabled) {
                 newExecutionMode = "duration"; // duration은 모든 시나리오에서 사용 가능
               }
-              
-              setConfig({ 
-                ...config, 
+
+              setConfig({
+                ...config,
                 scenario: newScenario,
                 executionMode: newExecutionMode,
                 // 시나리오 기본값으로 업데이트
                 vus: newScenarioConfig.defaultVus,
                 duration: newScenarioConfig.defaultDuration,
-                iterations: newScenarioConfig.defaultIterations || config.iterations,
+                iterations:
+                  newScenarioConfig.defaultIterations || config.iterations,
               });
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
@@ -230,18 +265,27 @@ export default function TestController({
               <button
                 type="button"
                 onClick={() =>
-                  getScenarioConfig(config.scenario).supportedModes.duration.enabled &&
+                  getScenarioConfig(config.scenario).supportedModes.duration
+                    .enabled &&
                   setConfig({ ...config, executionMode: "duration" })
                 }
                 className={`w-full px-3 py-2 rounded-md border transition-colors ${
                   config.executionMode === "duration"
                     ? "bg-blue-600 text-white border-blue-600"
-                    : getScenarioConfig(config.scenario).supportedModes.duration.enabled
+                    : getScenarioConfig(config.scenario).supportedModes.duration
+                        .enabled
                     ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={testStatus === "running" || !getScenarioConfig(config.scenario).supportedModes.duration.enabled}
-                title={getScenarioConfig(config.scenario).supportedModes.duration.tooltip}
+                disabled={
+                  testStatus === "running" ||
+                  !getScenarioConfig(config.scenario).supportedModes.duration
+                    .enabled
+                }
+                title={
+                  getScenarioConfig(config.scenario).supportedModes.duration
+                    .tooltip
+                }
               >
                 Duration
               </button>
@@ -250,61 +294,91 @@ export default function TestController({
               <button
                 type="button"
                 onClick={() =>
-                  getScenarioConfig(config.scenario).supportedModes.iterations.enabled &&
+                  getScenarioConfig(config.scenario).supportedModes.iterations
+                    .enabled &&
                   setConfig({ ...config, executionMode: "iterations" })
                 }
                 className={`w-full px-3 py-2 rounded-md border transition-colors ${
                   config.executionMode === "iterations"
                     ? "bg-blue-600 text-white border-blue-600"
-                    : getScenarioConfig(config.scenario).supportedModes.iterations.enabled
+                    : getScenarioConfig(config.scenario).supportedModes
+                        .iterations.enabled
                     ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={testStatus === "running" || !getScenarioConfig(config.scenario).supportedModes.iterations.enabled}
-                title={getScenarioConfig(config.scenario).supportedModes.iterations.tooltip}
+                disabled={
+                  testStatus === "running" ||
+                  !getScenarioConfig(config.scenario).supportedModes.iterations
+                    .enabled
+                }
+                title={
+                  getScenarioConfig(config.scenario).supportedModes.iterations
+                    .tooltip
+                }
               >
                 Iterations
               </button>
-              {!getScenarioConfig(config.scenario).supportedModes.iterations.enabled && getScenarioConfig(config.scenario).supportedModes.iterations.tooltip && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                  <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
-                    {getScenarioConfig(config.scenario).supportedModes.iterations.tooltip}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                      <div className="border-4 border-transparent border-t-gray-900"></div>
+              {!getScenarioConfig(config.scenario).supportedModes.iterations
+                .enabled &&
+                getScenarioConfig(config.scenario).supportedModes.iterations
+                  .tooltip && (
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                    <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
+                      {
+                        getScenarioConfig(config.scenario).supportedModes
+                          .iterations.tooltip
+                      }
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
             <div className="relative flex-1 group">
               <button
                 type="button"
-                onClick={() => 
-                  getScenarioConfig(config.scenario).supportedModes.hybrid.enabled &&
+                onClick={() =>
+                  getScenarioConfig(config.scenario).supportedModes.hybrid
+                    .enabled &&
                   setConfig({ ...config, executionMode: "hybrid" })
                 }
                 className={`w-full px-3 py-2 rounded-md border transition-colors ${
                   config.executionMode === "hybrid"
                     ? "bg-blue-600 text-white border-blue-600"
-                    : getScenarioConfig(config.scenario).supportedModes.hybrid.enabled
+                    : getScenarioConfig(config.scenario).supportedModes.hybrid
+                        .enabled
                     ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={testStatus === "running" || !getScenarioConfig(config.scenario).supportedModes.hybrid.enabled}
-                title={getScenarioConfig(config.scenario).supportedModes.hybrid.tooltip}
+                disabled={
+                  testStatus === "running" ||
+                  !getScenarioConfig(config.scenario).supportedModes.hybrid
+                    .enabled
+                }
+                title={
+                  getScenarioConfig(config.scenario).supportedModes.hybrid
+                    .tooltip
+                }
               >
                 Hybrid
               </button>
-              {!getScenarioConfig(config.scenario).supportedModes.hybrid.enabled && getScenarioConfig(config.scenario).supportedModes.hybrid.tooltip && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                  <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
-                    {getScenarioConfig(config.scenario).supportedModes.hybrid.tooltip}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                      <div className="border-4 border-transparent border-t-gray-900"></div>
+              {!getScenarioConfig(config.scenario).supportedModes.hybrid
+                .enabled &&
+                getScenarioConfig(config.scenario).supportedModes.hybrid
+                  .tooltip && (
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                    <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal">
+                      {
+                        getScenarioConfig(config.scenario).supportedModes.hybrid
+                          .tooltip
+                      }
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           </div>
         </div>
@@ -444,14 +518,21 @@ export default function TestController({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setConfig({ 
-                  ...config, 
-                  useCustomEndpoint: false,
-                  targetUrl: configModule.mockServerUrl,
-                  selectedEndpoint: "GET /success",
-                  urlPath: "/success",
-                  httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
-                })}
+                onClick={() =>
+                  setConfig({
+                    ...config,
+                    useCustomEndpoint: false,
+                    targetUrl: configModule.mockServerUrl,
+                    selectedEndpoint: "GET /success",
+                    urlPath: "/success",
+                    httpMethod: "GET" as
+                      | "GET"
+                      | "POST"
+                      | "PUT"
+                      | "DELETE"
+                      | "PATCH",
+                  })
+                }
                 className={`px-3 py-2 rounded-md border transition-colors ${
                   !config.useCustomEndpoint
                     ? "bg-blue-600 text-white border-blue-600"
@@ -463,14 +544,21 @@ export default function TestController({
               </button>
               <button
                 type="button"
-                onClick={() => setConfig({ 
-                  ...config, 
-                  useCustomEndpoint: true,
-                  targetUrl: "",
-                  selectedEndpoint: "custom",
-                  urlPath: "/",
-                  httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
-                })}
+                onClick={() =>
+                  setConfig({
+                    ...config,
+                    useCustomEndpoint: true,
+                    targetUrl: "",
+                    selectedEndpoint: "custom",
+                    urlPath: "/",
+                    httpMethod: "GET" as
+                      | "GET"
+                      | "POST"
+                      | "PUT"
+                      | "DELETE"
+                      | "PATCH",
+                  })
+                }
                 className={`px-3 py-2 rounded-md border transition-colors ${
                   config.useCustomEndpoint
                     ? "bg-blue-600 text-white border-blue-600"
@@ -484,18 +572,28 @@ export default function TestController({
             <input
               type="text"
               value={config.targetUrl}
-              onChange={(e) => setConfig({ ...config, targetUrl: e.target.value })}
-              placeholder={config.useCustomEndpoint ? "https://api.example.com" : "Mock server URL"}
+              onChange={(e) =>
+                setConfig({ ...config, targetUrl: e.target.value })
+              }
+              placeholder={
+                config.useCustomEndpoint
+                  ? "https://api.example.com"
+                  : "Mock server URL"
+              }
               className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                !config.useCustomEndpoint ? "bg-gray-100 cursor-not-allowed" : ""
+                !config.useCustomEndpoint
+                  ? "bg-gray-100 cursor-not-allowed"
+                  : ""
               } disabled:bg-gray-100`}
               style={{
-                color: testStatus === "running" || !config.useCustomEndpoint
-                  ? "rgb(156, 163, 175)"
-                  : "rgb(0, 0, 0)",
-                WebkitTextFillColor: testStatus === "running" || !config.useCustomEndpoint
-                  ? "rgb(156, 163, 175)"
-                  : "rgb(0, 0, 0)",
+                color:
+                  testStatus === "running" || !config.useCustomEndpoint
+                    ? "rgb(156, 163, 175)"
+                    : "rgb(0, 0, 0)",
+                WebkitTextFillColor:
+                  testStatus === "running" || !config.useCustomEndpoint
+                    ? "rgb(156, 163, 175)"
+                    : "rgb(0, 0, 0)",
                 opacity: 1,
               }}
               disabled={testStatus === "running" || !config.useCustomEndpoint}
@@ -514,13 +612,18 @@ export default function TestController({
               onChange={(e) => {
                 const selectedValue = e.target.value;
                 const endpoint = availableEndpoints.find(
-                  ep => `${ep.method} ${ep.path}` === selectedValue
+                  (ep) => `${ep.method} ${ep.path}` === selectedValue
                 );
                 if (endpoint) {
                   setConfig({
                     ...config,
                     selectedEndpoint: selectedValue,
-                    httpMethod: endpoint.method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
+                    httpMethod: endpoint.method as
+                      | "GET"
+                      | "POST"
+                      | "PUT"
+                      | "DELETE"
+                      | "PATCH",
                     urlPath: endpoint.path,
                   });
                 }
@@ -557,11 +660,27 @@ export default function TestController({
               <div className="flex gap-2">
                 <select
                   value={config.httpMethod}
-                  onChange={(e) => setConfig({ ...config, httpMethod: e.target.value as "GET" | "POST" | "PUT" | "DELETE" | "PATCH" })}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      httpMethod: e.target.value as
+                        | "GET"
+                        | "POST"
+                        | "PUT"
+                        | "DELETE"
+                        | "PATCH",
+                    })
+                  }
                   className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                   style={{
-                    color: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
-                    WebkitTextFillColor: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
+                    color:
+                      testStatus === "running"
+                        ? "rgb(156, 163, 175)"
+                        : "rgb(0, 0, 0)",
+                    WebkitTextFillColor:
+                      testStatus === "running"
+                        ? "rgb(156, 163, 175)"
+                        : "rgb(0, 0, 0)",
                     opacity: 1,
                   }}
                   disabled={testStatus === "running"}
@@ -575,25 +694,36 @@ export default function TestController({
                 <input
                   type="text"
                   value={config.urlPath}
-                  onChange={(e) => setConfig({ ...config, urlPath: e.target.value })}
+                  onChange={(e) =>
+                    setConfig({ ...config, urlPath: e.target.value })
+                  }
                   placeholder="/api/endpoint"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                   style={{
-                    color: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
-                    WebkitTextFillColor: testStatus === "running" ? "rgb(156, 163, 175)" : "rgb(0, 0, 0)",
+                    color:
+                      testStatus === "running"
+                        ? "rgb(156, 163, 175)"
+                        : "rgb(0, 0, 0)",
+                    WebkitTextFillColor:
+                      testStatus === "running"
+                        ? "rgb(156, 163, 175)"
+                        : "rgb(0, 0, 0)",
                     opacity: 1,
                   }}
                   disabled={testStatus === "running"}
                 />
               </div>
               <p className="text-xs text-gray-500">
-                Full URL: {config.targetUrl}{config.urlPath}
+                Full URL: {config.targetUrl}
+                {config.urlPath}
               </p>
             </div>
           )}
         </div>
 
-        {(config.httpMethod === "POST" || config.httpMethod === "PUT" || config.httpMethod === "PATCH") && (
+        {(config.httpMethod === "POST" ||
+          config.httpMethod === "PUT" ||
+          config.httpMethod === "PATCH") && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Request Body (JSON)
@@ -624,55 +754,90 @@ export default function TestController({
 
         {/* Error Simulation Section */}
         <div className="border-t pt-4">
-          <div className={`border rounded-lg p-4 ${
-            config.useCustomEndpoint 
-              ? 'bg-gray-50 border-gray-200' 
-              : 'bg-orange-50 border-orange-200'
-          }`}>
+          <div
+            className={`border rounded-lg p-4 ${
+              config.useCustomEndpoint
+                ? "bg-gray-50 border-gray-200"
+                : "bg-orange-50 border-orange-200"
+            }`}
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <svg className={`w-5 h-5 ${config.useCustomEndpoint ? 'text-gray-400' : 'text-orange-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <svg
+                  className={`w-5 h-5 ${
+                    config.useCustomEndpoint
+                      ? "text-gray-400"
+                      : "text-orange-600"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
                 </svg>
-                <label className={`text-base font-semibold ${
-                  config.useCustomEndpoint ? 'text-gray-500' : 'text-gray-800'
-                } cursor-pointer`} 
-                  htmlFor="error-simulation-toggle">
-                  Error Simulation {config.useCustomEndpoint && '(Mock Server Only)'}
+                <label
+                  className={`text-base font-semibold ${
+                    config.useCustomEndpoint ? "text-gray-500" : "text-gray-800"
+                  } cursor-pointer`}
+                  htmlFor="error-simulation-toggle"
+                >
+                  Error Simulation{" "}
+                  {config.useCustomEndpoint && "(Mock Server Only)"}
                 </label>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   id="error-simulation-toggle"
                   type="checkbox"
-                  checked={config.enableErrorSimulation && !config.useCustomEndpoint}
-                  onChange={(e) =>
-                    setConfig({ ...config, enableErrorSimulation: e.target.checked })
+                  checked={
+                    config.enableErrorSimulation && !config.useCustomEndpoint
                   }
-                  disabled={testStatus === "running" || config.useCustomEndpoint}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      enableErrorSimulation: e.target.checked,
+                    })
+                  }
+                  disabled={
+                    testStatus === "running" || config.useCustomEndpoint
+                  }
                   className="sr-only peer"
                 />
-                <div className={`w-11 h-6 ${
-                  config.useCustomEndpoint 
-                    ? 'bg-gray-100 cursor-not-allowed' 
-                    : 'bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300'
-                } rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600`}></div>
+                <div
+                  className={`w-11 h-6 ${
+                    config.useCustomEndpoint
+                      ? "bg-gray-100 cursor-not-allowed"
+                      : "bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300"
+                  } rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600`}
+                ></div>
               </label>
             </div>
-            
+
             {config.useCustomEndpoint && (
               <div className="text-xs text-gray-500 flex items-start gap-1 mb-3">
-                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <svg
+                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 <span>
-                  Error simulation is only available when using the Mock Server. 
+                  Error simulation is only available when using the Mock Server.
                   Switch to Mock Server to enable this feature.
                 </span>
               </div>
             )}
-          
+
             {config.enableErrorSimulation && !config.useCustomEndpoint && (
               <div className="space-y-4 mt-4">
                 <div className="bg-white rounded-lg p-3">
@@ -692,88 +857,124 @@ export default function TestController({
                       max="100"
                       value={config.errorRate}
                       onChange={(e) =>
-                        setConfig({ ...config, errorRate: parseInt(e.target.value) })
+                        setConfig({
+                          ...config,
+                          errorRate: parseInt(e.target.value),
+                        })
                       }
                       disabled={testStatus === "running"}
                       className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                       style={{
-                        background: `linear-gradient(to right, rgb(251, 146, 60) 0%, rgb(251, 146, 60) ${config.errorRate}%, rgb(229, 231, 235) ${config.errorRate}%, rgb(229, 231, 235) 100%)`
+                        background: `linear-gradient(to right, rgb(251, 146, 60) 0%, rgb(251, 146, 60) ${config.errorRate}%, rgb(229, 231, 235) ${config.errorRate}%, rgb(229, 231, 235) 100%)`,
                       }}
                     />
                     <span className="text-xs text-gray-500">100%</span>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {config.errorRate === 0 ? "No errors will be simulated" :
-                     config.errorRate <= 10 ? "Low error rate - realistic scenario" :
-                     config.errorRate <= 30 ? "Moderate error rate - degraded service" :
-                     config.errorRate <= 50 ? "High error rate - major issues" :
-                     "Extreme error rate - service failure"}
+                    {config.errorRate === 0
+                      ? "No errors will be simulated"
+                      : config.errorRate <= 10
+                      ? "Low error rate - realistic scenario"
+                      : config.errorRate <= 30
+                      ? "Moderate error rate - degraded service"
+                      : config.errorRate <= 50
+                      ? "High error rate - major issues"
+                      : "Extreme error rate - service failure"}
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-lg p-3">
                   <label className="text-sm font-semibold text-gray-700 mb-3 block">
                     Error Types to Simulate
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {Object.entries(config.errorTypes).map(([code, enabled]) => {
-                      const errorInfo: Record<string, { name: string; color: string }> = {
-                        '400': { name: 'Bad Request', color: 'yellow' },
-                        '401': { name: 'Unauthorized', color: 'red' },
-                        '403': { name: 'Forbidden', color: 'red' },
-                        '404': { name: 'Not Found', color: 'gray' },
-                        '429': { name: 'Too Many Requests', color: 'orange' },
-                        '500': { name: 'Internal Error', color: 'red' },
-                        '502': { name: 'Bad Gateway', color: 'purple' },
-                        '503': { name: 'Service Unavailable', color: 'orange' }
-                      };
-                      const info = errorInfo[code] || { name: code, color: 'gray' };
-                      
-                      return (
-                        <label 
-                          key={code} 
-                          className={`
+                    {Object.entries(config.errorTypes).map(
+                      ([code, enabled]) => {
+                        const errorInfo: Record<
+                          string,
+                          { name: string; color: string }
+                        > = {
+                          "400": { name: "Bad Request", color: "yellow" },
+                          "401": { name: "Unauthorized", color: "red" },
+                          "403": { name: "Forbidden", color: "red" },
+                          "404": { name: "Not Found", color: "gray" },
+                          "429": { name: "Too Many Requests", color: "orange" },
+                          "500": { name: "Internal Error", color: "red" },
+                          "502": { name: "Bad Gateway", color: "purple" },
+                          "503": {
+                            name: "Service Unavailable",
+                            color: "orange",
+                          },
+                        };
+                        const info = errorInfo[code] || {
+                          name: code,
+                          color: "gray",
+                        };
+
+                        return (
+                          <label
+                            key={code}
+                            className={`
                             flex items-center space-x-2 p-2 rounded-lg border cursor-pointer
                             transition-all duration-200
-                            ${enabled 
-                              ? `bg-${info.color}-50 border-${info.color}-300` 
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            ${
+                              enabled
+                                ? `bg-${info.color}-50 border-${info.color}-300`
+                                : "bg-gray-50 border-gray-200 hover:bg-gray-100"
                             }
-                            ${testStatus === "running" ? 'opacity-50 cursor-not-allowed' : ''}
+                            ${
+                              testStatus === "running"
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }
                           `}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={enabled}
-                            onChange={(e) =>
-                              setConfig({
-                                ...config,
-                                errorTypes: {
-                                  ...config.errorTypes,
-                                  [code]: e.target.checked,
-                                },
-                              })
-                            }
-                            disabled={testStatus === "running"}
-                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                          />
-                          <div className="flex-1">
-                            <span className="font-semibold text-sm">{code}</span>
-                            <span className="text-xs text-gray-600 ml-1">{info.name}</span>
-                          </div>
-                        </label>
-                      );
-                    })}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={enabled}
+                              onChange={(e) =>
+                                setConfig({
+                                  ...config,
+                                  errorTypes: {
+                                    ...config.errorTypes,
+                                    [code]: e.target.checked,
+                                  },
+                                })
+                              }
+                              disabled={testStatus === "running"}
+                              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                            />
+                            <div className="flex-1">
+                              <span className="font-semibold text-sm">
+                                {code}
+                              </span>
+                              <span className="text-xs text-gray-600 ml-1">
+                                {info.name}
+                              </span>
+                            </div>
+                          </label>
+                        );
+                      }
+                    )}
                   </div>
                 </div>
-                
+
                 <div className="text-xs text-gray-500 flex items-start gap-1">
-                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  <svg
+                    className="w-4 h-4 mt-0.5 flex-shrink-0"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                   <span>
-                    Error simulation works with Mock Server endpoints. 
-                    Selected error types will be randomly returned based on the error rate.
+                    Error simulation works with Mock Server endpoints. Selected
+                    error types will be randomly returned based on the error
+                    rate.
                   </span>
                 </div>
               </div>
