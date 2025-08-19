@@ -1,10 +1,16 @@
 import { TestService } from './test.service';
+import { ScenarioService } from '../scenarios/scenario.service';
+import { ConfigService } from '../config/config.service';
 
 describe('TestService', () => {
   let service: TestService;
+  let scenarioService: ScenarioService;
+  let configService: ConfigService;
 
   beforeEach(() => {
-    service = new TestService();
+    scenarioService = new ScenarioService();
+    configService = ConfigService.getInstance();
+    service = new TestService(scenarioService, configService);
   });
 
   it('should be defined', () => {
