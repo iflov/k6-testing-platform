@@ -15,7 +15,7 @@ services:
       # K6 Runner and Mock Server URLs for Docker network
       - K6_RUNNER_BASE_URL=http://k6-runner:3002
       - MOCK_SERVER_URL=http://mock-server:3001
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-testuser}:${POSTGRES_PASSWORD:-testpassword}@postgres:5432/${POSTGRES_DB:-k6_test_history}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-test_admin}:${POSTGRES_PASSWORD:-testpassword}@postgres:5432/${POSTGRES_DB:-k6_test_history}?schema=public
     depends_on:
       - mock-server
       - influxdb
@@ -73,6 +73,10 @@ services:
       - "5665:5665" # Web Dashboard 포트 (K6가 실행될 때 사용)
     env_file:
       - ./apps/k6-runner-v2/.env
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - K6_DASHBOARD_PORT=${K6_DASHBOARD_PORT:-5665}
+      - K6_DASHBOARD_HOST=${K6_DASHBOARD_HOST:-0.0.0.0}
     depends_on:
       - mock-server
       - influxdb
@@ -102,7 +106,11 @@ services:
       - k6-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U test_admin -d k6_test_history"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-test_admin} -d ${POSTGRES_DB:-k6_test_history}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -64,6 +64,6 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER update_test_runs_updated_at BEFORE UPDATE
     ON test_runs FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
--- Grant permissions
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO test_admin;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO test_admin;
+-- Grant permissions to the database owner
+-- The POSTGRES_USER from .env will automatically have all privileges as the database owner
+-- Additional grants are not needed for the owner user

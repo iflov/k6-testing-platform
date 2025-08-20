@@ -83,7 +83,11 @@ export class ProcessManagerService {
   };
 
   // * k6 web dashboard 설정
-  setupDashboard = async (enableDashboard: boolean, k6Args: string[], k6Env: Record<string, string>) => {
+  setupDashboard = async (
+    enableDashboard: boolean,
+    k6Args: string[],
+    k6Env: Record<string, string>,
+  ) => {
     if (!enableDashboard) return false;
 
     const portInUse = await this.isPortInUse(this.configService.getK6DashboardPort());
@@ -100,9 +104,9 @@ export class ProcessManagerService {
       `web-dashboard=host=${this.configService.getK6DashboardHost()}&port=${this.configService.getK6DashboardPort()}`,
     );
 
-    k6Env.K6_WEB_DASHBOARD = 'true';
-    k6Env.K6_WEB_DASHBOARD_HOST = this.configService.getK6DashboardHost();
-    k6Env.K6_WEB_DASHBOARD_PORT = this.configService.getK6DashboardPort();
+    k6Env.K6_DASHBOARD = 'true';
+    k6Env.K6_DASHBOARD_HOST = this.configService.getK6DashboardHost();
+    k6Env.K6_DASHBOARD_PORT = this.configService.getK6DashboardPort();
 
     return true;
   };
@@ -261,10 +265,10 @@ export class ProcessManagerService {
   cleanupTest = async (testId: string) => {
     // 진행 상태 정리
     this.testProgress.delete(testId);
-    
+
     // 에러 버퍼 정리
     this.errorBuffers.delete(testId);
-    
+
     console.warn(`Test ${testId} cleanup completed`);
   };
 
