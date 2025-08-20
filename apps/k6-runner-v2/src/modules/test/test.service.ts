@@ -238,4 +238,8 @@ export class TestService {
   getCurrentTest(): CurrentTest | null {
     return this.currentTest;
   }
+
+  getProgressById(testId: string) {
+    return this.processManagerService.getProgress(testId);
+  }
 }

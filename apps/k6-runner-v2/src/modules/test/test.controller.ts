@@ -57,10 +57,30 @@ export class TestController {
     }
   };
 
-  getProgress = async (_req: Request, res: Response) => {
+  getProgress = async (req: Request, res: Response) => {
     try {
-      const progress = await this.testService.getProgress();
-      return res.status(200).json(progress);
+      const { testId } = req.params;
+      
+      if (testId) {
+        // Get progress for specific test ID
+        const progress = this.testService.getProgressById(testId);
+        return res.status(200).json({
+          testId,
+          progress,
+        });
+      } else {
+        // Get progress for current test
+        const currentTest = this.testService.getCurrentTest();
+        const currentTestId = currentTest?.testId;
+        const progress = currentTestId 
+          ? this.testService.getProgressById(currentTestId)
+          : null;
+          
+        return res.status(200).json({
+          testId: currentTestId || null,
+          progress,
+        });
+      }
     } catch (error: any) {
       return res.status(500).json({
         error: 'Failed to get progress',

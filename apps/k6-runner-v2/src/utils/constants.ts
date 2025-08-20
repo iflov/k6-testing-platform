@@ -28,6 +28,22 @@ export const HTTP_STATUS = {
 };
 
 export const SCENARIO = {
+  custom: {
+    id: 'custom',
+    name: 'Custom Test',
+    description: 'User-defined test with custom parameters',
+    defaultVus: 10,
+    defaultDuration: '30s',
+    defaultIterations: 1000,
+    supportedModes: {
+      duration: { enabled: true },
+      iterations: { enabled: true },
+      hybrid: { enabled: true },
+    },
+    useStages: false,
+    rampPattern: 'none',
+    executor: 'constant-vus',
+  },
   smoke: {
     id: 'smoke',
     name: 'Smoke Test',

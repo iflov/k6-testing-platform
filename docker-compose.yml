@@ -77,8 +77,9 @@ services:
       - mock-server
       - influxdb
     volumes:
-      # 개발용 소스 코드 마운트 (hot reload)
-      - ./apps/k6-runner-v2:/app
+      # 개발용 볼륨 마운트 (dist와 node_modules는 컨테이너 내부 것 사용)
+      - ./apps/k6-runner-v2/.env:/app/.env:ro
+      - /app/dist # dist 폴더는 컨테이너 내부 것 사용
       - /app/node_modules # node_modules 제외
       - /tmp:/tmp # 임시 파일용
     extra_hosts:

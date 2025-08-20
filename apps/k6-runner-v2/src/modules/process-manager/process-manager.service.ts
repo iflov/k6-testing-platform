@@ -10,13 +10,9 @@ import { CONSTANTS } from '../../utils/constants';
 export class ProcessManagerService {
   private testProgress: Map<string, TestProgress> = new Map();
   private errorBuffers: Map<string, string> = new Map();
-  private k6Args: string[] = [];
   private k6Process: ChildProcess | null = null;
-  private k6Env: Record<string, string> = {};
 
-  constructor(private readonly configService: ConfigService) {
-    this.k6Args = ['run', '--out', `influxdb=${this.configService.getInfluxDbUrl()}`];
-  }
+  constructor(private readonly configService: ConfigService) {}
 
   // * child process 생성 - 테스트 실행하는 프로세스 생성
   spawnProcess = async ({
@@ -36,15 +32,19 @@ export class ProcessManagerService {
   }): Promise<{ process: ChildProcess; dashboardEnabled: boolean }> => {
     this.errorBuffers.set(testId, '');
 
-    this.k6Env = {
+    // Use local variables for each test to avoid conflicts
+    const k6Args = ['run', '--out', `influxdb=${this.configService.getInfluxDbUrl()}`];
+
+    const k6Env = {
       ...process.env,
       TARGET_URL: targetUrl,
     };
 
-    const dashboardActuallyEnabled = await this.setupDashboard(enableDashboard);
-    this.k6Args.push(scriptPath);
+    const dashboardActuallyEnabled = await this.setupDashboard(enableDashboard, k6Args, k6Env);
+    k6Args.push(scriptPath);
 
-    this.k6Process = spawn('k6', this.k6Args, { env: this.k6Env });
+    console.warn(`K6 command: k6 ${k6Args.join(' ')}`);
+    this.k6Process = spawn('k6', k6Args, { env: k6Env });
 
     this.k6Process.stderr?.on('data', (data) => {
       const current = this.errorBuffers.get(testId) || '';
@@ -83,7 +83,7 @@ export class ProcessManagerService {
   };
 
   // * k6 web dashboard 설정
-  setupDashboard = async (enableDashboard: boolean) => {
+  setupDashboard = async (enableDashboard: boolean, k6Args: string[], k6Env: Record<string, string>) => {
     if (!enableDashboard) return false;
 
     const portInUse = await this.isPortInUse(this.configService.getK6DashboardPort());
@@ -95,14 +95,14 @@ export class ProcessManagerService {
       return false;
     }
 
-    this.k6Args.push(
+    k6Args.push(
       '--out',
       `web-dashboard=host=${this.configService.getK6DashboardHost()}&port=${this.configService.getK6DashboardPort()}`,
     );
 
-    this.k6Env.K6_WEB_DASHBOARD = 'true';
-    this.k6Env.K6_WEB_DASHBOARD_HOST = this.configService.getK6DashboardHost();
-    this.k6Env.K6_WEB_DASHBOARD_PORT = this.configService.getK6DashboardPort();
+    k6Env.K6_WEB_DASHBOARD = 'true';
+    k6Env.K6_WEB_DASHBOARD_HOST = this.configService.getK6DashboardHost();
+    k6Env.K6_WEB_DASHBOARD_PORT = this.configService.getK6DashboardPort();
 
     return true;
   };
