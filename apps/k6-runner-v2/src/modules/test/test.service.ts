@@ -54,10 +54,12 @@ export class TestService {
 
     // URL 빌드
     const baseUrl = targetUrl || this.configService.getMockServerUrl();
-    
+
     // 헤더 기반 chaos를 사용하는 경우 URL에 쿼리 파라미터를 추가하지 않음
-    const fullUrl = useHeaderForChaos 
-      ? (urlPath ? `${baseUrl}${urlPath}` : baseUrl)
+    const fullUrl = useHeaderForChaos
+      ? urlPath
+        ? `${baseUrl}${urlPath}`
+        : baseUrl
       : this.scenarioService.buildUrl(
           baseUrl,
           urlPath,
@@ -74,14 +76,18 @@ export class TestService {
       urlPath,
       options,
       useHeaderForChaos,
-      chaosHeaders: useHeaderForChaos && enableErrorSimulation ? {
-        enabled: true,
-        errorRate: errorRate || CONSTANTS.DEFAULT_ERROR_RATE,
-        statusCodes: Object.entries(errorTypes || {})
-          .filter(([, enabled]) => enabled)
-          .map(([code]) => code)
-          .join(',') || '400,500,503',
-      } : undefined,
+      chaosHeaders:
+        useHeaderForChaos && enableErrorSimulation
+          ? {
+              enabled: true,
+              errorRate: errorRate || CONSTANTS.DEFAULT_ERROR_RATE,
+              statusCodes:
+                Object.entries(errorTypes || {})
+                  .filter(([, enabled]) => enabled)
+                  .map(([code]) => code)
+                  .join(',') || '400,500,503',
+            }
+          : undefined,
     });
 
     // 스크립트 파일 저장
@@ -102,12 +108,12 @@ export class TestService {
     k6Process.on('exit', async () => {
       if (this.currentTest?.testId === testId) {
         console.warn(`Test ${testId} process exited, clearing currentTest`);
-        
+
         // timeout 정리
         if (this.currentTest.timeoutId) {
           clearTimeout(this.currentTest.timeoutId);
         }
-        
+
         // 스크립트 파일 삭제
         if (this.currentTest.scriptPath) {
           try {
@@ -118,16 +124,16 @@ export class TestService {
             console.error(`Failed to delete script file: ${error}`);
           }
         }
-        
+
         // ProcessManagerService 정리
         await this.processManagerService.cleanupTest(testId);
-        
+
         // 대시보드 포트 해제 대기
         if (this.currentTest.dashboardEnabled) {
           console.warn('Dashboard was enabled, waiting for port release...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
-        
+
         // currentTest 정리
         this.currentTest = null;
       }
@@ -205,23 +211,28 @@ export class TestService {
       message: 'Test stopped successfully',
     };
   }
+
   async getStatus() {
     const isRunning = this.currentTest !== null;
-    const progress = this.currentTest ? this.processManagerService.getProgress(this.currentTest.testId) : null;
+    const progress = this.currentTest
+      ? this.processManagerService.getProgress(this.currentTest.testId)
+      : null;
 
     return {
       running: isRunning,
-      details: this.currentTest ? {
-        testId: this.currentTest.testId,
-        startTime: this.currentTest.startTime,
-        vus: this.currentTest.vus,
-        duration: this.currentTest.duration,
-        iterations: this.currentTest.iterations,
-        executionMode: this.currentTest.executionMode,
-        targetUrl: this.currentTest.targetUrl,
-        scenario: this.currentTest.scenario,
-        dashboardEnabled: this.currentTest.dashboardEnabled,
-      } : null,
+      details: this.currentTest
+        ? {
+            testId: this.currentTest.testId,
+            startTime: this.currentTest.startTime,
+            vus: this.currentTest.vus,
+            duration: this.currentTest.duration,
+            iterations: this.currentTest.iterations,
+            executionMode: this.currentTest.executionMode,
+            targetUrl: this.currentTest.targetUrl,
+            scenario: this.currentTest.scenario,
+            dashboardEnabled: this.currentTest.dashboardEnabled,
+          }
+        : null,
       progress,
     };
   }

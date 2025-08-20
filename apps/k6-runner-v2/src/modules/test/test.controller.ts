@@ -60,7 +60,7 @@ export class TestController {
   getProgress = async (req: Request, res: Response) => {
     try {
       const { testId } = req.params;
-      
+
       if (testId) {
         // Get progress for specific test ID
         const progress = this.testService.getProgressById(testId);
@@ -72,10 +72,8 @@ export class TestController {
         // Get progress for current test
         const currentTest = this.testService.getCurrentTest();
         const currentTestId = currentTest?.testId;
-        const progress = currentTestId 
-          ? this.testService.getProgressById(currentTestId)
-          : null;
-          
+        const progress = currentTestId ? this.testService.getProgressById(currentTestId) : null;
+
         return res.status(200).json({
           testId: currentTestId || null,
           progress,
