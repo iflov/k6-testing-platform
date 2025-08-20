@@ -72,4 +72,12 @@ export class ConfigService {
   getInfluxDbUrl(): string {
     return this.influxdbUrl;
   }
+
+  getK6DashboardHost(): string {
+    return this.k6DashboardHost;
+  }
+
+  getK6DashboardPort(): string {
+    return this.k6DashboardPort;
+  }
 }

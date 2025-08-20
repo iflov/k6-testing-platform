@@ -16,8 +16,6 @@ interface K6ScriptConfig {
   httpMethod: string;
   requestBody?: string;
   urlPath?: string;
-  testId: string;
-  scenario: string;
   options: any;
 }
 

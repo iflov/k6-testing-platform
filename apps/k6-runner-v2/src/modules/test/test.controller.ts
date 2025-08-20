@@ -9,7 +9,7 @@ export class TestController {
     try {
       const result = await this.testService.startTest(req.body);
 
-      res.status(200).json(result);
+      return res.status(200).json(result);
     } catch (error: any) {
       if (error.message === 'Another test is already running') {
         const currentTest = this.testService.getCurrentTest();
@@ -20,7 +20,7 @@ export class TestController {
           startTime: currentTest?.startTime,
         });
       }
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Failed to start test',
         message: error.message,
       });
@@ -29,16 +29,43 @@ export class TestController {
 
   stopTest = async (_req: Request, res: Response) => {
     try {
-    } catch (error: any) {}
+      const result = await this.testService.stopTest();
+      return res.status(200).json(result);
+    } catch (error: any) {
+      if (error.message === 'No test is currently running') {
+        return res.status(400).json({
+          error: 'No test is currently running',
+          message: 'No active test to stop',
+        });
+      }
+      return res.status(500).json({
+        error: 'Failed to stop test',
+        message: error.message,
+      });
+    }
   };
 
   getStatus = async (_req: Request, res: Response) => {
     try {
-    } catch (error: any) {}
+      const status = await this.testService.getStatus();
+      return res.status(200).json(status);
+    } catch (error: any) {
+      return res.status(500).json({
+        error: 'Failed to get status',
+        message: error.message,
+      });
+    }
   };
 
-  getProgress = async (req: Request, res: Response) => {
+  getProgress = async (_req: Request, res: Response) => {
     try {
-    } catch (error: any) {}
+      const progress = await this.testService.getProgress();
+      return res.status(200).json(progress);
+    } catch (error: any) {
+      return res.status(500).json({
+        error: 'Failed to get progress',
+        message: error.message,
+      });
+    }
   };
 }

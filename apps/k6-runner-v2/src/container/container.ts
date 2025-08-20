@@ -3,6 +3,7 @@ import { TestService } from '../modules/test/test.service';
 import { ScenarioService } from '../modules/scenarios/scenario.service';
 import { ScenariosController } from '../modules/scenarios/scenarios.controller';
 import { ConfigService } from '../modules/config/config.service';
+import { ProcessManagerService } from '../modules/process-manager/process-manager.service';
 
 /**
  * Dependency Injection Container
@@ -15,6 +16,7 @@ class Container {
   public readonly configService: ConfigService;
   public readonly testService: TestService;
   public readonly scenarioService: ScenarioService;
+  public readonly processManagerService: ProcessManagerService;
   // Controllers - HTTP 요청/응답 처리
   public readonly testController: TestController;
   public readonly scenariosController: ScenariosController;
@@ -26,7 +28,13 @@ class Container {
 
     // 2. 의존성이 있는 서비스 생성 (의존성 주입)
     // TestService는 ScenarioService와 ConfigService를 주입받음
-    this.testService = new TestService(this.scenarioService, this.configService);
+    this.processManagerService = new ProcessManagerService(this.configService);
+
+    this.testService = new TestService(
+      this.scenarioService,
+      this.configService,
+      this.processManagerService,
+    );
 
     // 3. 컨트롤러 생성 (서비스 주입)
     this.testController = new TestController(this.testService);
