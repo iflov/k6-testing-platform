@@ -38,6 +38,7 @@ export class TestService {
       enableErrorSimulation = false,
       errorRate = CONSTANTS.DEFAULT_ERROR_RATE,
       errorTypes = {},
+      useHeaderForChaos = false,
     } = body;
 
     // K6 옵션 생성
@@ -53,13 +54,17 @@ export class TestService {
 
     // URL 빌드
     const baseUrl = targetUrl || this.configService.getMockServerUrl();
-    const fullUrl = this.scenarioService.buildUrl(
-      baseUrl,
-      urlPath,
-      enableErrorSimulation,
-      errorRate,
-      errorTypes,
-    );
+    
+    // 헤더 기반 chaos를 사용하는 경우 URL에 쿼리 파라미터를 추가하지 않음
+    const fullUrl = useHeaderForChaos 
+      ? (urlPath ? `${baseUrl}${urlPath}` : baseUrl)
+      : this.scenarioService.buildUrl(
+          baseUrl,
+          urlPath,
+          enableErrorSimulation,
+          errorRate,
+          errorTypes,
+        );
 
     // K6 스크립트 생성
     const script = this.scenarioService.generateK6Script({
@@ -68,6 +73,15 @@ export class TestService {
       requestBody: requestBody || undefined,
       urlPath,
       options,
+      useHeaderForChaos,
+      chaosHeaders: useHeaderForChaos && enableErrorSimulation ? {
+        enabled: true,
+        errorRate: errorRate || CONSTANTS.DEFAULT_ERROR_RATE,
+        statusCodes: Object.entries(errorTypes || {})
+          .filter(([, enabled]) => enabled)
+          .map(([code]) => code)
+          .join(',') || '400,500,503',
+      } : undefined,
     });
 
     // 스크립트 파일 저장

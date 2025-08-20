@@ -9,6 +9,7 @@ export class ConfigService {
   mockServerUrl!: string;
   k6DashboardPort!: string;
   k6DashboardHost!: string;
+  k6DashboardPeriod!: string;
 
   static getInstance(): ConfigService {
     if (!ConfigService.instance) {
@@ -46,12 +47,14 @@ export class ConfigService {
       this.mockServerUrl = process.env.MOCK_SERVER_URL || 'http://host.docker.internal:3001';
       this.k6DashboardPort = process.env.K6_DASHBOARD_PORT || '5665';
       this.k6DashboardHost = process.env.K6_DASHBOARD_HOST || '0.0.0.0';
+      this.k6DashboardPeriod = process.env.K6_DASHBOARD_PERIOD || '1s';
     } else {
       this.port = this.assertEnvVar('PORT');
       this.influxdbUrl = this.assertEnvVar('INFLUXDB_URL');
       this.mockServerUrl = this.assertEnvVar('MOCK_SERVER_URL');
       this.k6DashboardPort = this.assertEnvVar('K6_DASHBOARD_PORT');
       this.k6DashboardHost = this.assertEnvVar('K6_DASHBOARD_HOST');
+      this.k6DashboardPeriod = this.assertEnvVar('K6_DASHBOARD_PERIOD');
     }
   }
 
@@ -79,5 +82,9 @@ export class ConfigService {
 
   getK6DashboardPort(): string {
     return this.k6DashboardPort;
+  }
+
+  getK6DashboardPeriod(): string {
+    return this.k6DashboardPeriod;
   }
 }

@@ -14,6 +14,7 @@ export interface TestConfig {
   enableErrorSimulation?: boolean;
   errorRate?: number;
   errorTypes?: Record<string, boolean>;
+  useHeaderForChaos?: boolean; // 헤더로 chaos 파라미터 전송 여부
 }
 
 export interface CurrentTest {

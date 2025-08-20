@@ -17,6 +17,12 @@ interface K6ScriptConfig {
   requestBody?: string;
   urlPath?: string;
   options: any;
+  useHeaderForChaos?: boolean;
+  chaosHeaders?: {
+    enabled: boolean;
+    errorRate: number;
+    statusCodes: string;
+  };
 }
 
 export class ScenarioService {
@@ -175,12 +181,24 @@ export class ScenarioService {
 
   // K6 스크립트 생성
   generateK6Script(config: K6ScriptConfig): string {
-    const { fullUrl, httpMethod, requestBody, urlPath, options } = config;
+    const { fullUrl, httpMethod, requestBody, urlPath, options, useHeaderForChaos, chaosHeaders } = config;
     const optionsConfig = JSON.stringify(options, null, 2);
 
     // HTTP request 생성
     const method = httpMethod.toLowerCase();
     let httpRequest = '';
+
+    // 헤더 설정 생성
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    
+    // Chaos 헤더 추가 (헤더 사용 옵션이 활성화된 경우)
+    if (useHeaderForChaos && chaosHeaders) {
+      headers['X-Chaos-Enabled'] = String(chaosHeaders.enabled);
+      headers['X-Chaos-Error-Rate'] = String(chaosHeaders.errorRate);
+      headers['X-Chaos-Status-Codes'] = chaosHeaders.statusCodes;
+    }
+
+    const headersString = JSON.stringify(headers);
 
     if (['POST', 'PUT', 'PATCH'].includes(httpMethod)) {
       let bodyData = requestBody || '{"message": "test"}';
@@ -199,18 +217,27 @@ export class ScenarioService {
 
       httpRequest = `
           const params = {
-            headers: { 'Content-Type': 'application/json' },
+            headers: ${headersString},
           };
           const res = http.${method}('${fullUrl}', \`${escapedBody}\`, params);`;
     } else if (httpMethod === 'DELETE') {
       httpRequest = `
           const params = {
-            headers: { 'Content-Type': 'application/json' },
+            headers: ${headersString},
           };
           const res = http.del('${fullUrl}', null, params);`;
     } else {
-      httpRequest = `
+      // GET 요청도 헤더가 필요한 경우 params 추가
+      if (useHeaderForChaos && chaosHeaders) {
+        httpRequest = `
+          const params = {
+            headers: ${headersString},
+          };
+          const res = http.get('${fullUrl}', params);`;
+      } else {
+        httpRequest = `
           const res = http.get('${fullUrl}');`;
+      }
     }
 
     // Success check

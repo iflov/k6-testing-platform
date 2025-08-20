@@ -78,7 +78,7 @@ export default function TestController({
     urlPath: "/health",
     httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
     requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
-    enableDashboard: false,
+    enableDashboard: true,  // 항상 대시보드 활성화
     // Error simulation settings
     enableErrorSimulation: false,
     errorRate: 10, // percentage
