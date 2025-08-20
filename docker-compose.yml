@@ -66,19 +66,19 @@ services:
   # K6 Runner - k6 테스트 실행 서비스
   k6-runner:
     build:
-      context: ./apps/k6-runner
+      context: ./apps/k6-runner-v2
       dockerfile: Dockerfile
     ports:
       - "3002:3002" # API 포트
       - "5665:5665" # Web Dashboard 포트 (K6가 실행될 때 사용)
     env_file:
-      - ./apps/k6-runner/.env
+      - ./apps/k6-runner-v2/.env
     depends_on:
       - mock-server
       - influxdb
     volumes:
       # 개발용 소스 코드 마운트 (hot reload)
-      - ./apps/k6-runner:/app
+      - ./apps/k6-runner-v2:/app
       - /app/node_modules # node_modules 제외
       - /tmp:/tmp # 임시 파일용
     extra_hosts:
