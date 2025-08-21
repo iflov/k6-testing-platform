@@ -69,7 +69,9 @@ help:
 	@echo "  make network-inspect - Inspect network"
 	@echo ""
 	@echo "🚢 Deployment:"
-	@echo "  make push         - Build and push all images to Docker Hub"
+	@echo "  make push         - Build & push multi-arch images (arm64, amd64)"
+	@echo "  make push-single  - Push single-arch images (current platform)"
+	@echo "  make buildx-setup - Setup Docker buildx for multi-platform"
 	@echo "  make pull         - Pull latest images from Docker Hub"
 	@echo "  make version      - Show version and tag information"
 	@echo ""
@@ -161,9 +163,34 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Push images to Docker Hub with git commit tag
-push: build push-control push-mock push-runner
-	@echo "✅ All images pushed to Docker Hub"
+# Multi-architecture build platforms
+PLATFORMS ?= linux/amd64,linux/arm64
+
+# Check if buildx is available
+BUILDX_EXISTS := $(shell docker buildx version 2>/dev/null)
+
+# Setup buildx builder for multi-platform builds
+buildx-setup:
+	@if [ -z "$(BUILDX_EXISTS)" ]; then \
+		echo "❌ Docker buildx not found. Please update Docker."; \
+		exit 1; \
+	fi
+	@if ! docker buildx ls | grep -q multiplatform-builder; then \
+		echo "🔧 Creating buildx builder for multi-platform builds..."; \
+		docker buildx create --name multiplatform-builder --use; \
+		docker buildx inspect --bootstrap; \
+	else \
+		echo "✅ Using existing buildx builder"; \
+		docker buildx use multiplatform-builder; \
+	fi
+
+# Push images to Docker Hub with git commit tag (multi-architecture)
+push: buildx-setup push-control-multi push-mock-multi push-runner-multi
+	@echo "✅ All multi-architecture images pushed to Docker Hub"
+
+# Legacy single-architecture push (for compatibility)
+push-single: build push-control push-mock push-runner
+	@echo "✅ All single-architecture images pushed to Docker Hub"
 
 push-control:
 	@echo "🚀 Pushing Control Panel to Docker Hub..."
@@ -188,6 +215,37 @@ push-runner:
 	docker push $(DOCKER_HUB_USER)/k6-testing-platform-k6-runner:$(GIT_COMMIT)
 	docker push $(DOCKER_HUB_USER)/k6-testing-platform-k6-runner:latest
 	@echo "✅ Pushed: $(DOCKER_HUB_USER)/k6-testing-platform-k6-runner:$(GIT_COMMIT)"
+
+# Multi-architecture builds and pushes
+push-control-multi: buildx-setup
+	@echo "🚀 Building and pushing multi-arch Control Panel to Docker Hub..."
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--tag $(DOCKER_HUB_USER)/k6-testing-platform-control-panel:$(GIT_COMMIT) \
+		--tag $(DOCKER_HUB_USER)/k6-testing-platform-control-panel:latest \
+		--push \
+		./apps/control-panel
+	@echo "✅ Pushed multi-arch: $(DOCKER_HUB_USER)/k6-testing-platform-control-panel:$(GIT_COMMIT)"
+
+push-mock-multi: buildx-setup
+	@echo "🚀 Building and pushing multi-arch Mock Server to Docker Hub..."
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--tag $(DOCKER_HUB_USER)/k6-testing-platform-mock-server:$(GIT_COMMIT) \
+		--tag $(DOCKER_HUB_USER)/k6-testing-platform-mock-server:latest \
+		--push \
+		./apps/mock-server
+	@echo "✅ Pushed multi-arch: $(DOCKER_HUB_USER)/k6-testing-platform-mock-server:$(GIT_COMMIT)"
+
+push-runner-multi: buildx-setup
+	@echo "🚀 Building and pushing multi-arch K6 Runner v2 to Docker Hub..."
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--tag $(DOCKER_HUB_USER)/k6-testing-platform-k6-runner:$(GIT_COMMIT) \
+		--tag $(DOCKER_HUB_USER)/k6-testing-platform-k6-runner:latest \
+		--push \
+		./apps/k6-runner-v2
+	@echo "✅ Pushed multi-arch: $(DOCKER_HUB_USER)/k6-testing-platform-k6-runner:$(GIT_COMMIT)"
 
 # Pull images from Docker Hub
 pull:
