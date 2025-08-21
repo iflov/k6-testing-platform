@@ -47,8 +47,19 @@ export async function GET(
     return NextResponse.json(serializeBigInt(testRun));
   } catch (error) {
     console.error('Failed to fetch test run:', error);
+    
+    // Prisma initialization error handling
+    if (error instanceof Error && error.name === 'PrismaClientInitializationError') {
+      console.error('Database connection error - please check DATABASE_URL configuration');
+      return NextResponse.json(
+        { error: 'Database connection error. Please check server configuration.' },
+        { status: 503 }
+      );
+    }
+    
+    // Generic error response without exposing internal details
     return NextResponse.json(
-      { error: 'Failed to fetch test run', details: error },
+      { error: 'Failed to fetch test run. Please try again later.' },
       { status: 500 }
     );
   }

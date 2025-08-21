@@ -91,23 +91,23 @@ install:
 
 # Development mode - all services with logs
 dev:
-	docker-compose up --build
+	docker compose up --build
 
 # Start services in background
 up:
-	docker-compose up -d --build
+	docker compose up -d --build
 
 # Stop services
 down:
-	docker-compose down
+	docker compose down
 
 # Show logs
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 # Clean up
 clean:
-	docker-compose down -v
+	docker compose down -v
 	docker system prune -f
 
 # Build all images
@@ -131,7 +131,7 @@ build-runner-v2:
 # Run tests
 test:
 	@echo "Running load test..."
-	docker-compose run --rm k6 run /scripts/scenarios/load-test.js \
+	docker compose run --rm k6 run /scripts/scenarios/load-test.js \
 		--out influxdb=http://influxdb:8086/k6 \
 		-e TARGET_URL=http://mock-server:3001 \
 		-e VUS=10 \
@@ -139,19 +139,19 @@ test:
 
 test-stress:
 	@echo "Running stress test..."
-	docker-compose run --rm k6 run /scripts/scenarios/stress-test.js \
+	docker compose run --rm k6 run /scripts/scenarios/stress-test.js \
 		--out influxdb=http://influxdb:8086/k6 \
 		-e TARGET_URL=http://mock-server:3001
 
 test-spike:
 	@echo "Running spike test..."
-	docker-compose run --rm k6 run /scripts/scenarios/spike-test.js \
+	docker compose run --rm k6 run /scripts/scenarios/spike-test.js \
 		--out influxdb=http://influxdb:8086/k6 \
 		-e TARGET_URL=http://mock-server:3001
 
 test-soak:
 	@echo "Running soak test (this will take a while)..."
-	docker-compose run --rm k6 run /scripts/scenarios/soak-test.js \
+	docker compose run --rm k6 run /scripts/scenarios/soak-test.js \
 		--out influxdb=http://influxdb:8086/k6 \
 		-e TARGET_URL=http://mock-server:3001 \
 		-e VUS=5 \
@@ -273,19 +273,19 @@ version:
 
 # Development helpers
 shell-control:
-	docker-compose exec control-panel sh
+	docker compose exec control-panel sh
 
 shell-mock:
-	docker-compose exec mock-server sh
+	docker compose exec mock-server sh
 
 shell-runner:
-	docker-compose exec k6-runner sh
+	docker compose exec k6-runner sh
 
 shell-postgres:
-	docker-compose exec postgres psql -U test_admin -d k6_test_history
+	docker compose exec postgres psql -U test_admin -d k6_test_history
 
 influx-cli:
-	docker-compose exec influxdb influx -database k6
+	docker compose exec influxdb influx -database k6
 
 grafana-url:
 	@echo "Grafana URL: http://localhost:3002 (admin/admin123)"
@@ -312,26 +312,26 @@ health:
 # Restart services
 restart:
 	@echo "Restarting all services..."
-	docker-compose restart
+	docker compose restart
 
 # Clean all (including images)
 clean-all:
 	@echo "Cleaning up everything (containers, volumes, and images)..."
-	docker-compose down -v --rmi all
+	docker compose down -v --rmi all
 	docker system prune -af
 
 # Development database commands
 db-migrate:
 	@echo "Running database migrations..."
-	docker-compose exec control-panel npm run db:migrate
+	docker compose exec control-panel npm run db:migrate
 
 db-seed:
 	@echo "Seeding database..."
-	docker-compose exec control-panel npm run db:seed
+	docker compose exec control-panel npm run db:seed
 
 db-reset:
 	@echo "Resetting database..."
-	docker-compose exec control-panel npm run db:reset
+	docker compose exec control-panel npm run db:reset
 
 # Monitoring commands
 monitor:
@@ -381,28 +381,28 @@ network-inspect:
 
 # Logs for specific services
 logs-control:
-	docker-compose logs -f control-panel
+	docker compose logs -f control-panel
 
 logs-mock:
-	docker-compose logs -f mock-server
+	docker compose logs -f mock-server
 
 logs-runner:
-	docker-compose logs -f k6-runner
+	docker compose logs -f k6-runner
 
 logs-influx:
-	docker-compose logs -f influxdb
+	docker compose logs -f influxdb
 
 # Build with no cache
 rebuild:
 	@echo "Rebuilding all images without cache..."
-	docker-compose build --no-cache
+	docker compose build --no-cache
 
 # Run specific service
 run-control:
-	docker-compose up control-panel
+	docker compose up control-panel
 
 run-mock:
-	docker-compose up mock-server
+	docker compose up mock-server
 
 run-runner:
-	docker-compose up k6-runner
+	docker compose up k6-runner

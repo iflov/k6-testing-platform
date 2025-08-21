@@ -43,8 +43,19 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Failed to fetch test runs:', error);
+    
+    // Prisma initialization error handling
+    if (error instanceof Error && error.name === 'PrismaClientInitializationError') {
+      console.error('Database connection error - please check DATABASE_URL configuration');
+      return NextResponse.json(
+        { error: 'Database connection error. Please check server configuration.' },
+        { status: 503 }
+      );
+    }
+    
+    // Generic error response without exposing internal details
     return NextResponse.json(
-      { error: 'Failed to fetch test runs', details: error },
+      { error: 'Failed to fetch test runs. Please try again later.' },
       { status: 500 }
     );
   }

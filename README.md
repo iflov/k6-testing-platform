@@ -738,6 +738,70 @@ sudo ufw allow 5665/tcp
 2. **InfluxDB 튜닝**: Write buffer 크기 증가
 3. **K6 최적화**: `--no-thresholds --no-summary` 옵션으로 오버헤드 감소
 
+## 🔒 보안 및 인증
+
+### 프로덕션 환경 보안 설정
+
+#### InfluxDB 인증 활성화
+
+프로덕션 환경에서는 InfluxDB 인증을 반드시 활성화해야 합니다:
+
+1. **환경 변수 설정** (.env.production)
+```bash
+# InfluxDB 관리자 계정
+INFLUXDB_ADMIN_USER=admin
+INFLUXDB_ADMIN_PASSWORD=secure-admin-password
+
+# K6 사용자 계정
+INFLUXDB_USER=k6
+INFLUXDB_USER_PASSWORD=your_k6_password_here
+```
+
+2. **프로덕션 Docker Compose 실행**
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+3. **Kubernetes Helm 배포**
+```bash
+# values.yaml에서 인증 설정 확인
+helm install k6-platform ./helm/k6-platform \
+  --set influxdb.setDefaultUser.enabled=true \
+  --set-string influxdb.setDefaultUser.user.password=secure-password
+```
+
+#### PostgreSQL 보안
+
+프로덕션 환경에서 PostgreSQL 보안 설정:
+
+```yaml
+# Helm values.yaml
+postgresql:
+  auth:
+    postgresPassword: "secure-admin-password"
+    username: "k6user"
+    password: "secure-user-password"
+    database: "k6_test_history"
+```
+
+### 보안 모범 사례
+
+1. **환경 변수 관리**
+   - 프로덕션 환경변수는 절대 코드 저장소에 커밋하지 않음
+   - Kubernetes Secrets 또는 AWS Secrets Manager 사용 권장
+
+2. **네트워크 보안**
+   - 서비스 간 통신은 내부 네트워크로 제한
+   - 외부 접근이 필요한 경우 VPN 또는 Private Link 사용
+
+3. **접근 제어**
+   - 최소 권한 원칙 적용
+   - K6 사용자는 k6 데이터베이스에만 접근 가능
+
+4. **모니터링**
+   - 인증 실패 로그 모니터링
+   - 비정상적인 쿼리 패턴 감지
+
 ## 📚 추가 리소스
 
 ### 공식 문서

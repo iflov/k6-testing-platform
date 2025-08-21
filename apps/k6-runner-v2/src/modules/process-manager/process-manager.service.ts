@@ -33,12 +33,28 @@ export class ProcessManagerService {
     this.errorBuffers.set(testId, '');
 
     // Use local variables for each test to avoid conflicts
-    const k6Args = ['run', '--out', `influxdb=${this.configService.getInfluxDbUrl()}`];
+    // InfluxDB 연결 문자열 생성 (인증 포함)
+    const influxdbUrl = this.configService.getInfluxDbUrl();
+    const influxdbUsername = this.configService.getInfluxDbUsername();
+    const influxdbPassword = this.configService.getInfluxDbPassword();
+    
+    let influxdbOutput = `influxdb=${influxdbUrl}`;
+    
+    // 인증 정보가 있으면 추가
+    if (influxdbUsername && influxdbPassword) {
+      // InfluxDB 1.x 인증 형식: influxdb=http://username:password@host:port/database
+      const url = new URL(influxdbUrl);
+      url.username = influxdbUsername;
+      url.password = influxdbPassword;
+      influxdbOutput = `influxdb=${url.toString()}`;
+    }
+    
+    const k6Args = ['run', '--out', influxdbOutput];
 
     const k6Env = {
       ...process.env,
       TARGET_URL: targetUrl,
-    };
+    } as Record<string, string>;
 
     const dashboardActuallyEnabled = await this.setupDashboard(enableDashboard, k6Args, k6Env);
     k6Args.push(scriptPath);

@@ -60,7 +60,12 @@ export default function Home() {
       if (response.ok) {
         console.log('Test results saved successfully');
       } else {
-        console.error('Failed to save test results');
+        const errorData = await response.json();
+        console.error('Failed to save test results:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
       }
     } catch (error) {
       console.error('Error saving test results:', error);

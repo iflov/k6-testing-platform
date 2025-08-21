@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// InfluxDB 연결 설정
-const INFLUXDB_URL = process.env.K6_INFLUXDB_URL || "http://influxdb:8086";
-const INFLUXDB_DB = process.env.K6_INFLUXDB_DB || "k6";
+import config from "@/lib/config";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -55,18 +52,26 @@ export async function GET(request: NextRequest) {
 
 // InfluxDB 쿼리 헬퍼 함수
 async function queryInfluxDB(query: string) {
-  const url = `${INFLUXDB_URL}/query`;
+  const url = `${config.influxDbUrl}/query`;
   const params = new URLSearchParams({
-    db: INFLUXDB_DB,
+    db: config.influxDbDatabase,
     q: query,
     epoch: "ms",
   });
 
+  const headers: HeadersInit = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  // Add Basic Auth if credentials are provided
+  if (config.influxDbUsername && config.influxDbPassword) {
+    const auth = Buffer.from(`${config.influxDbUsername}:${config.influxDbPassword}`).toString('base64');
+    headers["Authorization"] = `Basic ${auth}`;
+  }
+
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers,
     body: params,
   });
 

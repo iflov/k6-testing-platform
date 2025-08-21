@@ -6,6 +6,8 @@ export class ConfigService {
   isProduction: boolean;
   port!: string;
   influxdbUrl!: string;
+  influxdbUsername?: string;
+  influxdbPassword?: string;
   mockServerUrl!: string;
   k6DashboardPort!: string;
   k6DashboardHost!: string;
@@ -44,6 +46,8 @@ export class ConfigService {
     if (this.isDevelopment) {
       this.port = process.env.PORT || '3002';
       this.influxdbUrl = process.env.INFLUXDB_URL || 'http://host.docker.internal:8086';
+      this.influxdbUsername = process.env.INFLUXDB_USERNAME;
+      this.influxdbPassword = process.env.INFLUXDB_PASSWORD;
       this.mockServerUrl = process.env.MOCK_SERVER_URL || 'http://host.docker.internal:3001';
       this.k6DashboardPort = process.env.K6_DASHBOARD_PORT || '5665';
       this.k6DashboardHost = process.env.K6_DASHBOARD_HOST || '0.0.0.0';
@@ -51,6 +55,9 @@ export class ConfigService {
     } else {
       this.port = this.assertEnvVar('PORT');
       this.influxdbUrl = this.assertEnvVar('INFLUXDB_URL');
+      // InfluxDB 인증은 선택사항 (프로덕션에서도)
+      this.influxdbUsername = process.env.INFLUXDB_USERNAME;
+      this.influxdbPassword = process.env.INFLUXDB_PASSWORD;
       this.mockServerUrl = this.assertEnvVar('MOCK_SERVER_URL');
       this.k6DashboardPort = this.assertEnvVar('K6_DASHBOARD_PORT');
       this.k6DashboardHost = this.assertEnvVar('K6_DASHBOARD_HOST');
@@ -86,5 +93,13 @@ export class ConfigService {
 
   getK6DashboardPeriod(): string {
     return this.k6DashboardPeriod;
+  }
+
+  getInfluxDbUsername(): string | undefined {
+    return this.influxdbUsername;
+  }
+
+  getInfluxDbPassword(): string | undefined {
+    return this.influxdbPassword;
   }
 }

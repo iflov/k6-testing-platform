@@ -15,6 +15,12 @@ export class Config {
   public readonly k6DashboardUrl: string;
   public readonly mockServerUrl: string;
 
+  // InfluxDB 설정
+  public readonly influxDbUrl: string;
+  public readonly influxDbDatabase: string;
+  public readonly influxDbUsername?: string;
+  public readonly influxDbPassword?: string;
+
   // 환경 설정
   public readonly isDevelopment: boolean;
   public readonly isProduction: boolean;
@@ -33,6 +39,12 @@ export class Config {
       process.env.MOCK_SERVER_URL || "http://host.docker.internal:3001";
     this.k6DashboardUrl =
       process.env.K6_DASHBOARD_URL || "http://localhost:5665";
+    
+    // InfluxDB 설정
+    this.influxDbUrl = process.env.K6_INFLUXDB_URL || "http://influxdb:8086";
+    this.influxDbDatabase = process.env.K6_INFLUXDB_DB || "k6";
+    this.influxDbUsername = process.env.K6_INFLUXDB_USERNAME || process.env.INFLUXDB_USER;
+    this.influxDbPassword = process.env.K6_INFLUXDB_PASSWORD || process.env.INFLUXDB_USER_PASSWORD;
     
     // 프로덕션 환경에서만 경고 로그 (빌드 시점에는 에러 발생시키지 않음)
     if (this.isProduction && typeof window !== 'undefined') {
@@ -79,6 +91,9 @@ export class Config {
       k6RunnerBaseUrl: this.maskUrl(this.k6RunnerBaseUrl),
       mockServerUrl: this.maskUrl(this.mockServerUrl),
       dashboardUrl: this.maskUrl(this.k6DashboardUrl),
+      influxDbUrl: this.maskUrl(this.influxDbUrl),
+      influxDbDatabase: this.influxDbDatabase,
+      influxDbAuthEnabled: !!(this.influxDbUsername && this.influxDbPassword),
       isDevelopment: this.isDevelopment,
       isProduction: this.isProduction,
     });
@@ -120,6 +135,11 @@ export class Config {
         k6Runner: this.maskUrl(this.k6RunnerBaseUrl),
         mockServer: this.maskUrl(this.mockServerUrl),
         dashboard: this.maskUrl(this.k6DashboardUrl),
+        influxDb: this.maskUrl(this.influxDbUrl),
+      },
+      influxDb: {
+        database: this.influxDbDatabase,
+        authEnabled: !!(this.influxDbUsername && this.influxDbPassword),
       },
     };
   }

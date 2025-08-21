@@ -68,8 +68,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Failed to save test results:', error);
+    
+    // Prisma initialization error handling
+    if (error instanceof Error && error.name === 'PrismaClientInitializationError') {
+      console.error('Database connection error - please check DATABASE_URL configuration');
+      return NextResponse.json(
+        { error: 'Database connection error. Please check server configuration.' },
+        { status: 503 }
+      );
+    }
+    
+    // Generic error response without exposing internal details
     return NextResponse.json(
-      { error: 'Failed to save test results', details: error },
+      { error: 'Failed to save test results. Please try again later.' },
       { status: 500 }
     );
   }
