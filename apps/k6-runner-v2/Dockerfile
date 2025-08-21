@@ -6,8 +6,8 @@ FROM node:22-alpine
 # k6 바이너리 복사
 COPY --from=k6-binary /usr/bin/k6 /usr/bin/k6
 
-# lsof 설치 (포트 체크를 위해 필요)
-RUN apk add --no-cache lsof
+# lsof와 curl 설치 (포트 체크와 헬스체크를 위해 필요)
+RUN apk add --no-cache lsof curl
 
 WORKDIR /app
 

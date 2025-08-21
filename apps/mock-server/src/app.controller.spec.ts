@@ -12,22 +12,26 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('root', () => {
-    it('should return mock server status', () => {
-      const result = appController.getRoot();
-      expect(result.statusCode).toBe(200);
-      expect(result.error).toBe(false);
-      expect(result.message).toBe('Mock Server is running');
-      expect(result.timestamp).toBeDefined();
-    });
-  });
-
   describe('health', () => {
-    it('should return health status', () => {
+    it('should return health status with standard format', () => {
       const result = appController.getHealth();
       expect(result.status).toBe('healthy');
       expect(result.service).toBe('mock-server');
+      expect(result.version).toBeDefined();
       expect(result.timestamp).toBeDefined();
+      expect(result.uptime).toBeGreaterThanOrEqual(0);
+      expect(result.environment).toBeDefined();
+    });
+  });
+
+  describe('ready', () => {
+    it('should return readiness status', () => {
+      const result = appController.getReady();
+      expect(result.status).toBe('healthy');
+      expect(result.service).toBe('mock-server');
+      expect(result.dependencies).toBeDefined();
+      expect(result.dependencies.memory).toBeDefined();
+      expect(result.dependencies.memory.status).toBe('healthy');
     });
   });
 });

@@ -26,9 +26,9 @@ RUN npm run build
 # Production stage
 FROM node:22-slim
 
-# Install OpenSSL for Prisma and Docker CLI to communicate with Docker daemon
+# Install OpenSSL for Prisma, Docker CLI to communicate with Docker daemon, and curl for health checks
 RUN apt-get update && \
-    apt-get install -y openssl docker.io && \
+    apt-get install -y openssl docker.io curl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -3,6 +3,7 @@ import cors from 'cors';
 
 import { maskUrl } from './utils';
 import testRouter from './routes/route';
+import { container } from './container/container';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -16,17 +17,97 @@ app.use(
   }),
 );
 
+interface HealthCheckResponse {
+  status: 'healthy' | 'unhealthy' | 'degraded';
+  service: string;
+  version: string;
+  timestamp: string;
+  uptime: number;
+  environment?: string;
+  dependencies?: Record<string, { status: string; message?: string }>;
+}
+
 app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({
+  const response: HealthCheckResponse = {
     status: 'healthy',
-    environment: process.env.NODE_ENV,
+    service: 'k6-runner-v2',
+    version: process.env.npm_package_version || '2.0.0',
+    timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    config: {
-      influxdbConfigured: !!process.env.INFLUXDB_URL,
-      mockServerConfigured: !!process.env.MOCK_SERVER_URL,
-      dashboardEnabled: !!process.env.K6_DASHBOARD_PORT,
+    environment: process.env.NODE_ENV || 'development',
+    dependencies: {
+      influxdb: {
+        status: process.env.INFLUXDB_URL ? 'healthy' : 'unhealthy',
+        message: process.env.INFLUXDB_URL ? 'Configured' : 'Not configured',
+      },
+      mockServer: {
+        status: process.env.MOCK_SERVER_URL ? 'healthy' : 'unhealthy',
+        message: process.env.MOCK_SERVER_URL ? 'Configured' : 'Not configured',
+      },
+      dashboard: {
+        status: process.env.K6_DASHBOARD_PORT ? 'healthy' : 'unhealthy',
+        message: process.env.K6_DASHBOARD_PORT ? 'Enabled' : 'Disabled',
+      },
     },
-  });
+  };
+  res.status(200).json(response);
+});
+
+app.get('/ready', async (_req: Request, res: Response) => {
+  // Check actual dependencies
+  let influxReady = false;
+  let mockServerReady = false;
+
+  // Check InfluxDB connection
+  if (process.env.INFLUXDB_URL) {
+    try {
+      const influxResponse = await fetch(`${process.env.INFLUXDB_URL}/ping`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000),
+      });
+      influxReady = influxResponse.ok;
+    } catch (error) {
+      console.error('InfluxDB health check failed:', error);
+    }
+  }
+
+  // Check Mock Server connection
+  if (process.env.MOCK_SERVER_URL) {
+    try {
+      const mockResponse = await fetch(`${process.env.MOCK_SERVER_URL}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000),
+      });
+      mockServerReady = mockResponse.ok;
+    } catch (error) {
+      console.error('Mock Server health check failed:', error);
+    }
+  }
+
+  const isReady = (!process.env.INFLUXDB_URL || influxReady) && 
+                  (!process.env.MOCK_SERVER_URL || mockServerReady);
+
+  const response: HealthCheckResponse = {
+    status: isReady ? 'healthy' : 'unhealthy',
+    service: 'k6-runner-v2',
+    version: process.env.npm_package_version || '2.0.0',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    dependencies: {
+      influxdb: {
+        status: influxReady ? 'healthy' : 'unhealthy',
+        message: influxReady ? 'Connected' : 'Connection failed',
+      },
+      mockServer: {
+        status: mockServerReady ? 'healthy' : 'unhealthy',
+        message: mockServerReady ? 'Connected' : 'Connection failed',
+      },
+    },
+  };
+
+  const statusCode = isReady ? 200 : 503;
+  res.status(statusCode).json(response);
 });
 
 app.get('/config', (_req: Request, res: Response) => {
@@ -48,7 +129,44 @@ app.get('/config', (_req: Request, res: Response) => {
 
 app.use('/api', testRouter);
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`🚀 Server is running on ${PORT} port`);
 });
+
+// Graceful shutdown handling
+let isShuttingDown = false;
+
+const gracefulShutdown = (signal: string) => {
+  if (isShuttingDown) return;
+  
+  console.log(`\n${signal} received: starting graceful shutdown`);
+  isShuttingDown = true;
+
+  // Stop accepting new requests
+  server.close(() => {
+    console.log('HTTP server closed');
+    
+    // Clean up any active K6 processes
+    const { testService } = container;
+    
+    // Stop any running tests
+    if (testService) {
+      console.log('Stopping active K6 processes...');
+      testService.stopTest();
+    }
+    
+    console.log('Graceful shutdown completed');
+    process.exit(0);
+  });
+
+  // Force shutdown after 30 seconds
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 30000);
+};
+
+// Listen for termination signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

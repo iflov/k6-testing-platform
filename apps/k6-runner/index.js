@@ -1035,6 +1035,12 @@ app.get("/health", (req, res) => {
   res.json(config.getHealthInfo());
 });
 
+app.get("/ready", async (req, res) => {
+  const readiness = await config.getReadinessInfo();
+  const statusCode = readiness.status === "healthy" ? 200 : 503;
+  res.status(statusCode).json(readiness);
+});
+
 app.get("/config", (req, res) => {
   res.json(config.getConfigInfo());
 });

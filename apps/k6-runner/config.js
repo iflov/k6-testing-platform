@@ -108,17 +108,54 @@ class Config {
   }
 
   /**
-   * 헬스체크용 응답
+   * 헬스체크용 응답 - 표준 형식
    */
   getHealthInfo() {
     return {
       status: "healthy",
-      environment: this.environment,
+      service: "k6-runner",
+      version: process.env.npm_package_version || "1.0.0",
+      timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      config: {
-        influxdbConfigured: !!this.influxdbUrl,
-        mockServerConfigured: !!this.mockServerUrl,
-        dashboardEnabled: !!this.k6DashboardPort,
+      environment: this.environment,
+      dependencies: {
+        influxdb: {
+          status: this.influxdbUrl ? "healthy" : "unhealthy",
+          message: this.influxdbUrl ? "Configured" : "Not configured",
+        },
+        mockServer: {
+          status: this.mockServerUrl ? "healthy" : "unhealthy",
+          message: this.mockServerUrl ? "Configured" : "Not configured",
+        },
+        dashboard: {
+          status: this.k6DashboardPort ? "healthy" : "unhealthy",
+          message: this.k6DashboardPort ? "Enabled" : "Disabled",
+        },
+      },
+    };
+  }
+
+  /**
+   * Readiness 체크용 응답
+   */
+  async getReadinessInfo() {
+    // K6 Runner v1은 레거시이므로 간단한 readiness 체크만
+    return {
+      status: "healthy",
+      service: "k6-runner",
+      version: process.env.npm_package_version || "1.0.0",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: this.environment,
+      dependencies: {
+        influxdb: {
+          status: this.influxdbUrl ? "healthy" : "unhealthy",
+          message: this.influxdbUrl ? "Configured" : "Not configured",
+        },
+        mockServer: {
+          status: this.mockServerUrl ? "healthy" : "unhealthy",
+          message: this.mockServerUrl ? "Configured" : "Not configured",
+        },
       },
     };
   }
