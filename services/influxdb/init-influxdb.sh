@@ -2,7 +2,16 @@
 
 # Check if authentication is enabled
 if [ "$INFLUXDB_HTTP_AUTH_ENABLED" = "true" ]; then
-  echo "Authentication is enabled. Using credentials..."
+  echo "Authentication is enabled. Checking for admin user..."
+  
+  # First, try to connect without credentials to check if admin exists
+  if influx -execute "SHOW USERS" 2>&1 | grep -q "error authorizing query: create admin user first"; then
+    echo "Admin user does not exist. Creating admin user..."
+    influx -execute "CREATE USER ${INFLUXDB_ADMIN_USER:-admin} WITH PASSWORD '${INFLUXDB_ADMIN_PASSWORD:-admin}' WITH ALL PRIVILEGES"
+    echo "Admin user created successfully!"
+  fi
+  
+  # Now use credentials for all subsequent commands
   INFLUX_CMD="influx -username ${INFLUXDB_ADMIN_USER:-admin} -password ${INFLUXDB_ADMIN_PASSWORD:-admin}"
 else
   echo "Authentication is disabled. Running without credentials..."
