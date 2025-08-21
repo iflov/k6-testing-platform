@@ -1,0 +1,28 @@
+# Single node cluster values - no node selector
+image:
+  repository: k6-testing-platform-control-panel
+  pullPolicy: Never
+  tag: "local"
+
+# Remove node selector for single node
+nodeSelector: null
+
+database:
+  host: "postgres-service"
+  
+influxdb:
+  url: "http://influxdb:8181"
+  
+k6runner:
+  baseUrl: "http://k6-runner-service:3002"
+  
+mockServer:
+  url: "http://mock-server-service:3001"
+
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

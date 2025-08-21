@@ -1,0 +1,76 @@
+# Kind cluster configuration for K6 Testing Platform
+# 2 worker nodes setup matching infrastructure team's environment
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: k6-platform
+
+nodes:
+  # Control plane node
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-type=control-plane"
+    # Port mappings for local access
+    extraPortMappings:
+      # Control Panel (Next.js)
+      - containerPort: 30000
+        hostPort: 3000
+        protocol: TCP
+      # Mock Server
+      - containerPort: 30001
+        hostPort: 3001
+        protocol: TCP
+      # K6 Runner API
+      - containerPort: 30002
+        hostPort: 3002
+        protocol: TCP
+      # K6 Dashboard
+      - containerPort: 30665
+        hostPort: 5665
+        protocol: TCP
+      # InfluxDB
+      - containerPort: 30086
+        hostPort: 8086
+        protocol: TCP
+      # PostgreSQL
+      - containerPort: 30432
+        hostPort: 5432
+        protocol: TCP
+      # Ingress Controller (optional)
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+  
+  # Worker node 1: Mock Server only
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-type=worker,workload=mock-server"
+  
+  # Worker node 2: Main services (control-panel, k6-runner, influxdb, postgres)
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-type=worker,workload=main-services"
+
+# Networking configuration
+networking:
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"
+  disableDefaultCNI: false
+
+# Feature gates for development
+featureGates:
+  EphemeralContainers: true

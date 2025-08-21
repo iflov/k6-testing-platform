@@ -32,27 +32,22 @@ export class ProcessManagerService {
   }): Promise<{ process: ChildProcess; dashboardEnabled: boolean }> => {
     this.errorBuffers.set(testId, '');
 
-    // Use local variables for each test to avoid conflicts
-    // InfluxDB 연결 문자열 생성 (인증 포함)
-    const influxdbUrl = this.configService.getInfluxDbUrl();
-    const influxdbUsername = this.configService.getInfluxDbUsername();
-    const influxdbPassword = this.configService.getInfluxDbPassword();
+    // Get InfluxDB 3.x configuration
+    const influxConfig = this.configService.getInfluxDbConfig();
     
-    let influxdbOutput = `influxdb=${influxdbUrl}`;
+    // xk6-output-influxdb format for InfluxDB 3.x
+    const influxdbOutput = `xk6-influxdb=${influxConfig.url}`;
+    const k6Args = ['run', '--out', influxdbOutput, '--tag', `testId=${testId}`];
     
-    // 인증 정보가 있으면 추가
-    if (influxdbUsername && influxdbPassword) {
-      // InfluxDB 1.x 인증 형식: influxdb=http://username:password@host:port/database
-      const url = new URL(influxdbUrl);
-      url.username = influxdbUsername;
-      url.password = influxdbPassword;
-      influxdbOutput = `influxdb=${url.toString()}`;
-    }
-    
-    const k6Args = ['run', '--out', influxdbOutput];
-
+    // Create isolated environment variables for this K6 process
+    // This ensures each test has its own environment without affecting the global process.env
     const k6Env = {
       ...process.env,
+      // xk6-output-influxdb specific environment variables
+      K6_INFLUXDB_ORGANIZATION: influxConfig.org,
+      K6_INFLUXDB_BUCKET: influxConfig.bucket,
+      K6_INFLUXDB_TOKEN: influxConfig.token,
+      // Test-specific variables
       TARGET_URL: targetUrl,
     } as Record<string, string>;
 

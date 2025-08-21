@@ -1,10 +1,25 @@
-# Multi-stage build for k6-runner-v2
-FROM grafana/k6:0.52.0 AS k6-binary
+# Multi-stage build for k6-runner-v2 with xk6-output-influxdb extension
 
+# Stage 1: Build custom k6 with xk6-output-influxdb extension
+FROM golang:1.23-alpine AS xk6-builder
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Install xk6 (use a specific version that works with Go 1.23)
+RUN go install go.k6.io/xk6/cmd/xk6@v0.14.0
+
+# Build k6 with InfluxDB 3.x output extension
+RUN xk6 build \
+    --with github.com/grafana/xk6-output-influxdb@latest \
+    --output /k6
+
+# Stage 2: Node.js application
 FROM node:22-alpine
 
-# k6 바이너리 복사
-COPY --from=k6-binary /usr/bin/k6 /usr/bin/k6
+# Copy custom k6 binary from builder
+COPY --from=xk6-builder /k6 /usr/bin/k6
+RUN chmod +x /usr/bin/k6
 
 # lsof와 curl 설치 (포트 체크와 헬스체크를 위해 필요)
 RUN apk add --no-cache lsof curl

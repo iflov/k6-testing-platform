@@ -44,203 +44,152 @@ describe('ConfigService', () => {
       // 환경변수 초기화 (기본값 사용하도록)
       delete process.env.PORT;
       delete process.env.INFLUXDB_URL;
+      delete process.env.INFLUXDB_TOKEN;
+      delete process.env.INFLUXDB_ORG;
+      delete process.env.INFLUXDB_BUCKET;
       delete process.env.MOCK_SERVER_URL;
       delete process.env.K6_DASHBOARD_PORT;
       delete process.env.K6_DASHBOARD_HOST;
+      delete process.env.K6_DASHBOARD_PERIOD;
     });
 
-    it('should set development flags correctly', () => {
+    it('should use default values in development', () => {
       const service = ConfigService.getInstance();
-
-      // constructor에서 설정
-      expect(service.environment).toBe('development');
-      expect(service.isDevelopment).toBe(true);
-      expect(service.isProduction).toBe(false);
+      expect(service.getInfluxDbUrl()).toContain('influxdb:8086');
+      expect(service.getMockServerUrl()).toContain('mock-server:3001');
+      expect(service.getK6DashboardPort()).toBe('5665');
+      expect(service.getK6DashboardHost()).toBe('0.0.0.0');
+      expect(service.getK6DashboardPeriod()).toBe('1s');
+      expect(service.getInfluxDbOrg()).toBe('k6org');
+      expect(service.getInfluxDbBucket()).toBe('k6');
     });
 
-    it('should use default values in initializeConfig', () => {
-      const service = ConfigService.getInstance();
-
-      // initializeConfig()에서 설정한 기본값
-      expect(service.port).toBe('3002');
-      expect(service.influxdbUrl).toBe('http://host.docker.internal:8086');
-      expect(service.mockServerUrl).toBe('http://host.docker.internal:3001');
-      expect(service.k6DashboardPort).toBe('5665');
-      expect(service.k6DashboardHost).toBe('0.0.0.0');
-    });
-
-    it('should override defaults with environment variables', () => {
+    it('should use custom values from environment variables', () => {
       process.env.PORT = '4000';
       process.env.INFLUXDB_URL = 'http://custom-influx:8086';
+      process.env.INFLUXDB_TOKEN = 'custom-token';
+      process.env.INFLUXDB_ORG = 'custom-org';
+      process.env.INFLUXDB_BUCKET = 'custom-bucket';
+      process.env.MOCK_SERVER_URL = 'http://custom-mock:3001';
+      process.env.K6_DASHBOARD_PORT = '6000';
+      process.env.K6_DASHBOARD_HOST = '127.0.0.1';
+      process.env.K6_DASHBOARD_PERIOD = '5s';
 
       const service = ConfigService.getInstance();
+      expect(service.getInfluxDbUrl()).toBe('http://custom-influx:8086');
+      expect(service.getInfluxDbOrg()).toBe('custom-org');
+      expect(service.getInfluxDbBucket()).toBe('custom-bucket');
+      expect(service.getMockServerUrl()).toBe('http://custom-mock:3001');
+      expect(service.getK6DashboardPort()).toBe('6000');
+      expect(service.getK6DashboardHost()).toBe('127.0.0.1');
+      expect(service.getK6DashboardPeriod()).toBe('5s');
+    });
 
-      expect(service.port).toBe('4000');
-      expect(service.influxdbUrl).toBe('http://custom-influx:8086');
+    it('should detect Kubernetes environment', () => {
+      process.env.KUBERNETES_SERVICE_HOST = 'kubernetes.default';
+      const service = ConfigService.getInstance();
+      expect(service.getInfluxDbUrl()).toContain('influxdb-service:8086');
+      expect(service.getMockServerUrl()).toContain('mock-server-service:3001');
     });
   });
 
   describe('Production environment', () => {
     beforeEach(() => {
       process.env.NODE_ENV = 'production';
-      // Production 필수 환경변수 설정
-      process.env.PORT = '8080';
-      process.env.INFLUXDB_URL = 'http://prod-influx:8086';
-      process.env.MOCK_SERVER_URL = 'http://prod-mock:3001';
-      process.env.K6_DASHBOARD_PORT = '5665';
-      process.env.K6_DASHBOARD_HOST = '0.0.0.0';
     });
 
-    it('should set production flags correctly', () => {
-      const service = ConfigService.getInstance();
-
-      // constructor에서 설정
-      expect(service.environment).toBe('production');
-      expect(service.isDevelopment).toBe(false);
-      expect(service.isProduction).toBe(true);
-    });
-
-    it('should use environment variables in initializeConfig', () => {
-      const service = ConfigService.getInstance();
-
-      // initializeConfig()에서 환경변수 사용
-      expect(service.port).toBe('8080');
-      expect(service.influxdbUrl).toBe('http://prod-influx:8086');
-      expect(service.mockServerUrl).toBe('http://prod-mock:3001');
-      expect(service.k6DashboardPort).toBe('5665');
-      expect(service.k6DashboardHost).toBe('0.0.0.0');
-    });
-
-    it('should throw error when required env vars are missing', () => {
+    it('should throw error when required environment variables are missing', () => {
+      // 필수 환경변수 제거
       delete process.env.PORT;
       delete process.env.INFLUXDB_URL;
+      delete process.env.INFLUXDB_TOKEN;
       delete process.env.MOCK_SERVER_URL;
+      delete process.env.K6_DASHBOARD_PORT;
+      delete process.env.K6_DASHBOARD_HOST;
+      delete process.env.K6_DASHBOARD_PERIOD;
 
-      expect(() => ConfigService.getInstance()).toThrow('Missing required environment variable in production: PORT');
+      expect(() => ConfigService.getInstance()).toThrow();
     });
 
-    it('should identify missing environment variables correctly', () => {
+    it('should use provided environment variables in production', () => {
+      process.env.PORT = '5000';
+      process.env.INFLUXDB_URL = 'https://prod-influx.example.com';
+      process.env.INFLUXDB_TOKEN = 'prod-token';
+      process.env.INFLUXDB_ORG = 'prod-org';
+      process.env.INFLUXDB_BUCKET = 'prod-bucket';
+      process.env.MOCK_SERVER_URL = 'https://prod-mock.example.com';
+      process.env.K6_DASHBOARD_PORT = '7000';
+      process.env.K6_DASHBOARD_HOST = '0.0.0.0';
+      process.env.K6_DASHBOARD_PERIOD = '10s';
+
+      const service = ConfigService.getInstance();
+      expect(service.getInfluxDbUrl()).toBe('https://prod-influx.example.com');
+      expect(service.getInfluxDbOrg()).toBe('prod-org');
+      expect(service.getInfluxDbBucket()).toBe('prod-bucket');
+      expect(service.getMockServerUrl()).toBe('https://prod-mock.example.com');
+      expect(service.getK6DashboardPort()).toBe('7000');
+      expect(service.getK6DashboardHost()).toBe('0.0.0.0');
+      expect(service.getK6DashboardPeriod()).toBe('10s');
+    });
+  });
+
+  describe('InfluxDB 3.x configuration', () => {
+    beforeEach(() => {
+      process.env.NODE_ENV = 'development';
+    });
+
+    it('should return InfluxDB 3.x configuration', () => {
+      process.env.INFLUXDB_TOKEN = 'test-token';
+      process.env.INFLUXDB_ORG = 'test-org';
+      process.env.INFLUXDB_BUCKET = 'test-bucket';
+      process.env.INFLUXDB_URL = 'http://test-influx:8086';
+
+      const service = ConfigService.getInstance();
+      const config = service.getInfluxDbConfig();
+
+      expect(config).toHaveProperty('token', 'test-token');
+      expect(config).toHaveProperty('org', 'test-org');
+      expect(config).toHaveProperty('bucket', 'test-bucket');
+      expect(config).toHaveProperty('url', 'http://test-influx:8086');
+    });
+
+    it('should use default values for InfluxDB 3.x configuration', () => {
+      delete process.env.INFLUXDB_TOKEN;
+      delete process.env.INFLUXDB_ORG;
+      delete process.env.INFLUXDB_BUCKET;
       delete process.env.INFLUXDB_URL;
 
-      try {
-        ConfigService.getInstance();
-      } catch (error) {
-        expect((error as Error).message).toBe('Missing required environment variable in production: INFLUXDB_URL');
-      }
+      const service = ConfigService.getInstance();
+      const config = service.getInfluxDbConfig();
+
+      expect(config).toHaveProperty('token', 'dev-token-for-testing');
+      expect(config).toHaveProperty('org', 'k6org');
+      expect(config).toHaveProperty('bucket', 'k6');
+      expect(config.url).toContain('influxdb:8086');
     });
   });
 
-  describe('Default environment', () => {
-    it('should use development as default when NODE_ENV is not set', () => {
-      delete process.env.NODE_ENV;
-
-      const service = ConfigService.getInstance();
-
-      expect(service.environment).toBe('development');
-      expect(service.isDevelopment).toBe(true);
-      expect(service.isProduction).toBe(false);
-    });
-  });
-
-  describe('Method calls', () => {
-    it('should call initializeConfig during construction', () => {
-      process.env.NODE_ENV = 'development';
-      // TypeScript에서 private 메서드를 테스트하기 위해 'any' 타입 캐스팅 사용
-      const initSpy = jest.spyOn(ConfigService.prototype as any, 'initializeConfig');
-
-      ConfigService.getInstance();
-
-      expect(initSpy).toHaveBeenCalledTimes(1);
-
-      initSpy.mockRestore();
-    });
-
-    it('should call logConfiguration during construction', () => {
-      process.env.NODE_ENV = 'development';
-      // TypeScript에서 private 메서드를 테스트하기 위해 'any' 타입 캐스팅 사용
-      const logSpy = jest.spyOn(ConfigService.prototype as any, 'logConfiguration');
-
-      ConfigService.getInstance();
-
-      expect(logSpy).toHaveBeenCalledTimes(1);
-
-      logSpy.mockRestore();
-    });
-
-    it('should log configuration with correct format', () => {
-      // 이미 beforeEach에서 mock되어 있으므로 호출만 확인
-      process.env.NODE_ENV = 'development';
-
-      ConfigService.getInstance();
-
-      expect(console.log).toHaveBeenCalledWith(
-        '[Config] K6 Runner initialized with:',
-        expect.objectContaining({
-          environment: 'development',
-          isDevelopment: true,
-          isProduction: false,
-        }),
-      );
-    });
-  });
-
-  describe('Configuration validation', () => {
-    it('should have all required properties after initialization', () => {
+  describe('Environment detection', () => {
+    it('should correctly identify development environment', () => {
       process.env.NODE_ENV = 'development';
       const service = ConfigService.getInstance();
-
-      const requiredProps: (keyof ConfigService)[] = [
-        'environment',
-        'isDevelopment',
-        'isProduction',
-        'port',
-        'influxdbUrl',
-        'mockServerUrl',
-        'k6DashboardPort',
-        'k6DashboardHost',
-      ];
-
-      requiredProps.forEach((prop) => {
-        expect(service[prop]).toBeDefined();
-        expect(service[prop]).not.toBeNull();
-      });
+      expect(service.getIsDevelopment()).toBe(true);
+      expect(service.getIsProduction()).toBe(false);
     });
 
-    it('should validate port is a valid number string', () => {
-      process.env.NODE_ENV = 'development';
-      process.env.PORT = '3002';
+    it('should correctly identify production environment', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.PORT = '5000';
+      process.env.INFLUXDB_URL = 'https://prod-influx.example.com';
+      process.env.INFLUXDB_TOKEN = 'prod-token';
+      process.env.MOCK_SERVER_URL = 'https://prod-mock.example.com';
+      process.env.K6_DASHBOARD_PORT = '7000';
+      process.env.K6_DASHBOARD_HOST = '0.0.0.0';
+      process.env.K6_DASHBOARD_PERIOD = '10s';
 
       const service = ConfigService.getInstance();
-      const port = parseInt(service.port);
-
-      expect(port).toBeGreaterThan(0);
-      expect(port).toBeLessThanOrEqual(65535);
-    });
-
-    it('should validate URLs are valid format', () => {
-      process.env.NODE_ENV = 'development';
-      const service = ConfigService.getInstance();
-
-      // URL 형식 검증
-      expect(() => new URL(service.influxdbUrl)).not.toThrow();
-      expect(() => new URL(service.mockServerUrl)).not.toThrow();
-    });
-  });
-
-  describe('assertEnvVar', () => {
-    it('should return value when env var exists', () => {
-      process.env.NODE_ENV = 'development';
-      process.env.TEST_VAR = 'test-value';
-      const service = ConfigService.getInstance();
-
-      expect(service.assertEnvVar('TEST_VAR')).toBe('test-value');
-    });
-
-    it('should throw when env var is missing', () => {
-      process.env.NODE_ENV = 'development';
-      const service = ConfigService.getInstance();
-
-      expect(() => service.assertEnvVar('MISSING_VAR')).toThrow('Missing required environment variable in development: MISSING_VAR');
+      expect(service.getIsDevelopment()).toBe(false);
+      expect(service.getIsProduction()).toBe(true);
     });
   });
 });

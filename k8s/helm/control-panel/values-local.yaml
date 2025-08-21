@@ -1,0 +1,27 @@
+# Local development overrides for control-panel
+image:
+  repository: k6-testing-platform-control-panel
+  pullPolicy: Never  # Use local image
+  tag: "local"
+
+# For local development, we can use simpler service names
+database:
+  host: "postgres-service"
+  
+influxdb:
+  url: "http://influxdb:8086"
+  
+k6runner:
+  baseUrl: "http://k6-runner-service:3002"
+  
+mockServer:
+  url: "http://mock-server-service:3001"
+
+# Lower resource requirements for local
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

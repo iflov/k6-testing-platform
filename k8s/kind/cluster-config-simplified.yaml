@@ -1,0 +1,44 @@
+# Simplified Kind cluster configuration for K6 Testing Platform
+# Optimized for Docker Desktop on macOS M1
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: k6-platform
+
+nodes:
+  # Single control-plane node with ports
+  - role: control-plane
+    extraPortMappings:
+      # Control Panel (Next.js)
+      - containerPort: 30000
+        hostPort: 3000
+        protocol: TCP
+      # Mock Server
+      - containerPort: 30001
+        hostPort: 3001
+        protocol: TCP
+      # K6 Runner API
+      - containerPort: 30002
+        hostPort: 3002
+        protocol: TCP
+      # K6 Dashboard
+      - containerPort: 30665
+        hostPort: 5665
+        protocol: TCP
+      # InfluxDB
+      - containerPort: 30086
+        hostPort: 8086
+        protocol: TCP
+      # PostgreSQL
+      - containerPort: 30432
+        hostPort: 5432
+        protocol: TCP
+  
+  # Worker node 1: Mock Server only
+  - role: worker
+    labels:
+      workload: mock-server
+  
+  # Worker node 2: Main services
+  - role: worker
+    labels:
+      workload: main-services

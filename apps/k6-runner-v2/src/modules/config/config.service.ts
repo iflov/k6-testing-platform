@@ -1,17 +1,18 @@
 export class ConfigService {
   private static instance: ConfigService;
 
-  environment: string;
-  isDevelopment: boolean;
-  isProduction: boolean;
-  port!: string;
-  influxdbUrl!: string;
-  influxdbUsername?: string;
-  influxdbPassword?: string;
-  mockServerUrl!: string;
-  k6DashboardPort!: string;
-  k6DashboardHost!: string;
-  k6DashboardPeriod!: string;
+  private environment: string;
+  private isDevelopment: boolean;
+  private isProduction: boolean;
+  private influxdbUrl!: string;
+  // InfluxDB 3.x authentication only
+  private influxdbToken!: string;
+  private influxdbOrg!: string;
+  private influxdbBucket!: string;
+  private mockServerUrl!: string;
+  private k6DashboardPort!: string;
+  private k6DashboardHost!: string;
+  private k6DashboardPeriod!: string;
 
   static getInstance(): ConfigService {
     if (!ConfigService.instance) {
@@ -43,21 +44,29 @@ export class ConfigService {
   }
 
   private initializeConfig() {
+    // Detect environment
+    const isK8s = process.env.KUBERNETES_SERVICE_HOST !== undefined;
+    
     if (this.isDevelopment) {
-      this.port = process.env.PORT || '3002';
-      this.influxdbUrl = process.env.INFLUXDB_URL || 'http://host.docker.internal:8086';
-      this.influxdbUsername = process.env.INFLUXDB_USERNAME;
-      this.influxdbPassword = process.env.INFLUXDB_PASSWORD;
-      this.mockServerUrl = process.env.MOCK_SERVER_URL || 'http://host.docker.internal:3001';
+      // Dynamic URL based on environment
+      this.influxdbUrl = process.env.INFLUXDB_URL || 
+        (isK8s ? 'http://influxdb-service:8086' : 'http://influxdb:8086');
+      // InfluxDB 3.x authentication (required)
+      this.influxdbToken = process.env.INFLUXDB_TOKEN || 'dev-token-for-testing';
+      this.influxdbOrg = process.env.INFLUXDB_ORG || 'k6org';
+      this.influxdbBucket = process.env.INFLUXDB_BUCKET || 'k6';
+      this.mockServerUrl = process.env.MOCK_SERVER_URL || 
+        (isK8s ? 'http://mock-server-service:3001' : 'http://mock-server:3001');
       this.k6DashboardPort = process.env.K6_DASHBOARD_PORT || '5665';
       this.k6DashboardHost = process.env.K6_DASHBOARD_HOST || '0.0.0.0';
       this.k6DashboardPeriod = process.env.K6_DASHBOARD_PERIOD || '1s';
     } else {
-      this.port = this.assertEnvVar('PORT');
+      // In production, URL must be provided via environment variable
       this.influxdbUrl = this.assertEnvVar('INFLUXDB_URL');
-      // InfluxDB 인증은 선택사항 (프로덕션에서도)
-      this.influxdbUsername = process.env.INFLUXDB_USERNAME;
-      this.influxdbPassword = process.env.INFLUXDB_PASSWORD;
+      // InfluxDB 3.x authentication (required in production)
+      this.influxdbToken = this.assertEnvVar('INFLUXDB_TOKEN');
+      this.influxdbOrg = process.env.INFLUXDB_ORG || 'k6org';
+      this.influxdbBucket = process.env.INFLUXDB_BUCKET || 'k6';
       this.mockServerUrl = this.assertEnvVar('MOCK_SERVER_URL');
       this.k6DashboardPort = this.assertEnvVar('K6_DASHBOARD_PORT');
       this.k6DashboardHost = this.assertEnvVar('K6_DASHBOARD_HOST');
@@ -71,10 +80,16 @@ export class ConfigService {
       environment: this.environment,
       isDevelopment: this.isDevelopment,
       isProduction: this.isProduction,
+      influxDb3: {
+        url: this.influxdbUrl,
+        org: this.influxdbOrg,
+        bucket: this.influxdbBucket,
+        tokenConfigured: !!this.influxdbToken,
+      },
     });
   }
 
-  // Getter methods
+  // Public getters for non-sensitive configs
   getMockServerUrl(): string {
     return this.mockServerUrl;
   }
@@ -95,11 +110,31 @@ export class ConfigService {
     return this.k6DashboardPeriod;
   }
 
-  getInfluxDbUsername(): string | undefined {
-    return this.influxdbUsername;
+  getInfluxDbOrg(): string {
+    return this.influxdbOrg;
   }
 
-  getInfluxDbPassword(): string | undefined {
-    return this.influxdbPassword;
+  getInfluxDbBucket(): string {
+    return this.influxdbBucket;
+  }
+
+  // Internal method to get token for InfluxDB operations
+  // Not exposed publicly for security
+  getInfluxDbConfig(): { token: string; org: string; bucket: string; url: string } {
+    return {
+      token: this.influxdbToken,
+      org: this.influxdbOrg,
+      bucket: this.influxdbBucket,
+      url: this.influxdbUrl,
+    };
+  }
+
+  // Check environment
+  getIsDevelopment(): boolean {
+    return this.isDevelopment;
+  }
+
+  getIsProduction(): boolean {
+    return this.isProduction;
   }
 }

@@ -6,41 +6,13 @@ export async function GET(request: NextRequest) {
   const testId = searchParams.get("testId");
   const realtime = searchParams.get("realtime") === "true";
 
-  // 실제 InfluxDB에서 메트릭 조회
+  // 실제 InfluxDB 3.x에서 메트릭 조회
   try {
     // 시간 범위 설정 (실시간 모드일 경우 10초, 아니면 5분)
     const timeRange = realtime ? "10s" : "5m";
 
-    // 여러 메트릭을 병렬로 조회 (testId 필터링 포함)
-    const [
-      httpReqDuration,
-      httpReqs,
-      vus,
-      httpReqFailed,
-      iterationDuration,
-      dataTransfer,
-    ] = await Promise.all([
-      queryHttpReqDuration(timeRange, testId),
-      queryHttpReqs(timeRange, testId),
-      queryVUs(timeRange, testId),
-      queryHttpReqFailed(timeRange, testId),
-      queryIterationDuration(timeRange, testId),
-      queryDataTransfer(timeRange, testId),
-    ]);
-
-    const metrics = {
-      timestamp: new Date().toISOString(),
-      http_req_duration: httpReqDuration,
-      http_reqs: httpReqs,
-      vus: vus.current,
-      vus_max: vus.max,
-      http_req_failed: httpReqFailed,
-      iteration_duration: iterationDuration,
-      data_received: dataTransfer.received,
-      data_sent: dataTransfer.sent,
-    };
-
-    return NextResponse.json(metrics);
+    // InfluxDB 3.x (SQL 쿼리 사용)
+    return await queryInfluxDb3Metrics(timeRange, testId);
   } catch (error) {
     console.error("Failed to fetch metrics from InfluxDB:", error);
     return NextResponse.json(
@@ -50,231 +22,243 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// InfluxDB 쿼리 헬퍼 함수
-async function queryInfluxDB(query: string) {
-  const url = `${config.influxDbUrl}/query`;
-  const params = new URLSearchParams({
-    db: config.influxDbDatabase,
-    q: query,
-    epoch: "ms",
-  });
+// InfluxDB 3.x 메트릭 조회
+async function queryInfluxDb3Metrics(timeRange: string, testId: string | null) {
+  // InfluxDB 3.x uses SQL queries with the /api/v2/query endpoint
+  const [
+    httpReqDuration,
+    httpReqs,
+    vus,
+    httpReqFailed,
+    iterationDuration,
+    dataTransfer,
+  ] = await Promise.all([
+    queryInfluxDb3HttpReqDuration(timeRange, testId),
+    queryInfluxDb3HttpReqs(timeRange, testId),
+    queryInfluxDb3VUs(timeRange, testId),
+    queryInfluxDb3HttpReqFailed(timeRange, testId),
+    queryInfluxDb3IterationDuration(timeRange, testId),
+    queryInfluxDb3DataTransfer(timeRange, testId),
+  ]);
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/x-www-form-urlencoded",
+  const metrics = {
+    timestamp: new Date().toISOString(),
+    http_req_duration: httpReqDuration,
+    http_reqs: httpReqs,
+    vus: vus.current,
+    vus_max: vus.max,
+    http_req_failed: httpReqFailed,
+    iteration_duration: iterationDuration,
+    data_received: dataTransfer.received,
+    data_sent: dataTransfer.sent,
   };
 
-  // Add Basic Auth if credentials are provided
-  if (config.influxDbUsername && config.influxDbPassword) {
-    const auth = Buffer.from(`${config.influxDbUsername}:${config.influxDbPassword}`).toString('base64');
-    headers["Authorization"] = `Basic ${auth}`;
-  }
+  return NextResponse.json(metrics);
+}
+
+// InfluxDB 3.x SQL 쿼리 헬퍼 함수
+async function queryInfluxDb3(query: string) {
+  const influxConfig = config.getInfluxDbConfig();
+  const url = `${influxConfig.url}/api/v2/query`;
+  
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    "Accept": "application/csv",
+    "Authorization": `Token ${influxConfig.token}`,
+  };
+
+  const body = {
+    query,
+    type: "sql",
+    params: {
+      org: influxConfig.org,
+      bucket: influxConfig.bucket,
+    }
+  };
 
   const response = await fetch(url, {
     method: "POST",
     headers,
-    body: params,
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    console.error("InfluxDB query failed:", response.statusText);
-    throw new Error(`InfluxDB query failed: ${response.statusText}`);
+    console.error("InfluxDB 3.x query failed:", response.statusText);
+    throw new Error(`InfluxDB 3.x query failed: ${response.statusText}`);
   }
 
-  const data = await response.json();
-
-  return data.results?.[0]?.series?.[0] || null;
+  // Parse CSV response
+  const csvText = await response.text();
+  return parseInfluxDb3Response(csvText);
 }
 
-// HTTP 요청 지속 시간 메트릭
-async function queryHttpReqDuration(timeRange = "5m", testId?: string | null) {
-  // testId 필터 추가
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
+// InfluxDB 3.x CSV 응답 파싱
+function parseInfluxDb3Response(csv: string) {
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) return null;
+  
+  const headers = lines[0].split(',');
+  const values = lines.slice(1).map(line => {
+    const values = line.split(',');
+    const row: any = {};
+    headers.forEach((header, i) => {
+      row[header] = values[i];
+    });
+    return row;
+  });
+  
+  return values;
+}
 
+// InfluxDB 3.x 메트릭 쿼리 함수들
+async function queryInfluxDb3HttpReqDuration(timeRange: string, testId: string | null) {
+  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  
   const query = `
-    SELECT mean("value") as avg, 
-           min("value") as min, 
-           max("value") as max,
-           percentile("value", 95) as p95,
-           percentile("value", 99) as p99
-    FROM "http_req_duration"
-    WHERE time > now() - ${timeRange} ${testIdFilter}
+    SELECT 
+      AVG(value) as avg,
+      MIN(value) as min,
+      MAX(value) as max,
+      PERCENTILE(value, 0.95) as p95,
+      PERCENTILE(value, 0.99) as p99
+    FROM http_req_duration
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
-
-  const series = await queryInfluxDB(query);
-
-  if (series?.values?.[0]) {
-    const values = series.values[0];
-    const columns = series.columns;
-
+  
+  const result = await queryInfluxDb3(query);
+  
+  if (result && result[0]) {
     return {
-      avg: getValueByColumn(values, columns, "avg") || 0,
-      min: getValueByColumn(values, columns, "min") || 0,
-      max: getValueByColumn(values, columns, "max") || 0,
-      p95: getValueByColumn(values, columns, "p95") || 0,
-      p99: getValueByColumn(values, columns, "p99") || 0,
+      avg: parseFloat(result[0].avg) || 0,
+      min: parseFloat(result[0].min) || 0,
+      max: parseFloat(result[0].max) || 0,
+      p95: parseFloat(result[0].p95) || 0,
+      p99: parseFloat(result[0].p99) || 0,
     };
   }
-
+  
   return { avg: 0, min: 0, max: 0, p95: 0, p99: 0 };
 }
 
-// HTTP 요청 수 메트릭
-async function queryHttpReqs(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
-
+async function queryInfluxDb3HttpReqs(timeRange: string, testId: string | null) {
+  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  
   const query = `
-    SELECT count("value") as count,
-           mean("value") as rate
-    FROM "http_reqs"
-    WHERE time > now() - ${timeRange} ${testIdFilter}
+    SELECT 
+      COUNT(value) as count,
+      AVG(value) as rate
+    FROM http_reqs
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
-
-  const series = await queryInfluxDB(query);
-
-  if (series?.values?.[0]) {
-    const values = series.values[0];
-    const columns = series.columns;
-
+  
+  const result = await queryInfluxDb3(query);
+  
+  if (result && result[0]) {
     return {
-      count: Math.floor(getValueByColumn(values, columns, "count") || 0),
-      rate: getValueByColumn(values, columns, "rate") || 0,
+      count: Math.floor(parseFloat(result[0].count) || 0),
+      rate: parseFloat(result[0].rate) || 0,
     };
   }
-
+  
   return { count: 0, rate: 0 };
 }
 
-// Virtual Users 메트릭
-async function queryVUs(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
-
+async function queryInfluxDb3VUs(timeRange: string, testId: string | null) {
+  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  
   const query = `
-    SELECT last("value") as current,
-           max("value") as max
-    FROM "vus"
-    WHERE time > now() - ${timeRange} ${testIdFilter}
+    SELECT 
+      LAST(value) as current,
+      MAX(value) as max
+    FROM vus
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
-
-  const series = await queryInfluxDB(query);
-
-  if (series?.values?.[0]) {
-    const values = series.values[0];
-    const columns = series.columns;
-
+  
+  const result = await queryInfluxDb3(query);
+  
+  if (result && result[0]) {
     return {
-      current: Math.floor(getValueByColumn(values, columns, "current") || 0),
-      max: Math.floor(getValueByColumn(values, columns, "max") || 0),
+      current: Math.floor(parseFloat(result[0].current) || 0),
+      max: Math.floor(parseFloat(result[0].max) || 0),
     };
   }
-
+  
   return { current: 0, max: 0 };
 }
 
-// 실패한 HTTP 요청 메트릭
-async function queryHttpReqFailed(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
-
+async function queryInfluxDb3HttpReqFailed(timeRange: string, testId: string | null) {
+  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  
   const query = `
-    SELECT count("value") as count,
-           mean("value") as rate
-    FROM "http_req_failed"
-    WHERE time > now() - ${timeRange} ${testIdFilter}
+    SELECT 
+      COUNT(value) as count,
+      AVG(value) as rate
+    FROM http_req_failed
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
-
-  const series = await queryInfluxDB(query);
-
-  if (series?.values?.[0]) {
-    const values = series.values[0];
-    const columns = series.columns;
-
-    const failedCount = getValueByColumn(values, columns, "count") || 0;
-    const failRate = getValueByColumn(values, columns, "rate") || 0;
-
+  
+  const result = await queryInfluxDb3(query);
+  
+  if (result && result[0]) {
     return {
-      count: Math.floor(failedCount),
-      rate: failRate,
+      count: Math.floor(parseFloat(result[0].count) || 0),
+      rate: parseFloat(result[0].rate) || 0,
     };
   }
-
+  
   return { count: 0, rate: 0 };
 }
 
-// Iteration 지속 시간 메트릭
-async function queryIterationDuration(
-  timeRange = "5m",
-  testId?: string | null
-) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
-
+async function queryInfluxDb3IterationDuration(timeRange: string, testId: string | null) {
+  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  
   const query = `
-    SELECT mean("value") as avg,
-           min("value") as min,
-           max("value") as max
-    FROM "iteration_duration"
-    WHERE time > now() - ${timeRange} ${testIdFilter}
+    SELECT 
+      AVG(value) as avg,
+      MIN(value) as min,
+      MAX(value) as max
+    FROM iteration_duration
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
-
-  const series = await queryInfluxDB(query);
-
-  if (series?.values?.[0]) {
-    const values = series.values[0];
-    const columns = series.columns;
-
+  
+  const result = await queryInfluxDb3(query);
+  
+  if (result && result[0]) {
     return {
-      avg: getValueByColumn(values, columns, "avg") || 0,
-      min: getValueByColumn(values, columns, "min") || 0,
-      max: getValueByColumn(values, columns, "max") || 0,
+      avg: parseFloat(result[0].avg) || 0,
+      min: parseFloat(result[0].min) || 0,
+      max: parseFloat(result[0].max) || 0,
     };
   }
-
+  
   return { avg: 0, min: 0, max: 0 };
 }
 
-// 데이터 전송량 메트릭
-async function queryDataTransfer(timeRange = "5m", testId?: string | null) {
-  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
-
+async function queryInfluxDb3DataTransfer(timeRange: string, testId: string | null) {
+  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  
   const querySent = `
-    SELECT sum("value") as total
-    FROM "data_sent"
-    WHERE time > now() - ${timeRange} ${testIdFilter}
+    SELECT SUM(value) as total
+    FROM data_sent
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
-
+  
   const queryReceived = `
-    SELECT sum("value") as total
-    FROM "data_received"
-    WHERE time > now() - ${timeRange} ${testIdFilter}
+    SELECT SUM(value) as total
+    FROM data_received  
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
-
-  const [sentSeries, receivedSeries] = await Promise.all([
-    queryInfluxDB(querySent),
-    queryInfluxDB(queryReceived),
+  
+  const [sentResult, receivedResult] = await Promise.all([
+    queryInfluxDb3(querySent),
+    queryInfluxDb3(queryReceived),
   ]);
-
-  const sent = sentSeries?.values?.[0]
-    ? getValueByColumn(sentSeries.values[0], sentSeries.columns, "total") || 0
-    : 0;
-
-  const received = receivedSeries?.values?.[0]
-    ? getValueByColumn(
-        receivedSeries.values[0],
-        receivedSeries.columns,
-        "total"
-      ) || 0
-    : 0;
-
+  
+  const sent = sentResult?.[0]?.total ? parseFloat(sentResult[0].total) : 0;
+  const received = receivedResult?.[0]?.total ? parseFloat(receivedResult[0].total) : 0;
+  
   return {
     sent: Math.floor(sent),
     received: Math.floor(received),
   };
-}
-
-// Helper 함수
-function getValueByColumn(
-  values: any[],
-  columns: string[],
-  columnName: string
-): number {
-  const index = columns.indexOf(columnName);
-  return index >= 0 && values[index] !== null ? Number(values[index]) : 0;
 }

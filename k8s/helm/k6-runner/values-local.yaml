@@ -1,0 +1,21 @@
+# Local development overrides for k6-runner
+image:
+  repository: k6-testing-platform-k6-runner
+  pullPolicy: Never  # Use local image
+  tag: "local"
+
+# Simplified service names for local
+influxdb:
+  url: "http://influxdb:8086"
+  
+mockServer:
+  url: "http://mock-server-service:3001"
+
+# Lower resource requirements for local
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi

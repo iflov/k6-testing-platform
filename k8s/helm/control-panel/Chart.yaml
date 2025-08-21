@@ -1,0 +1,6 @@
+apiVersion: v2
+name: control-panel
+description: K6 Testing Platform Control Panel
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

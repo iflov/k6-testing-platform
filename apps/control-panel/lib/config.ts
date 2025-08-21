@@ -15,11 +15,11 @@ export class Config {
   public readonly k6DashboardUrl: string;
   public readonly mockServerUrl: string;
 
-  // InfluxDB 설정
-  public readonly influxDbUrl: string;
-  public readonly influxDbDatabase: string;
-  public readonly influxDbUsername?: string;
-  public readonly influxDbPassword?: string;
+  // InfluxDB 3.x 설정
+  private readonly influxDbUrl: string;
+  private readonly influxDbToken: string;
+  private readonly influxDbOrg: string;
+  private readonly influxDbBucket: string;
 
   // 환경 설정
   public readonly isDevelopment: boolean;
@@ -40,11 +40,15 @@ export class Config {
     this.k6DashboardUrl =
       process.env.K6_DASHBOARD_URL || "http://localhost:5665";
     
-    // InfluxDB 설정
-    this.influxDbUrl = process.env.K6_INFLUXDB_URL || "http://influxdb:8086";
-    this.influxDbDatabase = process.env.K6_INFLUXDB_DB || "k6";
-    this.influxDbUsername = process.env.K6_INFLUXDB_USERNAME || process.env.INFLUXDB_USER;
-    this.influxDbPassword = process.env.K6_INFLUXDB_PASSWORD || process.env.INFLUXDB_USER_PASSWORD;
+    // Detect Kubernetes environment
+    const isK8s = process.env.KUBERNETES_SERVICE_HOST !== undefined;
+    
+    // InfluxDB 3.x 설정 (필수)
+    this.influxDbUrl = process.env.INFLUXDB_URL || 
+      (isK8s ? "http://influxdb-service:8086" : "http://influxdb:8086");
+    this.influxDbToken = process.env.INFLUXDB_TOKEN || "dev-token-for-testing";
+    this.influxDbOrg = process.env.INFLUXDB_ORG || "k6org";
+    this.influxDbBucket = process.env.INFLUXDB_BUCKET || "k6";
     
     // 프로덕션 환경에서만 경고 로그 (빌드 시점에는 에러 발생시키지 않음)
     if (this.isProduction && typeof window !== 'undefined') {
@@ -92,8 +96,11 @@ export class Config {
       mockServerUrl: this.maskUrl(this.mockServerUrl),
       dashboardUrl: this.maskUrl(this.k6DashboardUrl),
       influxDbUrl: this.maskUrl(this.influxDbUrl),
-      influxDbDatabase: this.influxDbDatabase,
-      influxDbAuthEnabled: !!(this.influxDbUsername && this.influxDbPassword),
+      influxDb3: {
+        org: this.influxDbOrg,
+        bucket: this.influxDbBucket,
+        tokenConfigured: !!this.influxDbToken,
+      },
       isDevelopment: this.isDevelopment,
       isProduction: this.isProduction,
     });
@@ -111,6 +118,18 @@ export class Config {
     } catch {
       return "*****";
     }
+  }
+
+  /**
+   * InfluxDB 설정 가져오기 (내부용)
+   */
+  public getInfluxDbConfig() {
+    return {
+      url: this.influxDbUrl,
+      token: this.influxDbToken,
+      org: this.influxDbOrg,
+      bucket: this.influxDbBucket,
+    };
   }
 
   /**
@@ -138,8 +157,10 @@ export class Config {
         influxDb: this.maskUrl(this.influxDbUrl),
       },
       influxDb: {
-        database: this.influxDbDatabase,
-        authEnabled: !!(this.influxDbUsername && this.influxDbPassword),
+        url: this.maskUrl(this.influxDbUrl),
+        org: this.influxDbOrg,
+        bucket: this.influxDbBucket,
+        tokenConfigured: !!this.influxDbToken,
       },
     };
   }
