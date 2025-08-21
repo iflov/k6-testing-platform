@@ -19,9 +19,6 @@ RUN npm ci
 # 소스 코드 복사
 COPY src ./src
 
-# .env 파일 복사
-COPY .env* ./
-
 # TypeScript 빌드
 RUN npm run build
 
