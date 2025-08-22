@@ -9,6 +9,7 @@ nodeSelector: null
 
 influxdb:
   url: "http://influxdb:8181"
+  token: "apiv3_TMZp_DEszlT1GKMOLEOrxenxBvllSg9M-89-Sp9lOjCYvLFM9F6RuZieutMxtDQz00BrZLZmdynDhjgpHEPmww"
   
 mockServer:
   url: "http://mock-server-service:3001"

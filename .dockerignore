@@ -46,3 +46,6 @@ Thumbs.db
 
 # K6 test results
 /tmp/k6-test-*.js
+
+#local K8S Test Helm
+k8s/*

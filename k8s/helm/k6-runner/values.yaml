@@ -28,7 +28,7 @@ influxdb:
   url: "http://influxdb.k6-platform.svc.cluster.local:8086"
   org: "k6org"
   bucket: "k6"
-  token: "local-dev-token-12345"  # For local development
+  token: "apiv3_TMZp_DEszlT1GKMOLEOrxenxBvllSg9M-89-Sp9lOjCYvLFM9F6RuZieutMxtDQz00BrZLZmdynDhjgpHEPmww"  # For local development
 
 mockServer:
   url: "http://mock-server-service.k6-platform.svc.cluster.local:3001"
