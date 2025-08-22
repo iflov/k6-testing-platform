@@ -115,37 +115,9 @@ setup_cluster() {
         kind delete cluster --name $CLUSTER_NAME
     fi
     
-    # Create cluster config
-    cat > /tmp/kind-config.yaml <<EOF
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-name: $CLUSTER_NAME
-nodes:
-  - role: control-plane
-    extraPortMappings:
-      - containerPort: 30000
-        hostPort: 3000
-        protocol: TCP
-      - containerPort: 30001
-        hostPort: 3001
-        protocol: TCP
-      - containerPort: 30002
-        hostPort: 3002
-        protocol: TCP
-      - containerPort: 30665
-        hostPort: 5665
-        protocol: TCP
-      - containerPort: 30086
-        hostPort: 8086
-        protocol: TCP
-      - containerPort: 30432
-        hostPort: 5432
-        protocol: TCP
-EOF
-    
-    # Create cluster
-    echo -e "${YELLOW}Creating cluster (this may take 2-3 minutes)...${NC}"
-    kind create cluster --config /tmp/kind-config.yaml --wait 5m
+    # Create cluster using single-node config
+    echo -e "${YELLOW}Creating single-node cluster (this may take 2-3 minutes)...${NC}"
+    kind create cluster --config kind/single-node-config.yaml --wait 5m
     
     # Setup namespace and secrets
     kubectl create namespace $NAMESPACE || true

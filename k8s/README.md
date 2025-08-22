@@ -140,23 +140,44 @@ kubectl get all -n k6-platform
 kubectl get events -n k6-platform --sort-by='.lastTimestamp'
 ```
 
-## Directory Structure
+## Directory Structure (Single-Node Setup)
 ```
 k8s/
 ├── k8s-manager.sh           # Unified management script
+├── kind/
+│   └── single-node-config.yaml  # Single-node Kind cluster config
 ├── manifests/
 │   └── postgres.yaml        # PostgreSQL manifest
 ├── helm/
 │   ├── control-panel/       # Control Panel Helm chart
+│   │   ├── values.yaml      # Base configuration
+│   │   └── values-single-node.yaml  # Single-node overrides
 │   ├── mock-server/         # Mock Server Helm chart
+│   │   ├── values.yaml
+│   │   └── values-single-node.yaml
 │   ├── k6-runner/           # K6 Runner Helm chart
-│   └── influxdb/            # InfluxDB configuration
+│   │   ├── values.yaml
+│   │   └── values-single-node.yaml
+│   └── influxdb/            # InfluxDB wrapper chart with auto-init
+│       ├── Chart.yaml       # Depends on Bitnami InfluxDB
+│       ├── templates/
+│       │   └── init-job.yaml  # Auto token creation & DB setup
+│       └── values.yaml
 └── archive/
     └── old-scripts/         # Archived individual scripts
 ```
 
-## Notes
-- Optimized for single-node development clusters
-- Uses NodePort for service exposure (no LoadBalancer needed)
-- Platform-specific builds for M1/M2 Macs (linux/arm64)
-- All configuration consolidated in k8s-manager.sh
+## Key Features
+- **Single-node optimized**: Simplified architecture for local development
+- **Automatic InfluxDB setup**: Token creation and database initialization via Helm post-install hook
+- **Token management**: InfluxDB tokens stored in Kubernetes secrets, automatically used by services
+- **NodePort exposure**: Direct access without LoadBalancer
+- **Platform-specific builds**: Support for M1/M2 Macs (linux/arm64)
+- **Unified management**: All operations through k8s-manager.sh
+
+## Token Management
+InfluxDB tokens are automatically managed:
+1. **Auto-creation**: Post-install Job creates admin token
+2. **Secret storage**: Token stored in `influxdb-admin-token` secret
+3. **Auto-injection**: K6 Runner and Control Panel read from secret
+4. **Fallback support**: Manual token in values.yaml as backup
