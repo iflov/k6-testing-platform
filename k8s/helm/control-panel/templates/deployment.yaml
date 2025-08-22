@@ -33,18 +33,27 @@ spec:
           env:
             - name: NODE_ENV
               value: {{ .Values.env.NODE_ENV | quote }}
+            - name: PORT
+              value: "3000"
             - name: DATABASE_URL
               value: "postgresql://$(DB_USERNAME):$(DB_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}?schema=public"
             - name: K6_RUNNER_BASE_URL
               value: {{ .Values.k6runner.baseUrl | quote }}
             - name: MOCK_SERVER_URL
               value: {{ .Values.mockServer.url | quote }}
-            - name: K6_INFLUXDB_URL
-              value: {{ .Values.influxdb.url | quote }}
-            - name: K6_INFLUXDB_DB
-              value: {{ .Values.influxdb.bucket | quote }}
             - name: K6_DASHBOARD_URL
               value: {{ .Values.k6dashboard.url | quote }}
+            - name: INFLUXDB_URL
+              value: {{ .Values.influxdb.url | quote }}
+            - name: INFLUXDB_ORG
+              value: {{ .Values.influxdb.org | quote }}
+            - name: INFLUXDB_BUCKET
+              value: {{ .Values.influxdb.bucket | quote }}
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-secret
+                  key: token
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
