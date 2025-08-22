@@ -1,0 +1,11 @@
+apiVersion: v2
+name: influxdb-wrapper
+description: InfluxDB wrapper chart with automatic initialization
+type: application
+version: 0.1.0
+appVersion: "3.3.0"
+
+dependencies:
+  - name: influxdb
+    version: 7.1.18
+    repository: https://charts.bitnami.com/bitnami

@@ -45,7 +45,14 @@ spec:
             - name: INFLUXDB_BUCKET
               value: {{ .Values.influxdb.bucket | quote }}
             - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-admin-token
+                  key: token
+                  optional: true  # Allow fallback to values.yaml if secret doesn't exist</            {{- if .Values.influxdb.token }}
+            - name: INFLUXDB_TOKEN_FALLBACK
               value: {{ .Values.influxdb.token | quote }}
+            {{- end }}
             - name: MOCK_SERVER_URL
               value: {{ .Values.mockServer.url | quote }}
             - name: K6_DASHBOARD_PORT

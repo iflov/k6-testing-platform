@@ -223,11 +223,11 @@ deploy_services() {
     # Wait for PostgreSQL
     kubectl wait --for=condition=ready pod -l app=postgres -n $NAMESPACE --timeout=120s || true
     
-    # Deploy InfluxDB
+    # Deploy InfluxDB with wrapper chart
     echo -e "${YELLOW}Deploying InfluxDB...${NC}"
-    helm upgrade --install influxdb bitnami/influxdb \
+    helm dependency update ./helm/influxdb
+    helm upgrade --install influxdb ./helm/influxdb \
         --namespace $NAMESPACE \
-        --values helm/influxdb/values-local.yaml \
         --wait --timeout 5m || true
     
     # Deploy services (single node values)
