@@ -100,12 +100,13 @@ else
   echo -e "${YELLOW}⚠ Write endpoint returned: $write_check${NC}"
 fi
 
-# Check query endpoint
+# Check query endpoint (InfluxDB 3.x uses /query endpoint)
 query_check=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Token ${INFLUXDB_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"query\": \"SELECT 1\", \"type\": \"sql\"}" \
-  "${INFLUXDB_URL}/api/v2/query")
+  -H "Content-Type: application/sql" \
+  -H "Accept: application/csv" \
+  -d "SELECT 1 -- database=${INFLUXDB_BUCKET}" \
+  "${INFLUXDB_URL}/query")
 
 if [ "$query_check" = "200" ] || [ "$query_check" = "400" ]; then
   echo -e "${GREEN}✓ Query endpoint is accessible${NC}"
@@ -130,7 +131,7 @@ echo "API Endpoints:"
 echo "----------------------------------------"
 echo "Health:  GET  ${INFLUXDB_URL}/health"
 echo "Write:   POST ${INFLUXDB_URL}/api/v2/write?org=${INFLUXDB_ORG}&bucket=${INFLUXDB_BUCKET}"
-echo "Query:   POST ${INFLUXDB_URL}/api/v2/query?org=${INFLUXDB_ORG}"
+echo "Query:   POST ${INFLUXDB_URL}/query (with SQL in body)"
 echo "=========================================="
 
 # Note about InfluxDB 3.x Core

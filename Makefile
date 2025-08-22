@@ -290,7 +290,7 @@ influx-cli:
 	@echo "InfluxDB 3.x Core does not have a traditional CLI."
 	@echo "Use the API endpoints instead:"
 	@echo "  - Health: curl http://localhost:8086/health"
-	@echo "  - Query: Use SQL via /api/v2/query endpoint"
+	@echo "  - Query: Use SQL via /query endpoint"
 
 influx-health:
 	@echo "Checking InfluxDB 3.x health..."
@@ -313,9 +313,10 @@ validate-influx:
 		echo "Testing query endpoint..."; \
 		curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" \
 			-X POST -H "Authorization: Token $$TOKEN" \
-			-H "Content-Type: application/json" \
-			-d '{"query":"SELECT 1","type":"sql"}' \
-			"http://localhost:8086/api/v2/query?org=k6org"; \
+			-H "Content-Type: application/sql" \
+			-H "Accept: application/csv" \
+			-d 'SELECT 1 -- database=k6' \
+			"http://localhost:8086/query"; \
 	else \
 		echo "No token found in .env file"; \
 	fi
@@ -359,71 +360,108 @@ monitor:
 	@echo "K6 Web Dashboard: http://localhost:5665"
 
 ##########################################################
-# Kubernetes (Kind) Commands - Unified Manager
+# Kubernetes (Kind) Commands
 ##########################################################
-K8S_MGR := k8s/k8s-manager.sh
-
-.PHONY: k8s
-k8s: ## Show K8s manager help
-	@$(K8S_MGR) help
 
 .PHONY: k8s-install
 k8s-install: ## Install kubectl, helm, kind on macOS
 	@echo "📦 Installing K8s tools..."
-	@$(K8S_MGR) install
+	@command -v kubectl >/dev/null 2>&1 || brew install kubectl
+	@command -v helm >/dev/null 2>&1 || brew install helm
+	@command -v kind >/dev/null 2>&1 || brew install kind
+	@echo "✅ K8s tools installed"
 
 .PHONY: k8s-all
-k8s-all: ## 🚀 Complete K8s setup (setup + build + deploy)
-	@echo "🎯 Complete K6 Platform Setup"
-	@$(K8S_MGR) all
+k8s-all: k8s-setup k8s-build k8s-load k8s-deploy ## 🚀 Complete K8s setup (setup + build + deploy)
+	@echo "✅ K6 Platform deployed successfully!"
+	@echo "Run 'make k8s-forward' to access services"
 
 .PHONY: k8s-setup
 k8s-setup: ## Create Kind cluster
 	@echo "🌐 Creating Kind cluster..."
-	@$(K8S_MGR) setup
+	@kind get clusters | grep -q k6-cluster || kind create cluster --name k6-cluster --config k8s/kind/single-node-config.yaml
+	@kubectl cluster-info --context kind-k6-cluster
+	@echo "✅ Kind cluster ready"
 
 .PHONY: k8s-build
 k8s-build: ## Build Docker images for K8s
 	@echo "🔨 Building images..."
-	@$(K8S_MGR) build
+	@docker build -t k6-testing-platform-control-panel:local ./apps/control-panel
+	@docker build -t k6-testing-platform-mock-server:local ./apps/mock-server
+	@docker build -t k6-testing-platform-k6-runner:local ./apps/k6-runner-v2
+	@echo "✅ Images built"
 
 .PHONY: k8s-load
 k8s-load: ## Load images to Kind cluster
 	@echo "📦 Loading images to cluster..."
-	@$(K8S_MGR) load
+	@kind load docker-image k6-testing-platform-control-panel:local --name k6-cluster
+	@kind load docker-image k6-testing-platform-mock-server:local --name k6-cluster
+	@kind load docker-image k6-testing-platform-k6-runner:local --name k6-cluster
+	@echo "✅ Images loaded to cluster"
 
 .PHONY: k8s-deploy
 k8s-deploy: ## Deploy all services to K8s
 	@echo "🚢 Deploying services..."
-	@$(K8S_MGR) deploy
+	@kubectl create namespace k6-platform --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Deploying PostgreSQL..."
+	@kubectl apply -f k8s/manifests/postgres-deployment.yaml -n k6-platform
+	@echo "Deploying InfluxDB..."
+	@kubectl apply -f k8s/manifests/influxdb-deployment.yaml -n k6-platform
+	@echo "Waiting for databases to be ready..."
+	@kubectl wait --for=condition=ready pod -l app=postgres -n k6-platform --timeout=60s || true
+	@kubectl wait --for=condition=ready pod -l app=influxdb -n k6-platform --timeout=60s || true
+	@echo "Deploying services with Helm..."
+	@helm upgrade --install control-panel ./k8s/helm/control-panel -n k6-platform -f k8s/helm/control-panel/values-single-node.yaml
+	@helm upgrade --install k6-runner ./k8s/helm/k6-runner -n k6-platform -f k8s/helm/k6-runner/values-single-node.yaml
+	@helm upgrade --install mock-server ./k8s/helm/mock-server -n k6-platform -f k8s/helm/mock-server/values-single-node.yaml
+	@echo "✅ All services deployed"
 
 .PHONY: k8s-status
 k8s-status: ## Check K8s deployment status
-	@$(K8S_MGR) status
+	@echo "📊 Deployment status:"
+	@kubectl get pods -n k6-platform
+	@kubectl get svc -n k6-platform
 
 .PHONY: k8s-logs
 k8s-logs: ## View logs (use: make k8s-logs SERVICE=control-panel)
-	@$(K8S_MGR) logs -s $(SERVICE)
+	@kubectl logs -f -l app=$(SERVICE) -n k6-platform --tail=100
 
 .PHONY: k8s-test
 k8s-test: ## Test service endpoints
 	@echo "🧪 Testing services..."
-	@$(K8S_MGR) test
+	@for port in 30000 30001 30002; do \
+		echo "Testing localhost:$$port..."; \
+		curl -s http://localhost:$$port/health || echo "Service on port $$port not ready"; \
+	done
 
 .PHONY: k8s-forward
 k8s-forward: ## Port forward all services
 	@echo "🔌 Port forwarding..."
-	@$(K8S_MGR) forward
+	@echo "Starting port forwards (press Ctrl+C to stop)..."
+	@kubectl port-forward -n k6-platform svc/control-panel-service 3000:3000 & \
+	kubectl port-forward -n k6-platform svc/mock-server-service 3001:3001 & \
+	kubectl port-forward -n k6-platform svc/k6-runner-service 3002:3002 & \
+	kubectl port-forward -n k6-platform svc/k6-runner-service 5665:5665 & \
+	kubectl port-forward -n k6-platform svc/postgres-service 5432:5432 & \
+	kubectl port-forward -n k6-platform svc/influxdb-service 8086:8086 & \
+	wait
 
 .PHONY: k8s-clean
 k8s-clean: ## Clean up deployments (keep cluster)
 	@echo "🧹 Cleaning deployments..."
-	@$(K8S_MGR) clean
+	@helm uninstall control-panel -n k6-platform || true
+	@helm uninstall k6-runner -n k6-platform || true
+	@helm uninstall mock-server -n k6-platform || true
+	@kubectl delete -f k8s/manifests/postgres-deployment.yaml -n k6-platform || true
+	@kubectl delete -f k8s/manifests/influxdb-deployment.yaml -n k6-platform || true
+	@kubectl delete namespace k6-platform || true
+	@echo "✅ Deployments cleaned"
 
 .PHONY: k8s-destroy
 k8s-destroy: ## Destroy Kind cluster completely
 	@echo "💥 Destroying cluster..."
-	@$(K8S_MGR) destroy
+	@kind delete cluster --name k6-cluster
+	@echo "✅ Cluster destroyed"
 
 # Quick test commands
 test-quick:
