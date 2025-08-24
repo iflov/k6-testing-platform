@@ -62,24 +62,26 @@ async function queryInfluxDb3(query: string) {
   // InfluxDB 3.x Core uses /api/v3/query_sql endpoint
   const url = `${influxConfig.url}/api/v3/query_sql`;
 
-  // According to InfluxDB 3.x docs, token is passed as query parameter
-  const params = new URLSearchParams({
-    database: influxConfig.bucket,
-  });
-
   const headers: HeadersInit = {
     Authorization: `Bearer ${influxConfig.token}`,
+    "Content-Type": "application/json",
   };
 
-  // SQL query is sent as plain text body
-  const response = await fetch(`${url}?${params}`, {
+  // InfluxDB 3.x expects both db and q fields in JSON body
+  const response = await fetch(url, {
     method: "POST",
     headers,
-    body: query,
+    body: JSON.stringify({ 
+      db: influxConfig.bucket,
+      q: query 
+    }),
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
     console.error("InfluxDB 3.x query failed:", response.statusText);
+    console.error("Error details:", errorText);
+    console.error("Query was:", query);
     throw new Error(`InfluxDB 3.x query failed: ${response.statusText}`);
   }
 
@@ -93,15 +95,13 @@ async function queryInfluxDb3HttpReqDuration(
   timeRange: string,
   testId: string | null
 ) {
-  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
 
   const query = `
     SELECT 
       AVG(value) as avg,
       MIN(value) as min,
-      MAX(value) as max,
-      PERCENTILE(value, 0.95) as p95,
-      PERCENTILE(value, 0.99) as p99
+      MAX(value) as max
     FROM http_req_duration
     WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
@@ -113,8 +113,8 @@ async function queryInfluxDb3HttpReqDuration(
       avg: parseFloat(result[0].avg) || 0,
       min: parseFloat(result[0].min) || 0,
       max: parseFloat(result[0].max) || 0,
-      p95: parseFloat(result[0].p95) || 0,
-      p99: parseFloat(result[0].p99) || 0,
+      p95: 0, // Not supported in InfluxDB 3.x SQL
+      p99: 0, // Not supported in InfluxDB 3.x SQL
     };
   }
 
@@ -125,7 +125,7 @@ async function queryInfluxDb3HttpReqs(
   timeRange: string,
   testId: string | null
 ) {
-  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
 
   const query = `
     SELECT 
@@ -148,33 +148,40 @@ async function queryInfluxDb3HttpReqs(
 }
 
 async function queryInfluxDb3VUs(timeRange: string, testId: string | null) {
-  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
 
-  const query = `
-    SELECT 
-      LAST(value) as current,
-      MAX(value) as max
+  // Get current value with separate query
+  const currentQuery = `
+    SELECT value as current
+    FROM vus
+    WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
+    ORDER BY time DESC
+    LIMIT 1
+  `;
+  
+  // Get max value with separate query
+  const maxQuery = `
+    SELECT MAX(value) as max
     FROM vus
     WHERE time > now() - INTERVAL '${timeRange}' ${testIdFilter}
   `;
 
-  const result = await queryInfluxDb3(query);
+  const [currentResult, maxResult] = await Promise.all([
+    queryInfluxDb3(currentQuery),
+    queryInfluxDb3(maxQuery),
+  ]);
 
-  if (result && result[0]) {
-    return {
-      current: Math.floor(parseFloat(result[0].current) || 0),
-      max: Math.floor(parseFloat(result[0].max) || 0),
-    };
-  }
+  const current = currentResult?.[0]?.current ? Math.floor(parseFloat(currentResult[0].current)) : 0;
+  const max = maxResult?.[0]?.max ? Math.floor(parseFloat(maxResult[0].max)) : 0;
 
-  return { current: 0, max: 0 };
+  return { current, max };
 }
 
 async function queryInfluxDb3HttpReqFailed(
   timeRange: string,
   testId: string | null
 ) {
-  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
 
   const query = `
     SELECT 
@@ -200,7 +207,7 @@ async function queryInfluxDb3IterationDuration(
   timeRange: string,
   testId: string | null
 ) {
-  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
 
   const query = `
     SELECT 
@@ -228,7 +235,7 @@ async function queryInfluxDb3DataTransfer(
   timeRange: string,
   testId: string | null
 ) {
-  const testIdFilter = testId ? `AND tags['testId'] = '${testId}'` : "";
+  const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
 
   const querySent = `
     SELECT SUM(value) as total

@@ -36,7 +36,7 @@ spec:
             - name: PORT
               value: "3000"
             - name: DATABASE_URL
-              value: "postgresql://$(DB_USERNAME):$(DB_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}?schema=public"
+              value: "postgresql://test_admin:testpassword@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}?schema=public"
             - name: K6_RUNNER_BASE_URL
               value: {{ .Values.k6runner.baseUrl | quote }}
             - name: MOCK_SERVER_URL

@@ -11,11 +11,11 @@ database:
   host: "postgres-service"
 
 influxdb:
-  url: "http://influxdb:8086"
+  url: "http://influxdb-service:8181"
   org: "k6org"
   bucket: "k6"
   # Token should be provided via --set or values override file for security
-  token: "your-influxdb-token-here"
+  token: "apiv3_9TZuUxQ8PRJ2QrB2Tg3WLNI9nv-YZJn7Mzef2w7bAkJQ1TK2KhQ5mP-ez-NDywrm_TguVWiZ_KoyHVUU9A9_7A"
 
 k6runner:
   baseUrl: "http://k6-runner-service:3002"
