@@ -1,0 +1,42 @@
+# Kind cluster configuration with 2 worker nodes for K6 Testing Platform
+# This configuration creates a cluster that mimics the AWS EKS production setup
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  # Control plane node
+  - role: control-plane
+    extraPortMappings:
+      # Control Panel
+      - containerPort: 30000
+        hostPort: 3000
+        protocol: TCP
+      # Mock Server
+      - containerPort: 30001
+        hostPort: 3001
+        protocol: TCP
+      # K6 Runner API
+      - containerPort: 30002
+        hostPort: 3002
+        protocol: TCP
+      # K6 Dashboard
+      - containerPort: 30665
+        hostPort: 5665
+        protocol: TCP
+      # PostgreSQL
+      - containerPort: 30432
+        hostPort: 5432
+        protocol: TCP
+      # InfluxDB
+      - containerPort: 30181
+        hostPort: 8181
+        protocol: TCP
+
+  # Worker node 1 - For main services
+  - role: worker
+    labels:
+      workload: main-services
+
+  # Worker node 2 - For mock-server only
+  - role: worker
+    labels:
+      workload: mock-server

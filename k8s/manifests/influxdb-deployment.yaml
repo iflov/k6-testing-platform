@@ -44,6 +44,8 @@ spec:
       labels:
         app: influxdb
     spec:
+      nodeSelector:
+        workload: main-services
       containers:
         - name: influxdb
           image: bitnami/influxdb:3.3.0-debian-12-r34

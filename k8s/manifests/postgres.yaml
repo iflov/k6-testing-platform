@@ -31,6 +31,8 @@ spec:
         app: postgres
         component: database
     spec:
+      nodeSelector:
+        workload: main-services
       containers:
         - name: postgres
           image: postgres:16-alpine

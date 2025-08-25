@@ -75,6 +75,14 @@ help:
 	@echo "  make pull         - Pull latest images from Docker Hub"
 	@echo "  make version      - Show version and tag information"
 	@echo ""
+	@echo "🌊 ArgoCD (GitOps):"
+	@echo "  make argocd-setup - Install ArgoCD and open UI"
+	@echo "  make argocd-full-deploy - Complete ArgoCD setup with apps"
+	@echo "  make argocd-password - Get ArgoCD admin password"
+	@echo "  make argocd-ui    - Access ArgoCD UI"
+	@echo "  make argocd-status - Check applications status"
+	@echo "  make argocd-sync  - Sync all applications"
+	@echo ""
 	@echo "⚙️ InfluxDB 3.x:"
 	@echo "  make init-influx  - Initialize InfluxDB 3.x"
 	@echo "  make influx-health - Check InfluxDB 3.x health"
@@ -377,44 +385,85 @@ k8s-all: k8s-setup k8s-build k8s-load k8s-deploy ## 🚀 Complete K8s setup (set
 	@echo "Run 'make k8s-forward' to access services"
 
 .PHONY: k8s-setup
-k8s-setup: ## Create Kind cluster
-	@echo "🌐 Creating Kind cluster..."
-	@kind get clusters | grep -q k6-cluster || kind create cluster --name k6-cluster --config k8s/kind/single-node-config.yaml
+k8s-setup: ## Create Kind cluster with 2 worker nodes
+	@echo "🌐 Creating multi-node Kind cluster..."
+	@kind get clusters | grep -q k6-cluster || kind create cluster --name k6-cluster --config k8s/kind/multi-node-config.yaml
 	@kubectl cluster-info --context kind-k6-cluster
 	@echo "✅ Kind cluster ready"
 
 .PHONY: k8s-build
 k8s-build: ## Build Docker images for K8s
 	@echo "🔨 Building images..."
-	@docker build -t k6-testing-platform-control-panel:local ./apps/control-panel
-	@docker build -t k6-testing-platform-mock-server:local ./apps/mock-server
-	@docker build -t k6-testing-platform-k6-runner:local ./apps/k6-runner-v2
-	@echo "✅ Images built"
+	$(eval GIT_COMMIT := $(shell git rev-parse --short HEAD))
+	@echo "Using Git commit SHA: $(GIT_COMMIT)"
+	@docker build -t k6-testing-platform-control-panel:$(GIT_COMMIT) ./apps/control-panel
+	@docker build -t k6-testing-platform-mock-server:$(GIT_COMMIT) ./apps/mock-server
+	@docker build -t k6-testing-platform-k6-runner:$(GIT_COMMIT) ./apps/k6-runner-v2
+	@echo "✅ Images built with tag $(GIT_COMMIT)"
 
 .PHONY: k8s-load
 k8s-load: ## Load images to Kind cluster
 	@echo "📦 Loading images to cluster..."
-	@kind load docker-image k6-testing-platform-control-panel:local --name k6-cluster
-	@kind load docker-image k6-testing-platform-mock-server:local --name k6-cluster
-	@kind load docker-image k6-testing-platform-k6-runner:local --name k6-cluster
-	@echo "✅ Images loaded to cluster"
+	$(eval GIT_COMMIT := $(shell git rev-parse --short HEAD))
+	@kind load docker-image k6-testing-platform-control-panel:$(GIT_COMMIT) --name k6-cluster
+	@kind load docker-image k6-testing-platform-mock-server:$(GIT_COMMIT) --name k6-cluster
+	@kind load docker-image k6-testing-platform-k6-runner:$(GIT_COMMIT) --name k6-cluster
+	@echo "✅ Images loaded to cluster with tag $(GIT_COMMIT)"
 
 .PHONY: k8s-deploy
-k8s-deploy: ## Deploy all services to K8s
-	@echo "🚢 Deploying services..."
+k8s-deploy: ## Deploy all services to K8s with node affinity
+	@echo "🚢 Deploying services to multi-node cluster..."
 	@kubectl create namespace k6-platform --dry-run=client -o yaml | kubectl apply -f -
-	@echo "Deploying PostgreSQL..."
-	@kubectl apply -f k8s/manifests/postgres-deployment.yaml -n k6-platform
-	@echo "Deploying InfluxDB..."
+	
+	@echo "📦 Creating secrets..."
+	@kubectl create secret generic postgres-secret \
+		--from-literal=username=test_admin \
+		--from-literal=password=testpassword \
+		-n k6-platform --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl create secret generic influxdb-token \
+		--from-literal=token=apiv3_1mW0j3glqhna5FRJrI9A0cGZLKybAUfwrnZ2zG70Xciwaet9FOsqeEqELq_7OBqPmPISHhVFgsyquGR4zD0WtQ \
+		-n k6-platform --dry-run=client -o yaml | kubectl apply -f -
+	
+	@echo "🗄️ Deploying PostgreSQL to main-services node..."
+	@kubectl apply -f k8s/manifests/postgres-init-configmap.yaml -n k6-platform
+	@kubectl apply -f k8s/manifests/postgres.yaml -n k6-platform
+	
+	@echo "📊 Deploying InfluxDB to main-services node..."
 	@kubectl apply -f k8s/manifests/influxdb-deployment.yaml -n k6-platform
-	@echo "Waiting for databases to be ready..."
-	@kubectl wait --for=condition=ready pod -l app=postgres -n k6-platform --timeout=60s || true
-	@kubectl wait --for=condition=ready pod -l app=influxdb -n k6-platform --timeout=60s || true
-	@echo "Deploying services with Helm..."
-	@helm upgrade --install control-panel ./k8s/helm/control-panel -n k6-platform -f k8s/helm/control-panel/values-single-node.yaml
-	@helm upgrade --install k6-runner ./k8s/helm/k6-runner -n k6-platform -f k8s/helm/k6-runner/values-single-node.yaml
-	@helm upgrade --install mock-server ./k8s/helm/mock-server -n k6-platform -f k8s/helm/mock-server/values-single-node.yaml
-	@echo "✅ All services deployed"
+	
+	@echo "⏳ Waiting for databases to be ready..."
+	@kubectl wait --for=condition=ready pod -l app=postgres -n k6-platform --timeout=120s || true
+	@kubectl wait --for=condition=ready pod -l app=influxdb -n k6-platform --timeout=120s || true
+	
+	@echo "🚀 Deploying services with Helm..."
+	$(eval GIT_COMMIT := $(shell git rev-parse --short HEAD))
+	
+	@echo "📦 Deploying Control Panel to main-services node..."
+	@helm upgrade --install control-panel ./k8s/helm/control-panel -n k6-platform \
+		--set image.repository=k6-testing-platform-control-panel \
+		--set image.tag=$(GIT_COMMIT) \
+		--set image.pullPolicy=IfNotPresent \
+		--set nodeSelector.workload=main-services
+	
+	@echo "📦 Deploying K6 Runner to main-services node..."
+	@helm upgrade --install k6-runner ./k8s/helm/k6-runner -n k6-platform \
+		--set image.repository=k6-testing-platform-k6-runner \
+		--set image.tag=$(GIT_COMMIT) \
+		--set image.pullPolicy=IfNotPresent \
+		--set nodeSelector.workload=main-services
+	
+	@echo "📦 Deploying Mock Server to mock-server node..."
+	@helm upgrade --install mock-server ./k8s/helm/mock-server -n k6-platform \
+		--set image.repository=k6-testing-platform-mock-server \
+		--set image.tag=$(GIT_COMMIT) \
+		--set image.pullPolicy=IfNotPresent \
+		--set nodeSelector.workload=mock-server
+	
+	@echo "✅ All services deployed with node affinity"
+	@echo ""
+	@echo "📊 Node distribution:"
+	@echo "  • main-services node: control-panel, k6-runner, postgres, influxdb"
+	@echo "  • mock-server node: mock-server"
 
 .PHONY: k8s-status
 k8s-status: ## Check K8s deployment status
@@ -462,6 +511,165 @@ k8s-destroy: ## Destroy Kind cluster completely
 	@echo "💥 Destroying cluster..."
 	@kind delete cluster --name k6-cluster
 	@echo "✅ Cluster destroyed"
+
+##########################################################
+# ArgoCD Commands
+##########################################################
+
+.PHONY: argocd-install
+argocd-install: ## Install ArgoCD in the cluster
+	@echo "🚀 Installing ArgoCD..."
+	@kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+	@echo "⏳ Waiting for ArgoCD to be ready..."
+	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+	@echo "✅ ArgoCD installed successfully"
+
+.PHONY: argocd-password
+argocd-password: ## Get ArgoCD admin password
+	@echo "🔑 ArgoCD Admin Password:"
+	@kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+	@echo ""
+
+.PHONY: argocd-ui
+argocd-ui: ## Access ArgoCD UI (port-forward)
+	@echo "🌐 ArgoCD UI available at: https://localhost:8080"
+	@echo "Username: admin"
+	@echo "Password: Run 'make argocd-password' to get password"
+	@kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+.PHONY: argocd-login
+argocd-login: ## Login to ArgoCD CLI
+	@echo "🔐 Logging into ArgoCD..."
+	@argocd login localhost:8080 --insecure --username admin --password $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+	@echo "✅ Logged in to ArgoCD"
+
+.PHONY: argocd-add-repo
+argocd-add-repo: ## Add Bitbucket repository to ArgoCD
+	@echo "📦 Adding Bitbucket repository to ArgoCD..."
+	@echo "⚠️  Note: You need to create SSH secret first with:"
+	@echo "kubectl create secret generic repo-ssh-key \\"
+	@echo "  --from-file=sshPrivateKey=~/.ssh/id_rsa \\"
+	@echo "  -n argocd"
+	@echo ""
+	@echo "Then add repository:"
+	@argocd repo add git@bitbucket.org:inhuman-z/k6-test-platform.git \
+		--ssh-private-key-path ~/.ssh/id_rsa \
+		--insecure-skip-server-verification || echo "Repository might already exist"
+	@echo "✅ Repository added/verified"
+
+.PHONY: argocd-create-ssh-secret
+argocd-create-ssh-secret: ## Create SSH secret for ArgoCD
+	@echo "🔑 Creating SSH secret for ArgoCD..."
+	@read -p "Enter path to SSH private key (default: ~/.ssh/id_rsa): " ssh_key; \
+	kubectl create secret generic repo-ssh-key \
+		--from-file=sshPrivateKey=$${ssh_key:-~/.ssh/id_rsa} \
+		-n argocd --dry-run=client -o yaml | kubectl apply -f -
+	@echo "✅ SSH secret created"
+
+.PHONY: argocd-deploy-apps
+argocd-deploy-apps: ## Deploy ArgoCD Applications
+	@echo "🚀 Deploying ArgoCD Applications..."
+	@kubectl apply -f k8s/argocd/applications/control-panel.yaml
+	@kubectl apply -f k8s/argocd/applications/k6-runner.yaml
+	@if [ -f k8s/argocd/applications/mock-server.yaml ]; then \
+		kubectl apply -f k8s/argocd/applications/mock-server.yaml; \
+	else \
+		echo "⚠️  Mock Server Application YAML not found. Run 'make argocd-create-mock-app' to create it."; \
+	fi
+	@echo "✅ Applications deployed to ArgoCD"
+
+.PHONY: argocd-create-mock-app
+argocd-create-mock-app: ## Create Mock Server ArgoCD Application YAML
+	@echo "📝 Creating Mock Server ArgoCD Application..."
+	@cat > k8s/argocd/applications/mock-server.yaml << 'EOF'
+	apiVersion: argoproj.io/v1alpha1
+	kind: Application
+	metadata:
+	  name: mock-server
+	  namespace: argocd
+	  finalizers:
+	    - resources-finalizer.argocd.argoproj.io
+	spec:
+	  project: default
+	
+	  source:
+	    repoURL: git@bitbucket.org:inhuman-z/k6-test-platform.git
+	    targetRevision: main
+	    path: k8s/helm/mock-server
+	    helm:
+	      valueFiles:
+	        - values.yaml
+	
+	  destination:
+	    server: https://kubernetes.default.svc
+	    namespace: k6-platform
+	
+	  syncPolicy:
+	    automated:
+	      prune: true
+	      selfHeal: true
+	      allowEmpty: false
+	    syncOptions:
+	      - CreateNamespace=true
+	      - PrunePropagationPolicy=foreground
+	      - PruneLast=true
+	    retry:
+	      limit: 5
+	      backoff:
+	        duration: 5s
+	        factor: 2
+	        maxDuration: 3m
+	
+	  revisionHistoryLimit: 10
+	
+	  # Health checks
+	  health:
+	    progressDeadlineSeconds: 600
+	EOF
+	@echo "✅ Mock Server Application YAML created at k8s/argocd/applications/mock-server.yaml"
+
+.PHONY: argocd-sync
+argocd-sync: ## Sync all ArgoCD Applications
+	@echo "🔄 Syncing ArgoCD Applications..."
+	@argocd app sync control-panel || echo "Control Panel sync failed or not found"
+	@argocd app sync k6-runner || echo "K6 Runner sync failed or not found"
+	@argocd app sync mock-server || echo "Mock Server sync failed or not found"
+	@echo "✅ Applications synced"
+
+.PHONY: argocd-status
+argocd-status: ## Check ArgoCD Applications status
+	@echo "📊 ArgoCD Applications Status:"
+	@kubectl get applications -n argocd
+	@echo ""
+	@echo "Detailed status:"
+	@argocd app list
+
+.PHONY: argocd-delete-apps
+argocd-delete-apps: ## Delete ArgoCD Applications
+	@echo "🗑️  Deleting ArgoCD Applications..."
+	@kubectl delete -f k8s/argocd/applications/control-panel.yaml || true
+	@kubectl delete -f k8s/argocd/applications/k6-runner.yaml || true
+	@kubectl delete -f k8s/argocd/applications/mock-server.yaml || true
+	@echo "✅ Applications deleted"
+
+.PHONY: argocd-uninstall
+argocd-uninstall: ## Uninstall ArgoCD from cluster
+	@echo "🗑️  Uninstalling ArgoCD..."
+	@kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml || true
+	@kubectl delete namespace argocd || true
+	@echo "✅ ArgoCD uninstalled"
+
+.PHONY: argocd-setup
+argocd-setup: argocd-install argocd-ui ## Complete ArgoCD setup (install and open UI)
+	@echo "✅ ArgoCD setup complete!"
+	@echo "Run 'make argocd-password' to get admin password"
+
+.PHONY: argocd-full-deploy
+argocd-full-deploy: argocd-setup argocd-create-ssh-secret argocd-add-repo argocd-create-mock-app argocd-deploy-apps ## Full ArgoCD deployment
+	@echo "✅ Full ArgoCD deployment complete!"
+	@echo "Applications are now managed by ArgoCD"
+	@echo "Access ArgoCD UI at: https://localhost:8080"
 
 # Quick test commands
 test-quick:

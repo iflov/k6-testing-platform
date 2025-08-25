@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=https://bitbucket.org/pipelines-json-schema/pipelines-schema.json
+image: atlassian/default-image:4
+
+options:
+  docker: true
+
+definitions:
+  services:
+    docker:
+      memory: 4096
+
+  steps:
+    - step: &build-push-multiplatform
+        name: Build Multi-Platform Images
+        services:
+          - docker
+        caches:
+          - docker
+        script:
+          # Setup Docker buildx for multi-platform builds
+          - export DOCKER_BUILDKIT=1
+          - docker version
+
+          # Setup QEMU for multi-arch support
+          - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+          # Setup buildx
+          - docker buildx create --name multiplatform-builder --use
+          - docker buildx inspect --bootstrap
+
+          # Login to Docker Hub
+          - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
+
+          # Get git commit SHA for tagging
+          - export GIT_COMMIT=$(git rev-parse --short HEAD)
+          - echo "Building with tag $GIT_COMMIT"
+
+          # Build and push Control Panel (multi-platform)
+          - |
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT \
+              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest \
+              --push \
+              ./apps/control-panel
+
+          # Build and push K6 Runner (multi-platform)
+          - |
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT \
+              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest \
+              --push \
+              ./apps/k6-runner-v2
+
+          - echo "✅ Multi-platform images pushed with tag $GIT_COMMIT"
+
+pipelines:
+  branches:
+    # 모든 브랜치에서 테스트 실행
+    "**":
+      - parallel:
+          - step:
+              name: Test K6 Runner
+              image: node:22-slim
+              caches:
+                - node
+              script:
+                - cd apps/k6-runner-v2
+                - npm ci
+                - npm run lint
+                - npm test
+
+    # main 브랜치는 테스트 + 빌드 + 배포
+    main:
+      - step: *build-push-multiplatform
+
+      - step:
+          name: Update Helm Values
+          image: alpine:latest
+          script:
+            # Install required tools
+            - apk add --no-cache git wget
+            - wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            - chmod +x /usr/local/bin/yq
+
+            # Get git commit SHA
+            - export GIT_COMMIT=$(git rev-parse --short HEAD)
+
+            # Update control-panel values.yaml
+            - yq eval -i ".image.repository = \"$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel\"" k8s/helm/control-panel/values.yaml
+            - yq eval -i ".image.tag = \"$GIT_COMMIT\"" k8s/helm/control-panel/values.yaml
+            - yq eval -i ".image.pullPolicy = \"IfNotPresent\"" k8s/helm/control-panel/values.yaml
+
+            # Update k6-runner values.yaml
+            - yq eval -i ".image.repository = \"$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner\"" k8s/helm/k6-runner/values.yaml
+            - yq eval -i ".image.tag = \"$GIT_COMMIT\"" k8s/helm/k6-runner/values.yaml
+            - yq eval -i ".image.pullPolicy = \"IfNotPresent\"" k8s/helm/k6-runner/values.yaml
+
+            # Configure git
+            - git config user.email "$GIT_USER_EMAIL"
+            - git config user.name "$GIT_USER_NAME"
+
+            # Commit and push changes
+            - git add k8s/helm/*/values.yaml
+            - |
+              if ! git diff --staged --quiet; then
+                git commit -m "[CI] Update image tags to $GIT_COMMIT [skip ci]"
+                git push origin main
+              else
+                echo "No changes to commit"
+              fi
+
+# Required environment variables to be set in Bitbucket repository settings:
+# - DOCKER_HUB_USERNAME: Your Docker Hub username (leehyeontae)
+# - DOCKER_HUB_PASSWORD: Your Docker Hub password or access token
+# - GIT_USER_EMAIL: Git user email for commits
+# - GIT_USER_NAME: Git user name for commits
