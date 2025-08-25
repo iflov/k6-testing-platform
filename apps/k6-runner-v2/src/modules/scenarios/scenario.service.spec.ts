@@ -214,13 +214,12 @@ describe('ScenarioService with mocked dependencies', () => {
 
   beforeEach(() => {
     scenarioService = new ScenarioService();
-
-    // Mock the getScenarioConfig method for isolated testing
     mockScenarioConfig = jest.spyOn(scenarioService, 'getScenarioConfig');
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   it('should call getScenarioConfig when needed', () => {
@@ -232,6 +231,7 @@ describe('ScenarioService with mocked dependencies', () => {
     const result = scenarioService.getScenarioConfig('any-scenario');
 
     expect(mockScenarioConfig).toHaveBeenCalledWith('any-scenario');
+    expect(mockScenarioConfig).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       description: 'Mocked scenario',
       executor: 'ramping-vus',
@@ -244,5 +244,21 @@ describe('ScenarioService with mocked dependencies', () => {
     });
 
     expect(() => scenarioService.getScenarioConfig('error-scenario')).toThrow('Mocked error');
+    expect(mockScenarioConfig).toHaveBeenCalledWith('error-scenario');
+  });
+
+  it('should restore original implementation after test', () => {
+    // Save reference to verify mock was applied
+    mockScenarioConfig.mockReturnValue({ description: 'test', executor: 'test' });
+    
+    // Mock should work
+    const mockedResult = scenarioService.getScenarioConfig('test');
+    expect(mockedResult).toEqual({ description: 'test', executor: 'test' });
+    
+    // Restore original implementation
+    mockScenarioConfig.mockRestore();
+    
+    // After restore, it should use original implementation and throw for invalid scenario
+    expect(() => scenarioService.getScenarioConfig('invalid')).toThrow('Scenario invalid not found');
   });
 });

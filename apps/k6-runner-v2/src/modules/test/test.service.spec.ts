@@ -7,8 +7,10 @@ import { TestConfig } from '../../types/test.types';
 
 // Mock fs/promises
 jest.mock('fs/promises', () => ({
-  writeFile: jest.fn(),
-  unlink: jest.fn(),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+  readFile: jest.fn().mockResolvedValue('mock file content'),
+  access: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('TestService', () => {

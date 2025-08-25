@@ -6,17 +6,22 @@ import { CurrentTest } from '../../types/test.types';
 // Mock child_process
 jest.mock('child_process', () => ({
   spawn: jest.fn(),
-  exec: jest.fn(),
+  exec: jest.fn((_cmd, callback) => {
+    if (callback) callback(null, { stdout: '', stderr: '' });
+  }),
 }));
 
 // Mock fs/promises
 jest.mock('fs/promises', () => ({
-  readFile: jest.fn(),
+  readFile: jest.fn().mockResolvedValue('mock file content'),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+  access: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock util
 jest.mock('util', () => ({
-  promisify: jest.fn(() => jest.fn()),
+  promisify: jest.fn(() => jest.fn().mockResolvedValue({ stdout: '', stderr: '' })),
 }));
 
 describe('ProcessManagerService', () => {
@@ -25,11 +30,22 @@ describe('ProcessManagerService', () => {
   let mockProcess: Partial<ChildProcess>;
 
   beforeEach(() => {
+    // Suppress console warnings during tests
+    jest.spyOn(console, 'warn').mockImplementation();
+    jest.spyOn(console, 'error').mockImplementation();
+    
     // Mock ConfigService
     configService = {
-      getInfluxDbUrl: jest.fn().mockReturnValue('http://localhost:8086'),
+      getInfluxDbUrl: jest.fn().mockReturnValue('http://localhost:8181'),
       getK6DashboardPort: jest.fn().mockReturnValue('5665'),
       getK6DashboardHost: jest.fn().mockReturnValue('0.0.0.0'),
+      getK6DashboardPeriod: jest.fn().mockReturnValue('1s'),
+      getInfluxDbConfig: jest.fn().mockReturnValue({
+        url: 'http://localhost:8181',
+        token: 'test-token',
+        org: 'test-org',
+        bucket: 'test-bucket',
+      }),
     } as unknown as ConfigService;
 
     // Mock ChildProcess
@@ -51,6 +67,7 @@ describe('ProcessManagerService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('spawnProcess', () => {
@@ -109,10 +126,10 @@ describe('ProcessManagerService', () => {
       expect(result.dashboardEnabled).toBe(true);
       expect(spawn).toHaveBeenCalledWith(
         'k6',
-        expect.arrayContaining(['--out', expect.stringContaining('web-dashboard')]),
+        expect.arrayContaining(['--out', expect.stringContaining('dashboard')]),
         expect.objectContaining({
           env: expect.objectContaining({
-            K6_WEB_DASHBOARD: 'true',
+            K6_DASHBOARD: 'true',
           }),
         }),
       );
