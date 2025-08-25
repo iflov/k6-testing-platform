@@ -425,7 +425,6 @@ k8s-deploy: ## Deploy all services to K8s with node affinity
 		-n k6-platform --dry-run=client -o yaml | kubectl apply -f -
 	
 	@echo "🗄️ Deploying PostgreSQL to main-services node..."
-	@kubectl apply -f k8s/manifests/postgres-init-configmap.yaml -n k6-platform
 	@kubectl apply -f k8s/manifests/postgres.yaml -n k6-platform
 	
 	@echo "📊 Deploying InfluxDB to main-services node..."
