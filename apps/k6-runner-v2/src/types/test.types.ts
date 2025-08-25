@@ -41,7 +41,7 @@ export interface TestProgress {
   completedIterations: number;
   interruptedIterations: number;
   percentage: number;
-  status: 'running' | 'completed' | 'stopped' | 'failed';
+  status: 'starting' | 'running' | 'completed' | 'stopped' | 'failed';
 }
 
 export interface TestResponse {

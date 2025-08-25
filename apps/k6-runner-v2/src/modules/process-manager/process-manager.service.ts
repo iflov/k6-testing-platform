@@ -37,6 +37,21 @@ export class ProcessManagerService {
     console.warn(`[DEBUG] Target URL: ${targetUrl}`);
 
     this.errorBuffers.set(testId, '');
+    
+    // 테스트 시작 시 Progress Map 즉시 초기화
+    if (!this.testProgress.has(testId)) {
+      console.warn(`[DEBUG] Pre-initializing progress for testId: ${testId} at spawn`);
+      this.testProgress.set(testId, {
+        startTime: new Date(),
+        currentTime: '0s',
+        currentVUs: 0,
+        totalVUs: 0,
+        completedIterations: 0,
+        interruptedIterations: 0,
+        percentage: 0,
+        status: 'starting',
+      });
+    }
 
     // Get InfluxDB 3.x configuration
     const influxConfig = this.configService.getInfluxDbConfig();
@@ -251,6 +266,13 @@ export class ProcessManagerService {
 
   // * k6 progress parse
   private parseK6Progress = (output: string, testId: string, currentTest: CurrentTest) => {
+    // 테스트 시작 감지 패턴 추가
+    const isTestStarting = output.includes('scenarios:') || 
+                          output.includes('execution:') || 
+                          output.includes('script:') ||
+                          output.includes('web dashboard:') ||
+                          output.includes('output:');
+
     const runningPattern = /running \(([0-9hms.]+)\), (\d+)\/(\d+) VUs/;
     const runningMatch = output.match(runningPattern);
 
@@ -263,10 +285,11 @@ export class ProcessManagerService {
     const altPercentPattern = /(\d+)%\s+\[/;
     const altPercentMatch = output.match(altPercentPattern);
 
-    if (runningMatch || iterationMatch || percentMatch || altPercentMatch) {
+    // 테스트 시작 시점에도 Map 초기화 또는 업데이트
+    if (isTestStarting || runningMatch || iterationMatch || percentMatch || altPercentMatch) {
       // 초기화
       if (!this.testProgress.has(testId)) {
-        console.warn(`[DEBUG] Initializing progress for testId: ${testId}`);
+        console.warn(`[DEBUG] Initializing progress for testId: ${testId} (Test starting: ${isTestStarting})`);
         this.testProgress.set(testId, {
           startTime: new Date(),
           currentTime: '0s',
@@ -280,6 +303,13 @@ export class ProcessManagerService {
         console.warn(
           `[DEBUG] Progress initialized. Map now contains: ${Array.from(this.testProgress.keys()).join(', ')}`,
         );
+      } else if (isTestStarting) {
+        // 이미 초기화된 경우 status를 running으로 업데이트
+        const progress = this.testProgress.get(testId)!;
+        if (progress.status === 'starting') {
+          progress.status = 'running';
+          console.warn(`[DEBUG] Progress status updated to 'running' for testId: ${testId}`);
+        }
       }
 
       const progress = this.testProgress.get(testId)!;

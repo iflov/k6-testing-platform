@@ -126,14 +126,18 @@ export default function TestProgress({ testId, isRunning }: TestProgressProps) {
               <div className="text-xs text-gray-500 mb-1">Status</div>
               <div className="text-lg font-semibold">
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  progress.status === 'running' 
+                  progress.status === 'starting'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : progress.status === 'running' 
                     ? 'bg-blue-100 text-blue-800' 
                     : progress.status === 'completed'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-gray-100 text-gray-800'
                 }`}>
                   <span className={`w-2 h-2 mr-1 rounded-full ${
-                    progress.status === 'running' 
+                    progress.status === 'starting'
+                      ? 'bg-yellow-500 animate-pulse'
+                      : progress.status === 'running' 
                       ? 'bg-blue-500 animate-pulse' 
                       : progress.status === 'completed'
                       ? 'bg-green-500'
