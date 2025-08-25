@@ -13,15 +13,15 @@ services:
       retries: 3
       start_period: 40s
     env_file:
-      - .env  # 전역 환경 변수
-      - ./apps/control-panel/.env  # 앱별 환경 변수 (우선순위 높음)
+      - .env # 전역 환경 변수
+      - ./apps/control-panel/.env # 앱별 환경 변수 (우선순위 높음)
     environment:
       # 내부 서비스 통신용 URL (Docker 네트워크)
       - DB_HOST=postgres
       - DB_PORT=5432
       - K6_RUNNER_BASE_URL=http://k6-runner:3002
       - MOCK_SERVER_URL=http://mock-server:3001
-      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_URL=http://influxdb:8181
       # 환경 변수로부터 가져오기
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
@@ -59,8 +59,8 @@ services:
       retries: 3
       start_period: 30s
     env_file:
-      - .env  # 전역 환경 변수
-      - ./apps/mock-server/.env  # 앱별 환경 변수 (우선순위 높음)
+      - .env # 전역 환경 변수
+      - ./apps/mock-server/.env # 앱별 환경 변수 (우선순위 높음)
     environment:
       - NODE_ENV=${NODE_ENV:-development}
     networks:
@@ -70,10 +70,10 @@ services:
   influxdb:
     image: quay.io/influxdb/influxdb3-core:latest
     ports:
-      - "${INFLUXDB_PORT:-8086}:8181"
+      - "${INFLUXDB_PORT:-8181}:8181"
     environment:
       # InfluxDB 3.x Core configuration
-      - INFLUXDB_HTTP_BIND_ADDRESS=:8086
+      - INFLUXDB_HTTP_BIND_ADDRESS=:8181
       - INFLUXDB_REPORTING_DISABLED=true
       # Data directory
       - INFLUXDB_DATA_DIR=/var/lib/influxdb3
@@ -113,15 +113,15 @@ services:
       retries: 3
       start_period: 30s
     env_file:
-      - .env  # 전역 환경 변수
-      - ./apps/k6-runner-v2/.env  # 앱별 환경 변수 (우선순위 높음)
+      - .env # 전역 환경 변수
+      - ./apps/k6-runner-v2/.env # 앱별 환경 변수 (우선순위 높음)
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - K6_DASHBOARD_PORT=${K6_DASHBOARD_PORT}
       - K6_DASHBOARD_HOST=${K6_DASHBOARD_HOST:-0.0.0.0}
       - K6_DASHBOARD_PERIOD=${K6_DASHBOARD_PERIOD:-1s}
       # InfluxDB 3.x settings
-      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_URL=http://influxdb:8181
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
       - INFLUXDB_ORG=${INFLUXDB_ORG}
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}

@@ -55,7 +55,7 @@ describe('ConfigService', () => {
 
     it('should use default values in development', () => {
       const service = ConfigService.getInstance();
-      expect(service.getInfluxDbUrl()).toContain('influxdb:8086');
+      expect(service.getInfluxDbUrl()).toContain('influxdb:8181');
       expect(service.getMockServerUrl()).toContain('mock-server:3001');
       expect(service.getK6DashboardPort()).toBe('5665');
       expect(service.getK6DashboardHost()).toBe('0.0.0.0');
@@ -66,7 +66,7 @@ describe('ConfigService', () => {
 
     it('should use custom values from environment variables', () => {
       process.env.PORT = '4000';
-      process.env.INFLUXDB_URL = 'http://custom-influx:8086';
+      process.env.INFLUXDB_URL = 'http://custom-influx:8181';
       process.env.INFLUXDB_TOKEN = 'custom-token';
       process.env.INFLUXDB_ORG = 'custom-org';
       process.env.INFLUXDB_BUCKET = 'custom-bucket';
@@ -76,7 +76,7 @@ describe('ConfigService', () => {
       process.env.K6_DASHBOARD_PERIOD = '5s';
 
       const service = ConfigService.getInstance();
-      expect(service.getInfluxDbUrl()).toBe('http://custom-influx:8086');
+      expect(service.getInfluxDbUrl()).toBe('http://custom-influx:8181');
       expect(service.getInfluxDbOrg()).toBe('custom-org');
       expect(service.getInfluxDbBucket()).toBe('custom-bucket');
       expect(service.getMockServerUrl()).toBe('http://custom-mock:3001');
@@ -88,7 +88,7 @@ describe('ConfigService', () => {
     it('should detect Kubernetes environment', () => {
       process.env.KUBERNETES_SERVICE_HOST = 'kubernetes.default';
       const service = ConfigService.getInstance();
-      expect(service.getInfluxDbUrl()).toContain('influxdb-service:8086');
+      expect(service.getInfluxDbUrl()).toContain('influxdb-service:8181');
       expect(service.getMockServerUrl()).toContain('mock-server-service:3001');
     });
   });
@@ -142,7 +142,7 @@ describe('ConfigService', () => {
       process.env.INFLUXDB_TOKEN = 'test-token';
       process.env.INFLUXDB_ORG = 'test-org';
       process.env.INFLUXDB_BUCKET = 'test-bucket';
-      process.env.INFLUXDB_URL = 'http://test-influx:8086';
+      process.env.INFLUXDB_URL = 'http://test-influx:8181';
 
       const service = ConfigService.getInstance();
       const config = service.getInfluxDbConfig();
@@ -150,7 +150,7 @@ describe('ConfigService', () => {
       expect(config).toHaveProperty('token', 'test-token');
       expect(config).toHaveProperty('org', 'test-org');
       expect(config).toHaveProperty('bucket', 'test-bucket');
-      expect(config).toHaveProperty('url', 'http://test-influx:8086');
+      expect(config).toHaveProperty('url', 'http://test-influx:8181');
     });
 
     it('should use default values for InfluxDB 3.x configuration', () => {
@@ -165,7 +165,7 @@ describe('ConfigService', () => {
       expect(config).toHaveProperty('token', 'dev-token-for-testing');
       expect(config).toHaveProperty('org', 'k6org');
       expect(config).toHaveProperty('bucket', 'k6');
-      expect(config.url).toContain('influxdb:8086');
+      expect(config.url).toContain('influxdb:8181');
     });
   });
 

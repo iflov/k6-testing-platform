@@ -112,7 +112,7 @@ export class ProcessManagerService {
 
     k6Args.push(
       '--out',
-      `web-dashboard=host=${this.configService.getK6DashboardHost()}&port=${this.configService.getK6DashboardPort()}&period=${this.configService.getK6DashboardPeriod()}`,
+      `dashboard=host=${this.configService.getK6DashboardHost()}&port=${this.configService.getK6DashboardPort()}&period=${this.configService.getK6DashboardPeriod()}`,
     );
 
     k6Env.K6_DASHBOARD = 'true';

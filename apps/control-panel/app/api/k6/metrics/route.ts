@@ -63,7 +63,7 @@ async function queryInfluxDb3(query: string) {
   const url = `${influxConfig.url}/api/v3/query_sql`;
 
   const headers: HeadersInit = {
-    Authorization: `Bearer ${influxConfig.token}`,
+    Authorization: `Token ${influxConfig.token}`,
     "Content-Type": "application/json",
   };
 
@@ -71,9 +71,9 @@ async function queryInfluxDb3(query: string) {
   const response = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({ 
+    body: JSON.stringify({
       db: influxConfig.bucket,
-      q: query 
+      q: query,
     }),
   });
 
@@ -158,7 +158,7 @@ async function queryInfluxDb3VUs(timeRange: string, testId: string | null) {
     ORDER BY time DESC
     LIMIT 1
   `;
-  
+
   // Get max value with separate query
   const maxQuery = `
     SELECT MAX(value) as max
@@ -171,8 +171,12 @@ async function queryInfluxDb3VUs(timeRange: string, testId: string | null) {
     queryInfluxDb3(maxQuery),
   ]);
 
-  const current = currentResult?.[0]?.current ? Math.floor(parseFloat(currentResult[0].current)) : 0;
-  const max = maxResult?.[0]?.max ? Math.floor(parseFloat(maxResult[0].max)) : 0;
+  const current = currentResult?.[0]?.current
+    ? Math.floor(parseFloat(currentResult[0].current))
+    : 0;
+  const max = maxResult?.[0]?.max
+    ? Math.floor(parseFloat(maxResult[0].max))
+    : 0;
 
   return { current, max };
 }

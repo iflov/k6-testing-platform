@@ -289,12 +289,12 @@ shell-postgres:
 influx-cli:
 	@echo "InfluxDB 3.x Core does not have a traditional CLI."
 	@echo "Use the API endpoints instead:"
-	@echo "  - Health: curl http://localhost:8086/health"
+	@echo "  - Health: curl http://localhost:8181/health"
 	@echo "  - Query: Use SQL via /query endpoint"
 
 influx-health:
 	@echo "Checking InfluxDB 3.x health..."
-	@curl -s http://localhost:8086/health | jq '.' || echo "InfluxDB 3.x not responding"
+	@curl -s http://localhost:8181/health | jq '.' || echo "InfluxDB 3.x not responding"
 
 # Initialize InfluxDB 3.x
 init-influx:
@@ -309,14 +309,14 @@ validate-influx:
 		echo "Testing write endpoint..."; \
 		curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" \
 			-H "Authorization: Token $$TOKEN" \
-			"http://localhost:8086/api/v2/write?org=k6org&bucket=k6"; \
+			"http://localhost:8181/api/v2/write?org=k6org&bucket=k6"; \
 		echo "Testing query endpoint..."; \
 		curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" \
 			-X POST -H "Authorization: Token $$TOKEN" \
 			-H "Content-Type: application/sql" \
 			-H "Accept: application/csv" \
 			-d 'SELECT 1 -- database=k6' \
-			"http://localhost:8086/query"; \
+			"http://localhost:8181/query"; \
 	else \
 		echo "No token found in .env file"; \
 	fi
@@ -327,7 +327,7 @@ health:
 	@curl -s http://localhost:3001/health | jq '.' || echo "Mock server not responding"
 	@curl -s http://localhost:3000 > /dev/null && echo "Control panel is running" || echo "Control panel not responding"
 	@curl -s http://localhost:3002/health > /dev/null && echo "K6 Runner v2 is running" || echo "K6 Runner v2 not responding"
-	@curl -s http://localhost:8086/health | jq '.' && echo "InfluxDB 3.x is running" || echo "InfluxDB 3.x not responding"
+	@curl -s http://localhost:8181/health | jq '.' && echo "InfluxDB 3.x is running" || echo "InfluxDB 3.x not responding"
 	@curl -s http://localhost:5665 > /dev/null && echo "K6 Web Dashboard is running" || echo "K6 Web Dashboard not responding"
 
 # Restart services
@@ -443,7 +443,7 @@ k8s-forward: ## Port forward all services
 	kubectl port-forward -n k6-platform svc/k6-runner-service 3002:3002 & \
 	kubectl port-forward -n k6-platform svc/k6-runner-service 5665:5665 & \
 	kubectl port-forward -n k6-platform svc/postgres-service 5432:5432 & \
-	kubectl port-forward -n k6-platform svc/influxdb-service 8086:8086 & \
+	kubectl port-forward -n k6-platform svc/influxdb-service 8181:8181 & \
 	wait
 
 .PHONY: k8s-clean

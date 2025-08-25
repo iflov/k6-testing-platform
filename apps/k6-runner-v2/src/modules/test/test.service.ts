@@ -128,9 +128,21 @@ export class TestService {
         // ProcessManagerService 정리
         await this.processManagerService.cleanupTest(testId);
 
-        // 대시보드 포트 해제 대기
+        // 대시보드 포트 해제 대기 및 강제 종료
         if (this.currentTest.dashboardEnabled) {
-          console.warn('Dashboard was enabled, waiting for port release...');
+          console.warn('Dashboard was enabled, forcing process termination...');
+          
+          // Dashboard가 활성화된 경우 프로세스가 종료되지 않을 수 있으므로 강제 종료
+          if (this.currentTest.process && !this.currentTest.process.killed) {
+            this.currentTest.process.kill('SIGTERM');
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            
+            if (!this.currentTest.process.killed) {
+              this.currentTest.process.kill('SIGKILL');
+            }
+          }
+          
+          // 포트 해제 대기
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
 

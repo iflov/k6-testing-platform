@@ -46,16 +46,18 @@ export class ConfigService {
   private initializeConfig() {
     // Detect environment
     const isK8s = process.env.KUBERNETES_SERVICE_HOST !== undefined;
-    
+
     if (this.isDevelopment) {
       // Dynamic URL based on environment
-      this.influxdbUrl = process.env.INFLUXDB_URL || 
-        (isK8s ? 'http://influxdb-service:8086' : 'http://influxdb:8086');
+      this.influxdbUrl =
+        process.env.INFLUXDB_URL ||
+        (isK8s ? 'http://influxdb-service:8181' : 'http://influxdb:8181');
       // InfluxDB 3.x authentication (required)
       this.influxdbToken = process.env.INFLUXDB_TOKEN || 'dev-token-for-testing';
       this.influxdbOrg = process.env.INFLUXDB_ORG || 'k6org';
       this.influxdbBucket = process.env.INFLUXDB_BUCKET || 'k6';
-      this.mockServerUrl = process.env.MOCK_SERVER_URL || 
+      this.mockServerUrl =
+        process.env.MOCK_SERVER_URL ||
         (isK8s ? 'http://mock-server-service:3001' : 'http://mock-server:3001');
       this.k6DashboardPort = process.env.K6_DASHBOARD_PORT || '5665';
       this.k6DashboardHost = process.env.K6_DASHBOARD_HOST || '0.0.0.0';

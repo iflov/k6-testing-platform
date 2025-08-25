@@ -39,19 +39,20 @@ export class Config {
       process.env.MOCK_SERVER_URL || "http://host.docker.internal:3001";
     this.k6DashboardUrl =
       process.env.K6_DASHBOARD_URL || "http://localhost:5665";
-    
+
     // Detect Kubernetes environment
     const isK8s = process.env.KUBERNETES_SERVICE_HOST !== undefined;
-    
+
     // InfluxDB 3.x 설정 (필수)
-    this.influxDbUrl = process.env.INFLUXDB_URL || 
-      (isK8s ? "http://influxdb-service:8086" : "http://influxdb:8086");
+    this.influxDbUrl =
+      process.env.INFLUXDB_URL ||
+      (isK8s ? "http://influxdb-service:8181" : "http://influxdb:8181");
     this.influxDbToken = process.env.INFLUXDB_TOKEN || "dev-token-for-testing";
     this.influxDbOrg = process.env.INFLUXDB_ORG || "k6org";
     this.influxDbBucket = process.env.INFLUXDB_BUCKET || "k6";
-    
+
     // 프로덕션 환경에서만 경고 로그 (빌드 시점에는 에러 발생시키지 않음)
-    if (this.isProduction && typeof window !== 'undefined') {
+    if (this.isProduction && typeof window !== "undefined") {
       // 런타임에만 환경변수 체크 (클라이언트 사이드에서만)
       this.checkRequiredEnvVars();
     }

@@ -9,9 +9,10 @@ RUN apk add --no-cache git
 # Install xk6 (use a specific version that works with Go 1.23)
 RUN go install go.k6.io/xk6/cmd/xk6@v0.14.0
 
-# Build k6 with InfluxDB 3.x output extension
+# Build k6 with InfluxDB 3.x output extension and dashboard
 RUN xk6 build \
     --with github.com/grafana/xk6-output-influxdb@latest \
+    --with github.com/grafana/xk6-dashboard@latest \
     --output /k6
 
 # Stage 2: Node.js application

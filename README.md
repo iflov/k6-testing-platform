@@ -120,7 +120,7 @@ make logs  # 또는 docker-compose logs -f
 | **Mock Server**      | http://localhost:3001 | 테스트 타겟 API 서버               |
 | **K6 Runner API**    | http://localhost:3002 | K6 실행 관리 API                   |
 | **K6 Web Dashboard** | http://localhost:5665 | 실시간 메트릭 대시보드 (테스트 중) |
-| **InfluxDB**         | http://localhost:8086 | 시계열 메트릭 DB                   |
+| **InfluxDB**         | http://localhost:8181 | 시계열 메트릭 DB                   |
 
 ### 4. 테스트 실행
 
@@ -443,7 +443,7 @@ MOCK_SERVER_URL=http://mock-server:3001
 K6_DASHBOARD_URL=http://localhost:5665
 
 # InfluxDB 설정
-K6_INFLUXDB_URL=http://influxdb:8086
+K6_INFLUXDB_URL=http://influxdb:8181
 K6_INFLUXDB_DB=k6
 ```
 
@@ -454,7 +454,7 @@ K6_INFLUXDB_DB=k6
 PORT=3002
 
 # InfluxDB 설정
-INFLUXDB_URL=http://influxdb:8086
+INFLUXDB_URL=http://influxdb:8181
 
 # K6 Dashboard 설정
 K6_DASHBOARD_PORT=5665
@@ -747,6 +747,7 @@ sudo ufw allow 5665/tcp
 프로덕션 환경에서는 InfluxDB 인증을 반드시 활성화해야 합니다:
 
 1. **환경 변수 설정** (.env.production)
+
 ```bash
 # InfluxDB 관리자 계정
 INFLUXDB_ADMIN_USER=admin
@@ -758,11 +759,13 @@ INFLUXDB_USER_PASSWORD=your_k6_password_here
 ```
 
 2. **프로덕션 Docker Compose 실행**
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 3. **Kubernetes Helm 배포**
+
 ```bash
 # values.yaml에서 인증 설정 확인
 helm install k6-platform ./helm/k6-platform \
@@ -787,14 +790,17 @@ postgresql:
 ### 보안 모범 사례
 
 1. **환경 변수 관리**
+
    - 프로덕션 환경변수는 절대 코드 저장소에 커밋하지 않음
    - Kubernetes Secrets 또는 AWS Secrets Manager 사용 권장
 
 2. **네트워크 보안**
+
    - 서비스 간 통신은 내부 네트워크로 제한
    - 외부 접근이 필요한 경우 VPN 또는 Private Link 사용
 
 3. **접근 제어**
+
    - 최소 권한 원칙 적용
    - K6 사용자는 k6 데이터베이스에만 접근 가능
 
