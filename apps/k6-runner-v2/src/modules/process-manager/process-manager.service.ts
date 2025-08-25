@@ -7,6 +7,8 @@ import { ConfigService } from '../config/config.service';
 import { parseDuration, parseTimeString } from '../../utils/time';
 import { CONSTANTS } from '../../utils/constants';
 
+const execAsync = promisify(exec);
+
 export class ProcessManagerService {
   private testProgress: Map<string, TestProgress> = new Map();
   private errorBuffers: Map<string, string> = new Map();
@@ -30,15 +32,22 @@ export class ProcessManagerService {
     scenario: string;
     httpMethod: string;
   }): Promise<{ process: ChildProcess; dashboardEnabled: boolean }> => {
+    console.warn(`[DEBUG] Starting spawnProcess for testId: ${testId}`);
+    console.warn(`[DEBUG] Script path: ${scriptPath}`);
+    console.warn(`[DEBUG] Target URL: ${targetUrl}`);
+
     this.errorBuffers.set(testId, '');
 
     // Get InfluxDB 3.x configuration
     const influxConfig = this.configService.getInfluxDbConfig();
-    
+    console.warn(
+      `[DEBUG] InfluxDB Config - URL: ${influxConfig.url}, Org: ${influxConfig.org}, Bucket: ${influxConfig.bucket}, Token exists: ${!!influxConfig.token}`,
+    );
+
     // xk6-output-influxdb format for InfluxDB 3.x
     const influxdbOutput = `xk6-influxdb=${influxConfig.url}`;
     const k6Args = ['run', '--out', influxdbOutput, '--tag', `testId=${testId}`];
-    
+
     // Create isolated environment variables for this K6 process
     // This ensures each test has its own environment without affecting the global process.env
     const k6Env = {
@@ -54,18 +63,54 @@ export class ProcessManagerService {
     const dashboardActuallyEnabled = await this.setupDashboard(enableDashboard, k6Args, k6Env);
     k6Args.push(scriptPath);
 
+    // Check if k6 binary exists before spawning
+    try {
+      const { stdout: k6Path } = await execAsync('which k6');
+      console.warn(`[DEBUG] K6 binary found at: ${k6Path.trim()}`);
+      const { stdout: k6Version } = await execAsync('k6 version');
+      console.warn(`[DEBUG] K6 version: ${k6Version.trim()}`);
+    } catch (error) {
+      console.error(`[ERROR] K6 binary check failed:`, error);
+      console.error(`[ERROR] PATH environment: ${process.env.PATH}`);
+    }
+
     console.warn(`K6 command: k6 ${k6Args.join(' ')}`);
-    this.k6Process = spawn('k6', k6Args, { env: k6Env });
+    console.warn(`[DEBUG] Environment variables being passed to K6:`);
+    console.warn(`[DEBUG] - K6_INFLUXDB_ORGANIZATION: ${k6Env.K6_INFLUXDB_ORGANIZATION}`);
+    console.warn(`[DEBUG] - K6_INFLUXDB_BUCKET: ${k6Env.K6_INFLUXDB_BUCKET}`);
+    console.warn(`[DEBUG] - K6_INFLUXDB_TOKEN exists: ${!!k6Env.K6_INFLUXDB_TOKEN}`);
+
+    try {
+      this.k6Process = spawn('k6', k6Args, { env: k6Env });
+      console.warn(`[DEBUG] K6 process spawned successfully, PID: ${this.k6Process.pid}`);
+    } catch (spawnError) {
+      console.error(`[ERROR] Failed to spawn K6 process:`, spawnError);
+      throw spawnError;
+    }
 
     this.k6Process.stderr?.on('data', (data) => {
       const current = this.errorBuffers.get(testId) || '';
       this.errorBuffers.set(testId, current + data.toString());
-      console.error(`k6 stderr: ${data.toString()}`);
+      console.error(`[K6 STDERR] TestId ${testId}: ${data.toString()}`);
+      // Check for common K6 errors
+      const errorStr = data.toString();
+      if (errorStr.includes('connection refused') || errorStr.includes('ECONNREFUSED')) {
+        console.error(`[ERROR] K6 connection refused - likely InfluxDB connection issue`);
+      }
+      if (errorStr.includes('unauthorized') || errorStr.includes('401')) {
+        console.error(`[ERROR] K6 unauthorized - likely token issue`);
+      }
     });
 
     this.k6Process.stdout?.on('data', (data) => {
       const output = data.toString();
-      console.warn(`k6 stdout: ${output}`);
+      console.warn(`[K6 STDOUT] TestId ${testId}: ${output}`);
+      // Log when progress is being updated
+      if (output.includes('running') || output.includes('VUs')) {
+        console.warn(`[DEBUG] Progress update detected for testId ${testId}`);
+        console.warn(`[DEBUG] Current testProgress Map size: ${this.testProgress.size}`);
+        console.warn(`[DEBUG] TestIds in Map: ${Array.from(this.testProgress.keys()).join(', ')}`);
+      }
     });
 
     this.k6Process.on('exit', async (code, signal) => {
@@ -221,6 +266,7 @@ export class ProcessManagerService {
     if (runningMatch || iterationMatch || percentMatch || altPercentMatch) {
       // 초기화
       if (!this.testProgress.has(testId)) {
+        console.warn(`[DEBUG] Initializing progress for testId: ${testId}`);
         this.testProgress.set(testId, {
           startTime: new Date(),
           currentTime: '0s',
@@ -231,6 +277,9 @@ export class ProcessManagerService {
           percentage: 0,
           status: 'running',
         });
+        console.warn(
+          `[DEBUG] Progress initialized. Map now contains: ${Array.from(this.testProgress.keys()).join(', ')}`,
+        );
       }
 
       const progress = this.testProgress.get(testId)!;
@@ -269,13 +318,37 @@ export class ProcessManagerService {
 
   // * 진행 상태 조회
   getProgress = (testId: string): TestProgress | null => {
-    return this.testProgress.get(testId) || null;
+    console.warn(`[DEBUG] getProgress called for testId: ${testId}`);
+    console.warn(`[DEBUG] Current testProgress Map size: ${this.testProgress.size}`);
+    console.warn(
+      `[DEBUG] Available testIds in Map: ${Array.from(this.testProgress.keys()).join(', ')}`,
+    );
+
+    const progress = this.testProgress.get(testId);
+    if (progress) {
+      console.warn(`[DEBUG] Progress found for ${testId}:`, JSON.stringify(progress));
+    } else {
+      console.warn(`[WARNING] No progress found for testId: ${testId}`);
+      console.warn(
+        `[DEBUG] Map contents:`,
+        Array.from(this.testProgress.entries()).map(([id, p]) => ({ id, status: p.status })),
+      );
+    }
+
+    return progress || null;
   };
 
   // * 테스트 정리
   cleanupTest = async (testId: string) => {
+    console.warn(`[DEBUG] Cleaning up test ${testId}`);
+    console.warn(
+      `[DEBUG] Before cleanup - Map size: ${this.testProgress.size}, Contains testId: ${this.testProgress.has(testId)}`,
+    );
+
     // 진행 상태 정리
     this.testProgress.delete(testId);
+
+    console.warn(`[DEBUG] After cleanup - Map size: ${this.testProgress.size}`);
 
     // 에러 버퍼 정리
     this.errorBuffers.delete(testId);
