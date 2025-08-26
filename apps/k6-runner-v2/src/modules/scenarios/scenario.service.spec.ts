@@ -5,7 +5,7 @@ import { RampPattern } from '../../types/scenario.types';
 describe('ScenarioService', () => {
   let scenarioService: ScenarioService;
 
-  // Test data constants
+  // 테스트 데이터 상수
   const TEST_DATA = {
     VU: 100,
     DURATION: 100,
@@ -248,17 +248,19 @@ describe('ScenarioService with mocked dependencies', () => {
   });
 
   it('should restore original implementation after test', () => {
-    // Save reference to verify mock was applied
+    // 모의 구현이 적용되었는지 확인하기 위해 참조 저장
     mockScenarioConfig.mockReturnValue({ description: 'test', executor: 'test' });
-    
-    // Mock should work
+
+    // 모의 구현 작동 확인
     const mockedResult = scenarioService.getScenarioConfig('test');
     expect(mockedResult).toEqual({ description: 'test', executor: 'test' });
-    
-    // Restore original implementation
+
+    // 원래 구현 복원
     mockScenarioConfig.mockRestore();
-    
-    // After restore, it should use original implementation and throw for invalid scenario
-    expect(() => scenarioService.getScenarioConfig('invalid')).toThrow('Scenario invalid not found');
+
+    // 복원 후 원래 구현 사용 및 유효하지 않은 시나리오 예외 확인
+    expect(() => scenarioService.getScenarioConfig('invalid')).toThrow(
+      'Scenario invalid not found',
+    );
   });
 });

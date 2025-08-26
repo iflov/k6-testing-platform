@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+
 import { sanitizeString as sanitizeStr } from '../utils';
 
 export const sanitizeString = (req: Request, _res: Response, next: NextFunction) => {

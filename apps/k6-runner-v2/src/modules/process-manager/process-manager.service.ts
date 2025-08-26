@@ -53,21 +53,21 @@ export class ProcessManagerService {
       });
     }
 
-    // Get InfluxDB 3.x configuration
+    // InfluxDB 3.x 설정 조회
     const influxConfig = this.configService.getInfluxDbConfig();
     console.warn(
       `[DEBUG] InfluxDB Config - URL: ${influxConfig.url}, Org: ${influxConfig.org}, Bucket: ${influxConfig.bucket}, Token exists: ${!!influxConfig.token}`,
     );
 
-    // xk6-output-influxdb format for InfluxDB 3.x
+    // InfluxDB 3.x xk6-output-influxdb 포맷
     const influxdbOutput = `xk6-influxdb=${influxConfig.url}`;
     const k6Args = ['run', '--out', influxdbOutput, '--tag', `testId=${testId}`];
 
-    // Create isolated environment variables for this K6 process
-    // This ensures each test has its own environment without affecting the global process.env
+    // 이 프로세스에 대한 격리된 환경 변수 생성
+    // 이는 각 테스트가 전역 process.env에 영향을 주지 않기 위해서 따로 정의
     const k6Env = {
       ...process.env,
-      // xk6-output-influxdb specific environment variables
+      // xk6-output-influxdb 특정 환경 변수
       K6_INFLUXDB_ORGANIZATION: influxConfig.org,
       K6_INFLUXDB_BUCKET: influxConfig.bucket,
       K6_INFLUXDB_TOKEN: influxConfig.token,
@@ -78,7 +78,7 @@ export class ProcessManagerService {
     const dashboardActuallyEnabled = await this.setupDashboard(enableDashboard, k6Args, k6Env);
     k6Args.push(scriptPath);
 
-    // Check if k6 binary exists before spawning
+    // k6 바이너리 존재 여부 확인
     try {
       const { stdout: k6Path } = await execAsync('which k6');
       console.warn(`[DEBUG] K6 binary found at: ${k6Path.trim()}`);
@@ -107,7 +107,7 @@ export class ProcessManagerService {
       const current = this.errorBuffers.get(testId) || '';
       this.errorBuffers.set(testId, current + data.toString());
       console.error(`[K6 STDERR] TestId ${testId}: ${data.toString()}`);
-      // Check for common K6 errors
+      // 일반적인 K6 오류 확인
       const errorStr = data.toString();
       if (errorStr.includes('connection refused') || errorStr.includes('ECONNREFUSED')) {
         console.error(`[ERROR] K6 connection refused - likely InfluxDB connection issue`);
@@ -120,7 +120,7 @@ export class ProcessManagerService {
     this.k6Process.stdout?.on('data', (data) => {
       const output = data.toString();
       console.warn(`[K6 STDOUT] TestId ${testId}: ${output}`);
-      // Log when progress is being updated
+      // 진행 상태 업데이트 시 로그 기록
       if (output.includes('running') || output.includes('VUs')) {
         console.warn(`[DEBUG] Progress update detected for testId ${testId}`);
         console.warn(`[DEBUG] Current testProgress Map size: ${this.testProgress.size}`);
@@ -143,7 +143,7 @@ export class ProcessManagerService {
         scriptPath,
       });
 
-      // 정리
+      // 에러 버퍼 정리
       this.errorBuffers.delete(testId);
     });
 

@@ -62,14 +62,12 @@ export class TestController {
       const { testId } = req.params;
 
       if (testId) {
-        // Get progress for specific test ID
         const progress = this.testService.getProgressById(testId);
         return res.status(200).json({
           testId,
           progress,
         });
       } else {
-        // Get progress for current test
         const currentTest = this.testService.getCurrentTest();
         const currentTestId = currentTest?.testId;
         const progress = currentTestId ? this.testService.getProgressById(currentTestId) : null;

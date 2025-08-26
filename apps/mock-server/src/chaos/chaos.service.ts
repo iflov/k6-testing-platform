@@ -13,7 +13,7 @@ export interface ChaosConfig {
 export class ChaosService implements OnModuleDestroy {
   private config: ChaosConfig = {
     enabled: false,
-    errorRate: 0.1, // 10% default
+    errorRate: 0.1, // 10% 기본값
     statusCodes: [400, 500, 503],
     delayMin: 0,
     delayMax: 0,
@@ -27,10 +27,10 @@ export class ChaosService implements OnModuleDestroy {
     const rate = errorRate ?? this.config.errorRate;
     const codes = statusCodes ?? this.config.statusCodes;
 
-    // Generate random number between 0 and 1
+    // 0과 1 사이의 랜덤 숫자 생성
     const random = Math.random();
 
-    // If random is less than error rate, throw an error
+    // 랜덤 숫자가 에러 비율보다 작으면 에러 발생
     if (random < rate) {
       const statusCode = codes[Math.floor(Math.random() * codes.length)];
       const errorMessages = {
@@ -51,13 +51,13 @@ export class ChaosService implements OnModuleDestroy {
           message:
             errorMessages[statusCode] || `Error ${statusCode} - Simulated`,
           timestamp: new Date(),
-          chaos: true, // Flag to indicate this is a simulated error
+          chaos: true, // 시뮬레이션된 에러 표시
         },
         statusCode,
       );
     }
 
-    // Apply random delay if configured
+    // 설정된 랜덤 지연 적용
     if (this.config.delayMin || this.config.delayMax) {
       const delay =
         Math.random() *
@@ -66,7 +66,7 @@ export class ChaosService implements OnModuleDestroy {
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
-    // Return success response
+    // 성공 응답 반환
     return {
       statusCode: 200,
       error: false,
@@ -85,13 +85,13 @@ export class ChaosService implements OnModuleDestroy {
     return this.config;
   }
 
-  // Check if error should be triggered based on current config
+  // 현재 설정에 따라 에러 발생 여부 확인
   shouldTriggerError(): boolean {
     if (!this.config.enabled) return false;
     return Math.random() < this.config.errorRate;
   }
 
-  // Get random error status code from config
+  // 설정에서 랜덤 에러 상태 코드 가져오기
   getRandomErrorCode(): number {
     const codes = this.config.statusCodes;
     return codes[Math.floor(Math.random() * codes.length)];
@@ -110,7 +110,7 @@ export class ChaosService implements OnModuleDestroy {
       console.log(`📍 Shutdown time: ${new Date().toISOString()}`);
       console.log(`🔴 Process PID: ${process.pid}`);
 
-      // Force immediate exit
+      // 강제 종료
       process.exit(1);
     }, delay);
 

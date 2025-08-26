@@ -10,7 +10,7 @@ export class ChaosController {
     @Query('errorRate') errorRate?: string,
     @Query('statusCodes') statusCodes?: string,
   ) {
-    const rate = errorRate ? parseFloat(errorRate) : 0.1; // Default 10% error rate
+    const rate = errorRate ? parseFloat(errorRate) : 0.1; // 기본값 10% 에러 비율
     const codes = statusCodes
       ? statusCodes.split(',').map(Number)
       : [400, 500, 503];

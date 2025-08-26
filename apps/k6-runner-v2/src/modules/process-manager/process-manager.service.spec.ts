@@ -3,7 +3,7 @@ import { ProcessManagerService } from './process-manager.service';
 import { ConfigService } from '../config/config.service';
 import { CurrentTest } from '../../types/test.types';
 
-// Mock child_process
+// Mock child_process 모듈
 jest.mock('child_process', () => ({
   spawn: jest.fn(),
   exec: jest.fn((_cmd, callback) => {
@@ -11,7 +11,7 @@ jest.mock('child_process', () => ({
   }),
 }));
 
-// Mock fs/promises
+// Mock fs/promises 모듈
 jest.mock('fs/promises', () => ({
   readFile: jest.fn().mockResolvedValue('mock file content'),
   writeFile: jest.fn().mockResolvedValue(undefined),
@@ -19,7 +19,7 @@ jest.mock('fs/promises', () => ({
   access: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock util
+// Mock util 모듈
 jest.mock('util', () => ({
   promisify: jest.fn(() => jest.fn().mockResolvedValue({ stdout: '', stderr: '' })),
 }));
@@ -30,11 +30,11 @@ describe('ProcessManagerService', () => {
   let mockProcess: Partial<ChildProcess>;
 
   beforeEach(() => {
-    // Suppress console warnings during tests
+    // 테스트 중 콘솔 경고 억제
     jest.spyOn(console, 'warn').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
-    
-    // Mock ConfigService
+
+    // Mock ConfigService 모듈
     configService = {
       getInfluxDbUrl: jest.fn().mockReturnValue('http://localhost:8181'),
       getK6DashboardPort: jest.fn().mockReturnValue('5665'),
@@ -48,7 +48,7 @@ describe('ProcessManagerService', () => {
       }),
     } as unknown as ConfigService;
 
-    // Mock ChildProcess
+    // Mock ChildProcess 모듈
     mockProcess = {
       stdout: {
         on: jest.fn(),
@@ -153,7 +153,7 @@ describe('ProcessManagerService', () => {
 
       processManagerService.handleProcessOutput(mockProcess as ChildProcess, testId, currentTest);
 
-      // Simulate stdout data
+      // stdout 데이터 시뮬레이션
       const stdoutOn = (mockProcess.stdout as unknown as Record<string, unknown>).on as jest.Mock;
       const stdoutCallback = stdoutOn.mock.calls[0][1];
       stdoutCallback(Buffer.from('running (10s), 5/10 VUs'));
@@ -197,7 +197,7 @@ describe('ProcessManagerService', () => {
 
       expect(timeoutId).toBeDefined();
 
-      // Fast-forward time
+      // 테스트 이후 60초 경과
       jest.advanceTimersByTime(60000); // 60 seconds (30s + buffer)
 
       expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM');
@@ -208,10 +208,10 @@ describe('ProcessManagerService', () => {
     it('should return test progress', () => {
       const testId = 'test-123';
 
-      // Initially no progress
+      // 초기 진행 상태 없음
       expect(processManagerService.getProgress(testId)).toBeNull();
 
-      // Simulate adding progress
+      // 진행 상태 시뮬레이션
       const currentTest: CurrentTest = {
         testId,
         process: mockProcess as ChildProcess,
@@ -226,7 +226,7 @@ describe('ProcessManagerService', () => {
 
       processManagerService.handleProcessOutput(mockProcess as ChildProcess, testId, currentTest);
 
-      // Simulate progress update
+      // 진행 상태 시뮬레이션
       const stdoutOn = (mockProcess.stdout as unknown as Record<string, unknown>).on as jest.Mock;
       const stdoutCallback = stdoutOn.mock.calls[0][1];
       stdoutCallback(Buffer.from('running (10s), 5/10 VUs'));

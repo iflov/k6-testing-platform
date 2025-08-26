@@ -107,7 +107,7 @@ describe('PerformanceService', () => {
         results.push(await promise);
       }
 
-      // All durations should be within range (accounting for timer precision)
+      // 모든 지연 시간이 범위 내에 있어야 함 (타이머 정밀도 고려)
       results.forEach((result) => {
         expect(result.metrics.duration).toBeGreaterThanOrEqual(100);
         expect(result.metrics.duration).toBeLessThanOrEqual(200);
@@ -119,7 +119,7 @@ describe('PerformanceService', () => {
     it('should demonstrate race condition', async () => {
       jest.useFakeTimers();
 
-      // 동시에 여러 요청 실행
+      // 동시에 여러 요청 실행 (race condition 테스트)
       const promises = Array(5)
         .fill(null)
         .map(() => {
@@ -130,14 +130,14 @@ describe('PerformanceService', () => {
 
       const results = await Promise.all(promises);
 
-      // 카운터가 증가해야 함
+      // 마지막 요청의 반복 횟수가 증가해야 함
       const lastResult = results[results.length - 1];
       expect(lastResult.metrics.iterations).toBeGreaterThan(0);
       expect(lastResult.statusCode).toBe(200);
       expect(lastResult.error).toBe(false);
     });
 
-    it('should increment counter on each call', async () => {
+    it('should increment iterations on each call', async () => {
       jest.useFakeTimers();
 
       const first = service.getConcurrencyIssue();

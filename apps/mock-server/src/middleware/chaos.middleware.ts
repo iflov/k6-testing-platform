@@ -4,7 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 @Injectable()
 export class ChaosMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    // Check if chaos is enabled via query parameters
+    // 쿼리 파라미터로 카오스 활성화 여부 확인 (k6-runner-v2)
     const chaosEnabled = req.query.chaos === 'true';
     const errorRate = req.query.errorRate
       ? parseFloat(req.query.errorRate as string)
@@ -13,7 +13,7 @@ export class ChaosMiddleware implements NestMiddleware {
       ? (req.query.statusCodes as string).split(',').map(Number)
       : [400, 500, 503];
 
-    // Check if chaos is enabled via headers
+    // 헤더로 카오스 활성화 여부 확인
     const headerChaosEnabled = req.headers['x-chaos-enabled'] === 'true';
     const headerErrorRate = req.headers['x-chaos-error-rate']
       ? parseFloat(req.headers['x-chaos-error-rate'] as string)
@@ -22,7 +22,7 @@ export class ChaosMiddleware implements NestMiddleware {
       ? (req.headers['x-chaos-status-codes'] as string).split(',').map(Number)
       : [400, 500, 503];
 
-    // Use query params first, then headers
+    // 쿼리 파라미터 먼저 사용, 그 다음 헤더 사용
     const shouldApplyChaos = chaosEnabled || headerChaosEnabled;
     const finalErrorRate = chaosEnabled ? errorRate : headerErrorRate;
     const finalStatusCodes = chaosEnabled ? statusCodes : headerStatusCodes;

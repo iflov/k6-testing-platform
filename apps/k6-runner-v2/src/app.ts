@@ -54,11 +54,11 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 app.get('/ready', async (_req: Request, res: Response) => {
-  // Check actual dependencies
+  // 실제 의존성 확인
   let influxReady = false;
   let mockServerReady = false;
 
-  // Check InfluxDB connection
+  // InfluxDB 연결 확인
   if (process.env.INFLUXDB_URL) {
     try {
       const influxResponse = await fetch(`${process.env.INFLUXDB_URL}/ping`, {
@@ -71,7 +71,7 @@ app.get('/ready', async (_req: Request, res: Response) => {
     }
   }
 
-  // Check Mock Server connection
+  // Mock Server 연결 확인
   if (process.env.MOCK_SERVER_URL) {
     try {
       const mockResponse = await fetch(`${process.env.MOCK_SERVER_URL}/health`, {
@@ -84,8 +84,8 @@ app.get('/ready', async (_req: Request, res: Response) => {
     }
   }
 
-  const isReady = (!process.env.INFLUXDB_URL || influxReady) && 
-                  (!process.env.MOCK_SERVER_URL || mockServerReady);
+  const isReady =
+    (!process.env.INFLUXDB_URL || influxReady) && (!process.env.MOCK_SERVER_URL || mockServerReady);
 
   const response: HealthCheckResponse = {
     status: isReady ? 'healthy' : 'unhealthy',
@@ -134,39 +134,39 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on ${PORT} port`);
 });
 
-// Graceful shutdown handling
+// 그레이스풀 다운 처리
 let isShuttingDown = false;
 
 const gracefulShutdown = (signal: string) => {
   if (isShuttingDown) return;
-  
+
   console.log(`\n${signal} received: starting graceful shutdown`);
   isShuttingDown = true;
 
-  // Stop accepting new requests
+  // 새로운 요청 수락 중단
   server.close(() => {
     console.log('HTTP server closed');
-    
-    // Clean up any active K6 processes
+
+    // 활성 K6 프로세스 정리
     const { testService } = container;
-    
-    // Stop any running tests
+
+    // 실행 중인 테스트 중단
     if (testService) {
       console.log('Stopping active K6 processes...');
       testService.stopTest();
     }
-    
+
     console.log('Graceful shutdown completed');
     process.exit(0);
   });
 
-  // Force shutdown after 30 seconds
+  // 30초 후 강제 종료
   setTimeout(() => {
     console.error('Could not close connections in time, forcefully shutting down');
     process.exit(1);
   }, 30000);
 };
 
-// Listen for termination signals
+// 종료 신호 수신 대기
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));

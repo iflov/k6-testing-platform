@@ -1,17 +1,21 @@
 export class ConfigService {
   private static instance: ConfigService;
 
+  // 현재 애플리케이션 환경
   private environment: string;
   private isDevelopment: boolean;
   private isProduction: boolean;
+  // InfluxDB 3.x 설정
   private influxdbUrl!: string;
-  // InfluxDB 3.x authentication only
   private influxdbToken!: string;
   private influxdbOrg!: string;
   private influxdbBucket!: string;
+  // Mock Server 설정
   private mockServerUrl!: string;
+  // K6 Dashboard 설정
   private k6DashboardPort!: string;
   private k6DashboardHost!: string;
+  // K6 Dashboard 주기
   private k6DashboardPeriod!: string;
 
   static getInstance(): ConfigService {
@@ -44,15 +48,15 @@ export class ConfigService {
   }
 
   private initializeConfig() {
-    // Detect environment
+    // 환경 감지
     const isK8s = process.env.KUBERNETES_SERVICE_HOST !== undefined;
 
     if (this.isDevelopment) {
-      // Dynamic URL based on environment
+      // 환경에 따라 동적 URL 설정
       this.influxdbUrl =
         process.env.INFLUXDB_URL ||
         (isK8s ? 'http://influxdb-service:8181' : 'http://influxdb:8181');
-      // InfluxDB 3.x authentication (required)
+      // InfluxDB 3.x 인증 (필수)
       this.influxdbToken = process.env.INFLUXDB_TOKEN || 'dev-token-for-testing';
       this.influxdbOrg = process.env.INFLUXDB_ORG || 'k6org';
       this.influxdbBucket = process.env.INFLUXDB_BUCKET || 'k6';
@@ -63,9 +67,7 @@ export class ConfigService {
       this.k6DashboardHost = process.env.K6_DASHBOARD_HOST || '0.0.0.0';
       this.k6DashboardPeriod = process.env.K6_DASHBOARD_PERIOD || '1s';
     } else {
-      // In production, URL must be provided via environment variable
       this.influxdbUrl = this.assertEnvVar('INFLUXDB_URL');
-      // InfluxDB 3.x authentication (required in production)
       this.influxdbToken = this.assertEnvVar('INFLUXDB_TOKEN');
       this.influxdbOrg = process.env.INFLUXDB_ORG || 'k6org';
       this.influxdbBucket = process.env.INFLUXDB_BUCKET || 'k6';
@@ -91,7 +93,7 @@ export class ConfigService {
     });
   }
 
-  // Public getters for non-sensitive configs
+  // 민감하지 않은 설정 가져오기
   getMockServerUrl(): string {
     return this.mockServerUrl;
   }
@@ -120,8 +122,8 @@ export class ConfigService {
     return this.influxdbBucket;
   }
 
-  // Internal method to get token for InfluxDB operations
-  // Not exposed publicly for security
+  // InfluxDB 작업을 위한 토큰 가져오기
+  // 보안상 공개하지 않음
   getInfluxDbConfig(): { token: string; org: string; bucket: string; url: string } {
     return {
       token: this.influxdbToken,
@@ -131,7 +133,7 @@ export class ConfigService {
     };
   }
 
-  // Check environment
+  // 환경 확인
   getIsDevelopment(): boolean {
     return this.isDevelopment;
   }
