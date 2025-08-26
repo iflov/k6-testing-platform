@@ -150,7 +150,7 @@ async function queryInfluxDb3HttpReqs(
 async function queryInfluxDb3VUs(timeRange: string, testId: string | null) {
   const testIdFilter = testId ? `AND "testId" = '${testId}'` : "";
 
-  // Get current value with separate query
+  // 현재 가상유저 (VU) 가져오는 쿼리
   const currentQuery = `
     SELECT value as current
     FROM vus
@@ -159,7 +159,7 @@ async function queryInfluxDb3VUs(timeRange: string, testId: string | null) {
     LIMIT 1
   `;
 
-  // Get max value with separate query
+  // 최대 가상유저 (VU) 가져오는 쿼리
   const maxQuery = `
     SELECT MAX(value) as max
     FROM vus

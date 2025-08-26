@@ -36,7 +36,7 @@ export default function TestProgress({ testId, isRunning }: TestProgressProps) {
           : `/api/k6/progress`;
 
         const response = await fetch(endpoint);
-        
+
         if (!response.ok) {
           throw new Error("Failed to fetch progress");
         }

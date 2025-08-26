@@ -78,7 +78,7 @@ export default function TestController({
     urlPath: "/health",
     httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
     requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
-    enableDashboard: true,  // 항상 대시보드 활성화
+    enableDashboard: true, // 항상 대시보드 활성화
     // Error simulation settings
     enableErrorSimulation: false,
     errorRate: 10, // percentage
@@ -98,11 +98,11 @@ export default function TestController({
 
   const handleStart = async () => {
     // Warning for chaos shutdown endpoint
-    if (config.urlPath === '/chaos/shutdown') {
+    if (config.urlPath === "/chaos/shutdown") {
       const confirmed = confirm(
-        '⚠️ 경고: 이 엔드포인트는 Mock 서버를 종료시킵니다!\n' +
-        '서버가 종료되면 진행 중인 테스트는 실패하게 됩니다.\n' +
-        '정말로 계속하시겠습니까?'
+        "⚠️ 경고: 이 엔드포인트는 Mock 서버를 종료시킵니다!\n" +
+          "서버가 종료되면 진행 중인 테스트는 실패하게 됩니다.\n" +
+          "정말로 계속하시겠습니까?"
       );
       if (!confirmed) return;
     }

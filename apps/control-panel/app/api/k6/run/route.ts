@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         urlPath: urlPath,
         httpMethod: httpMethod || "GET",
         requestBody: requestBody,
-        enableDashboard: enableDashboard, // Dashboard는 필요시에만 활성화
+        enableDashboard: enableDashboard,
         enableErrorSimulation: enableErrorSimulation,
         errorRate: errorRate,
         errorTypes: errorTypes,
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     const result = await response.json();
     const testId = result.testId || Date.now().toString();
 
-    // Save test run to PostgreSQL
+    // DB에 테스트 실행 정보 저장
     try {
       const testRun = await prisma.testRun.create({
         data: {
@@ -80,17 +80,19 @@ export async function POST(request: NextRequest) {
 
       console.log("Test run saved to database:", testRun.id);
 
-      // If this is a chaos/shutdown endpoint, log it
-      if (urlPath && urlPath.includes('/chaos/shutdown')) {
+      // 카오스 shutdown(서버 종료) 엔드포인트인 경우 로그 출력
+      if (urlPath && urlPath.includes("/chaos/shutdown")) {
         console.log("⚠️ CHAOS SHUTDOWN TEST STARTED!");
         console.log("  - Test ID:", testId);
         console.log("  - Target URL:", targetUrl || config.mockServerUrl);
         console.log("  - Endpoint:", urlPath);
-        console.log("  - Expected behavior: Mock server will shutdown after first request");
+        console.log(
+          "  - Expected behavior: Mock server will shutdown after first request"
+        );
       }
     } catch (dbError) {
       console.error("Failed to save test run to database:", dbError);
-      // Continue even if DB save fails - we don't want to stop the test
+      // DB 저장 실패 시 테스트 실행 계속 진행
     }
 
     return NextResponse.json({

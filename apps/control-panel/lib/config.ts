@@ -5,6 +5,10 @@
 export class Config {
   private static instance: Config;
 
+  // TODO DatabaseURL 추가
+  // TODO port 추가 ( NextJs에서는 어디서 port 설정하는지도 확인 )
+  // TODO appVersion이 필요하다면 appVersion 추가
+
   // K6 Runner 관련 설정
   public readonly k6RunnerBaseUrl: string;
   public readonly k6RunnerTestStartUrl: string;

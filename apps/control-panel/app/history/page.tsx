@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import TestHistory from '@/components/TestHistory';
+import TestHistory from "@/components/TestHistory";
 
 export default function HistoryPage() {
   return (
@@ -8,10 +8,11 @@ export default function HistoryPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Test History</h1>
         <p className="text-gray-600 mt-2">
-          View and analyze all your past test results. Click on any test to see detailed metrics and performance data.
+          View and analyze all your past test results. Click on any test to see
+          detailed metrics and performance data.
         </p>
       </div>
-      
+
       <TestHistory />
     </main>
   );

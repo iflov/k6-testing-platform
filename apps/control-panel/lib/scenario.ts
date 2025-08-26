@@ -52,9 +52,10 @@ export const scenarioConfigs: Record<ScenarioId, ScenarioMetadata> = {
     defaultDuration: "5m",
     supportedModes: {
       duration: { enabled: true },
-      iterations: { 
-        enabled: false, 
-        tooltip: "Load test requires duration-based execution for proper ramp patterns" 
+      iterations: {
+        enabled: false,
+        tooltip:
+          "Load test requires duration-based execution for proper ramp patterns",
       },
       hybrid: { enabled: true },
     },
@@ -69,13 +70,15 @@ export const scenarioConfigs: Record<ScenarioId, ScenarioMetadata> = {
     defaultDuration: "10m",
     supportedModes: {
       duration: { enabled: true },
-      iterations: { 
-        enabled: false, 
-        tooltip: "Stress test requires duration-based execution for gradual load increase" 
+      iterations: {
+        enabled: false,
+        tooltip:
+          "Stress test requires duration-based execution for gradual load increase",
       },
-      hybrid: { 
-        enabled: false, 
-        tooltip: "Stress test uses staged approach incompatible with hybrid mode" 
+      hybrid: {
+        enabled: false,
+        tooltip:
+          "Stress test uses staged approach incompatible with hybrid mode",
       },
     },
     useStages: true,
@@ -89,13 +92,13 @@ export const scenarioConfigs: Record<ScenarioId, ScenarioMetadata> = {
     defaultDuration: "5m",
     supportedModes: {
       duration: { enabled: true },
-      iterations: { 
-        enabled: false, 
-        tooltip: "Spike test requires precise timing control" 
+      iterations: {
+        enabled: false,
+        tooltip: "Spike test requires precise timing control",
       },
-      hybrid: { 
-        enabled: false, 
-        tooltip: "Spike patterns incompatible with hybrid execution" 
+      hybrid: {
+        enabled: false,
+        tooltip: "Spike patterns incompatible with hybrid execution",
       },
     },
     useStages: true,
@@ -124,13 +127,13 @@ export const scenarioConfigs: Record<ScenarioId, ScenarioMetadata> = {
     defaultDuration: "20m",
     supportedModes: {
       duration: { enabled: true },
-      iterations: { 
-        enabled: false, 
-        tooltip: "Breakpoint test requires continuous load increase" 
+      iterations: {
+        enabled: false,
+        tooltip: "Breakpoint test requires continuous load increase",
       },
-      hybrid: { 
-        enabled: false, 
-        tooltip: "Breakpoint test uses ramping VU executor" 
+      hybrid: {
+        enabled: false,
+        tooltip: "Breakpoint test uses ramping VU executor",
       },
     },
     useStages: true,
@@ -153,10 +156,15 @@ export const getScenarioConfig = (id: ScenarioId): ScenarioMetadata => {
 };
 
 // K6 Executor 설정 생성을 위한 헬퍼 함수
-export const getExecutorStrategy = (scenario: ScenarioMetadata, executionMode: ExecutionMode) => {
+export const getExecutorStrategy = (
+  scenario: ScenarioMetadata,
+  executionMode: ExecutionMode
+) => {
   // 시나리오와 실행 모드에 따른 전략 반환
   if (!scenario.supportedModes[executionMode].enabled) {
-    throw new Error(`Execution mode '${executionMode}' is not supported for scenario '${scenario.id}'`);
+    throw new Error(
+      `Execution mode '${executionMode}' is not supported for scenario '${scenario.id}'`
+    );
   }
 
   return {

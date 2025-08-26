@@ -15,7 +15,7 @@ export async function GET(
       );
     }
 
-    // Use environment variable or default to localhost for development
+    // 환경변수 가져오기
     const config = Config.getInstance();
     const k6RunnerUrl = config.k6RunnerBaseUrl;
     const endpoint = `${k6RunnerUrl}/api/test/progress/${testId}`;
@@ -24,12 +24,12 @@ export async function GET(
       `[Progress API] Fetching progress for test ${testId} from: ${endpoint}`
     );
 
-    // Forward request to K6 Runner service
+    // 현재 테스트 진행도 가져오는 API 요청
     const response = await fetch(endpoint, {
       headers: {
         "Content-Type": "application/json",
       },
-      // Don't cache progress data
+      // Progress 데이터 캐시 비활성화
       cache: "no-store",
     });
 
@@ -38,7 +38,7 @@ export async function GET(
         `[Progress API] K6 Runner returned ${response.status}: ${response.statusText}`
       );
 
-      // If 404, test might not exist or have no progress yet
+      // 404 에러 처리
       if (response.status === 404) {
         return NextResponse.json(
           {
@@ -57,7 +57,7 @@ export async function GET(
 
     const data = await response.json();
 
-    // Log for debugging
+    // 디버깅 로그
     if (data.progress) {
       console.log(
         `[Progress API] Test ${testId} progress: ${data.progress.percentage}%, status: ${data.progress.status}`

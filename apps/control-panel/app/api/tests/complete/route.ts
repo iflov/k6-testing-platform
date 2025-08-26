@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/src/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/src/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,38 +7,38 @@ export async function POST(request: NextRequest) {
 
     if (!testId || !metrics) {
       return NextResponse.json(
-        { error: 'testId and metrics are required' },
+        { error: "testId and metrics are required" },
         { status: 400 }
       );
     }
 
-    // Find the test run
+    // 테스트 실행 찾기
     const testRun = await prisma.testRun.findUnique({
       where: { testId },
     });
 
     if (!testRun) {
       return NextResponse.json(
-        { error: 'Test run not found' },
+        { error: "Test run not found" },
         { status: 404 }
       );
     }
 
-    // Update test run status
+    // 테스트 실행 상태 업데이트
     const updatedTestRun = await prisma.testRun.update({
       where: { id: testRun.id },
       data: {
-        status: 'completed',
+        status: "completed",
         completedAt: new Date(),
-      }
+      },
     });
 
-    // Calculate failed requests from error rate
+    // 실패한 요청 수 계산
     const totalRequests = metrics.http_reqs?.count || 0;
     const errorRate = metrics.http_req_failed?.rate || 0;
     const failedRequests = Math.round(totalRequests * errorRate);
 
-    // Create test result
+    // 테스트 결과 생성
     const testResult = await prisma.testResult.create({
       data: {
         testRunId: testRun.id,
@@ -56,31 +56,39 @@ export async function POST(request: NextRequest) {
         maxVus: metrics.vus_max || metrics.vus || 0,
         avgIterationDuration: metrics.iteration_duration?.avg || null,
         metricsJson: metrics,
-      }
+      },
     });
 
-    // Serialize the response to handle BigInt
+    // BigInt 직렬화 처리
     return NextResponse.json({
       success: true,
-      message: 'Test results saved successfully',
+      message: "Test results saved successfully",
       testRunId: testRun.id,
       testResultId: testResult.id,
     });
   } catch (error) {
-    console.error('Failed to save test results:', error);
-    
-    // Prisma initialization error handling
-    if (error instanceof Error && error.name === 'PrismaClientInitializationError') {
-      console.error('Database connection error - please check DATABASE_URL configuration');
+    console.error("Failed to save test results:", error);
+
+    // Prisma 초기화 오류 처리
+    if (
+      error instanceof Error &&
+      error.name === "PrismaClientInitializationError"
+    ) {
+      console.error(
+        "Database connection error - please check DATABASE_URL configuration"
+      );
       return NextResponse.json(
-        { error: 'Database connection error. Please check server configuration.' },
+        {
+          error:
+            "Database connection error. Please check server configuration.",
+        },
         { status: 503 }
       );
     }
-    
-    // Generic error response without exposing internal details
+
+    // 일반적인 오류 응답 (내부 세부 정보 노출 방지)
     return NextResponse.json(
-      { error: 'Failed to save test results. Please try again later.' },
+      { error: "Failed to save test results. Please try again later." },
       { status: 500 }
     );
   }

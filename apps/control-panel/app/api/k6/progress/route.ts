@@ -3,21 +3,21 @@ import { Config } from "@/lib/config";
 
 export async function GET(_request: Request) {
   try {
-    // Use Config instance for consistency
+    // 환경변수 가져오기
     const config = Config.getInstance();
     const k6RunnerUrl = config.k6RunnerBaseUrl;
 
-    // Construct endpoint based on whether testId is provided
+    // 엔드포인트 생성
     const endpoint = `${k6RunnerUrl}/api/test/progress`;
 
     console.log(`[Progress API] Fetching from: ${endpoint}`);
 
-    // Forward request to K6 Runner service
+    // 현재 테스트 진행도 가져오는 API 요청
     const response = await fetch(endpoint, {
       headers: {
         "Content-Type": "application/json",
       },
-      // Don't cache progress data
+      // Progress 데이터 캐시 비활성화
       cache: "no-store",
     });
 
@@ -33,7 +33,7 @@ export async function GET(_request: Request) {
 
     const data = await response.json();
 
-    // Log for debugging
+    // 디버깅 로그
     if (data.progress) {
       console.log(
         `[Progress API] Progress for test ${"current"}: ${
