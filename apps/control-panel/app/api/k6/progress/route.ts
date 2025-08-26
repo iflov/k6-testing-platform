@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Config } from "@/lib/config";
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   try {
     // Use Config instance for consistency
     const config = Config.getInstance();

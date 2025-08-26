@@ -3,10 +3,10 @@ import { Config } from "@/lib/config";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
   try {
-    const { testId } = params;
+    const { testId } = await params;
 
     if (!testId) {
       return NextResponse.json(
@@ -68,15 +68,16 @@ export async function GET(
 
     return NextResponse.json(data);
   } catch (error) {
+    const { testId } = await params;
     console.error(
-      `[Progress API] Error fetching progress for test ${params.testId}:`,
+      `[Progress API] Error fetching progress for test ${testId}:`,
       error
     );
     return NextResponse.json(
       {
         error: "Failed to fetch progress",
         details: error instanceof Error ? error.message : "Unknown error",
-        testId: params.testId,
+        testId: testId,
       },
       { status: 500 }
     );
