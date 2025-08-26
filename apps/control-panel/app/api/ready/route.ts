@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { Config } from "@/lib/config";
+
+import config from "@/lib/config";
 
 interface HealthCheckResponse {
   status: "healthy" | "unhealthy" | "degraded";
@@ -12,15 +13,13 @@ interface HealthCheckResponse {
 }
 
 export async function GET() {
-  const config = Config.getInstance();
-
   // 실제 의존성 확인
   let dbReady = false;
   let k6RunnerReady = false;
   let mockServerReady = false;
 
   // DB 연결 확인
-  if (process.env.DATABASE_URL) {
+  if (config.databaseUrl) {
     try {
       // DB 연결 확인
       const { PrismaClient } = await import("@prisma/client");
@@ -56,15 +55,15 @@ export async function GET() {
   }
 
   const isReady =
-    (!process.env.DATABASE_URL || dbReady) && k6RunnerReady && mockServerReady;
+    (!config.databaseUrl || dbReady) && k6RunnerReady && mockServerReady;
 
   const response: HealthCheckResponse = {
     status: isReady ? "healthy" : "unhealthy",
     service: "control-panel",
-    version: process.env.npm_package_version || "1.0.0",
+    version: config.appVersion,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || "development",
+    environment: config.environment,
     dependencies: {
       database: {
         status: dbReady ? "healthy" : "unhealthy",
