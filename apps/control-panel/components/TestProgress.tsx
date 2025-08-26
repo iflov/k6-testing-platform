@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Config } from "@/lib/config";
 
 interface TestProgress {
   currentTime: string;
@@ -23,8 +22,6 @@ export default function TestProgress({ testId, isRunning }: TestProgressProps) {
   const [progress, setProgress] = useState<TestProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const config = Config.getInstance();
-
   useEffect(() => {
     if (!isRunning) {
       setProgress(null);
@@ -33,11 +30,13 @@ export default function TestProgress({ testId, isRunning }: TestProgressProps) {
 
     const fetchProgress = async () => {
       try {
+        // Use server-side API route instead of direct client call
         const endpoint = testId
-          ? `${config.k6RunnerBaseUrl}/api/test/progress/${testId}`
-          : `${config.k6RunnerBaseUrl}/api/test/progress`;
+          ? `/api/k6/progress/${testId}`
+          : `/api/k6/progress`;
 
         const response = await fetch(endpoint);
+        
         if (!response.ok) {
           throw new Error("Failed to fetch progress");
         }

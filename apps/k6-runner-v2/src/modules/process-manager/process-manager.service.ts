@@ -37,7 +37,7 @@ export class ProcessManagerService {
     console.warn(`[DEBUG] Target URL: ${targetUrl}`);
 
     this.errorBuffers.set(testId, '');
-    
+
     // 테스트 시작 시 Progress Map 즉시 초기화
     if (!this.testProgress.has(testId)) {
       console.warn(`[DEBUG] Pre-initializing progress for testId: ${testId} at spawn`);
@@ -189,6 +189,7 @@ export class ProcessManagerService {
 
     k6Process.stdout?.on('data', (data) => {
       const output = data.toString();
+      console.warn(`[DEBUG] Raw stdout data: ${output}`);
       outputBuffer += output;
       console.warn(`k6 stdout: ${output}`);
       this.parseK6Progress(output, testId, currentTest);
@@ -267,11 +268,12 @@ export class ProcessManagerService {
   // * k6 progress parse
   private parseK6Progress = (output: string, testId: string, currentTest: CurrentTest) => {
     // 테스트 시작 감지 패턴 추가
-    const isTestStarting = output.includes('scenarios:') || 
-                          output.includes('execution:') || 
-                          output.includes('script:') ||
-                          output.includes('web dashboard:') ||
-                          output.includes('output:');
+    const isTestStarting =
+      output.includes('scenarios:') ||
+      output.includes('execution:') ||
+      output.includes('script:') ||
+      output.includes('web dashboard:') ||
+      output.includes('output:');
 
     const runningPattern = /running \(([0-9hms.]+)\), (\d+)\/(\d+) VUs/;
     const runningMatch = output.match(runningPattern);
@@ -289,7 +291,9 @@ export class ProcessManagerService {
     if (isTestStarting || runningMatch || iterationMatch || percentMatch || altPercentMatch) {
       // 초기화
       if (!this.testProgress.has(testId)) {
-        console.warn(`[DEBUG] Initializing progress for testId: ${testId} (Test starting: ${isTestStarting})`);
+        console.warn(
+          `[DEBUG] Initializing progress for testId: ${testId} (Test starting: ${isTestStarting})`,
+        );
         this.testProgress.set(testId, {
           startTime: new Date(),
           currentTime: '0s',
