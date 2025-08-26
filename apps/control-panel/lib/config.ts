@@ -5,10 +5,6 @@
 export class Config {
   private static instance: Config;
 
-  // TODO DatabaseURL 추가
-  // TODO port 추가 ( NextJs에서는 어디서 port 설정하는지도 확인 )
-  // TODO appVersion이 필요하다면 appVersion 추가
-
   // K6 Runner 관련 설정
   public readonly k6RunnerBaseUrl: string;
   public readonly k6RunnerTestStartUrl: string;
@@ -29,6 +25,12 @@ export class Config {
   public readonly isDevelopment: boolean;
   public readonly isProduction: boolean;
   public readonly environment: string;
+
+  // Database 설정
+  public readonly databaseUrl: string;
+
+  // App Version 설정
+  public readonly appVersion: string;
 
   private constructor() {
     this.environment = process.env.NODE_ENV || "development";
@@ -63,6 +65,11 @@ export class Config {
     this.influxDbToken = process.env.INFLUXDB_TOKEN || "dev-token-for-testing";
     this.influxDbOrg = process.env.INFLUXDB_ORG || "k6org";
     this.influxDbBucket = process.env.INFLUXDB_BUCKET || "k6";
+
+    // Database 설정
+    this.databaseUrl =
+      process.env.DATABASE_URL || "postgresql://localhost:5432/k6";
+    this.appVersion = process.env.npm_package_version || "1.0.0";
 
     // 프로덕션 환경에서만 경고 로그 (빌드 시점에는 에러 발생시키지 않음)
     if (this.isProduction && typeof window !== "undefined") {
