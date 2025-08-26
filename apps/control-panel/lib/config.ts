@@ -37,14 +37,20 @@ export class Config {
     // 설정 초기화 - 프로덕션에서도 기본값 제공 (환경변수가 없을 경우)
     // 실제 런타임에서는 .env 파일이나 vault에서 제공됨
     this.k6RunnerBaseUrl =
-      process.env.K6_RUNNER_BASE_URL || 
-      (isK8s ? "http://k6-runner-service.k6-platform.svc.cluster.local:3002" : "http://k6-runner:3002");
+      process.env.K6_RUNNER_BASE_URL ||
+      (isK8s
+        ? "http://k6-runner-service.k6-platform.svc.cluster.local:3002"
+        : "http://k6-runner-service:3002");
     this.mockServerUrl =
-      process.env.MOCK_SERVER_URL || 
-      (isK8s ? "http://mock-server-service.k6-platform.svc.cluster.local:3001" : "http://host.docker.internal:3001");
+      process.env.MOCK_SERVER_URL ||
+      (isK8s
+        ? "http://mock-server-service.k6-platform.svc.cluster.local:3001"
+        : "http://host.docker.internal:3001");
     this.k6DashboardUrl =
-      process.env.K6_DASHBOARD_URL || 
-      (isK8s ? "http://k6-runner-service.k6-platform.svc.cluster.local:5665" : "http://localhost:5665");
+      process.env.K6_DASHBOARD_URL ||
+      (isK8s
+        ? "http://k6-runner-service.k6-platform.svc.cluster.local:5665"
+        : "http://k6-runner-service:5665");
 
     // InfluxDB 3.x 설정 (필수)
     this.influxDbUrl =
