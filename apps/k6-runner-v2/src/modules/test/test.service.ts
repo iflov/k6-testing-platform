@@ -107,7 +107,7 @@ export class TestService {
     // 프로세스 종료 시 currentTest 정리
     k6Process.on('exit', async () => {
       if (this.currentTest?.testId === testId) {
-        console.warn(`Test ${testId} process exited, clearing currentTest`);
+        // console.warn(`Test ${testId} process exited, clearing currentTest`);
 
         // timeout 정리
         if (this.currentTest.timeoutId) {
@@ -119,7 +119,7 @@ export class TestService {
           try {
             const fs = await import('fs/promises');
             await fs.unlink(this.currentTest.scriptPath);
-            console.warn(`Deleted script file: ${this.currentTest.scriptPath}`);
+            // console.warn(`Deleted script file: ${this.currentTest.scriptPath}`);
           } catch (error) {
             console.error(`Failed to delete script file: ${error}`);
           }
@@ -193,7 +193,7 @@ export class TestService {
       throw new Error('No test is currently running');
     }
 
-    const { process: k6Process, testId, timeoutId } = this.currentTest;
+    const { process: k6Process, timeoutId } = this.currentTest;
 
     // Timeout 클리어
     if (timeoutId) {
@@ -202,13 +202,13 @@ export class TestService {
 
     // 프로세스 종료
     if (k6Process && !k6Process.killed) {
-      console.warn(`Stopping test ${testId}`);
+      // console.warn(`Stopping test ${testId}`);
       k6Process.kill('SIGTERM');
 
       // SIGTERM이 안 되면 SIGKILL
       setTimeout(() => {
         if (!k6Process.killed) {
-          console.error(`Test ${testId} not responding to SIGTERM, forcing SIGKILL`);
+          // console.error(`Test ${testId} not responding to SIGTERM, forcing SIGKILL`);
           k6Process.kill('SIGKILL');
         }
       }, 5000);
