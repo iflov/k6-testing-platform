@@ -17,25 +17,25 @@ definitions:
         caches:
           - docker
         script:
-          # Setup Docker buildx for multi-platform builds
+          # Docker buildx 설정 (멀티 플랫폼 빌드용)
           - export DOCKER_BUILDKIT=1
           - docker version
 
-          # Setup QEMU for multi-arch support
+          # QEMU 설정 (멀티 아키텍처 지원)
           - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-          # Setup buildx
+          # buildx 빌더 생성 및 설정
           - docker buildx create --name multiplatform-builder --use
           - docker buildx inspect --bootstrap
 
-          # Login to Docker Hub
+          # Docker Hub 로그인
           - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
 
-          # Get git commit SHA for tagging
+          # 태깅용 git commit SHA 가져오기
           - export GIT_COMMIT=$(git rev-parse --short HEAD)
-          - echo "Building with tag $GIT_COMMIT"
+          - echo "🏷️ 태그로 빌드 중: $GIT_COMMIT"
 
-          # Build and push Control Panel (multi-platform)
+          # Control Panel 빌드 및 푸시 (멀티 플랫폼)
           - |
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
@@ -44,7 +44,7 @@ definitions:
               --push \
               ./apps/control-panel
 
-          # Build and push K6 Runner (multi-platform)
+          # K6 Runner 빌드 및 푸시 (멀티 플랫폼)
           - |
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
@@ -53,11 +53,20 @@ definitions:
               --push \
               ./apps/k6-runner-v2
 
-          - echo "✅ Multi-platform images pushed with tag $GIT_COMMIT"
+          # Mock Server 빌드 및 푸시 (멀티 플랫폼)
+          - |
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT \
+              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest \
+              --push \
+              ./apps/mock-server
+
+          - echo "✅ 멀티 플랫폼 이미지 푸시 완료! 태그: $GIT_COMMIT"
 
 pipelines:
   branches:
-    # 모든 브랜치에서 테스트 실행
+    # 모든 브랜치에서 테스트 실행 (main 브랜치 제외)
     "**":
       - parallel:
           - step:
@@ -71,48 +80,74 @@ pipelines:
                 - npm run lint
                 - npm test
 
-    # main 브랜치는 테스트 + 빌드 + 배포
+    # main 브랜치: 테스트 → Docker 빌드/푸시 → IAC 저장소 업데이트
     main:
+      # 1단계: K6 Runner 테스트 실행
+      - parallel:
+          - step:
+              name: Test K6 Runner
+              image: node:22-slim
+              caches:
+                - node
+              script:
+                - echo "🧪 K6 Runner 테스트 시작..."
+                - cd apps/k6-runner-v2
+                - npm ci
+                - npm run lint
+                - npm test
+                - echo "✅ K6 Runner 테스트 성공!"
+
+      # 2단계: Docker 이미지 빌드 및 Docker Hub 푸시
       - step: *build-push-multiplatform
 
+      # 3단계: IAC Repository 업데이트 (Helm values.yaml 수정)
       - step:
-          name: Update Helm Values
+          name: Update IAC Repository (Helm Values)
           image: alpine:latest
           script:
-            # Install required tools
-            - apk add --no-cache git wget
+            # 필수 도구 설치 (git, yq, ssh)
+            - apk add --no-cache git wget openssh-client
             - wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
             - chmod +x /usr/local/bin/yq
 
-            # Get git commit SHA
-            - export GIT_COMMIT=$(git rev-parse --short HEAD)
+            # Config Repository 접근을 위한 SSH 설정
+            - mkdir -p ~/.ssh
+            - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
+            - chmod 600 ~/.ssh/id_rsa
+            - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
 
-            # Update control-panel values.yaml
-            - yq eval -i ".image.repository = \"$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel\"" k8s/helm/control-panel/values.yaml
-            - yq eval -i ".image.tag = \"$GIT_COMMIT\"" k8s/helm/control-panel/values.yaml
-            - yq eval -i ".image.pullPolicy = \"IfNotPresent\"" k8s/helm/control-panel/values.yaml
+            # IAC Repository 클론
+            - echo "📥 IAC 저장소 클론 중..."
+            - git clone $CONFIG_REPO_URL /tmp/iac-repo
+            - cd /tmp/iac-repo
 
-            # Update k6-runner values.yaml
-            - yq eval -i ".image.repository = \"$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner\"" k8s/helm/k6-runner/values.yaml
-            - yq eval -i ".image.tag = \"$GIT_COMMIT\"" k8s/helm/k6-runner/values.yaml
-            - yq eval -i ".image.pullPolicy = \"IfNotPresent\"" k8s/helm/k6-runner/values.yaml
+            # 메인 저장소의 git commit SHA와 현재 날짜 가져오기
+            - export GIT_COMMIT=$(cd $BITBUCKET_CLONE_DIR && git rev-parse --short HEAD)
+            - export CURRENT_DATE=$(date +"%Y-%m-%d %H:%M:%S")
+            - echo "🏷️ 이미지 태그 업데이트 중: $GIT_COMMIT"
 
-            # Configure git
+            # Helm Chart의 이미지 태그 업데이트
+            - echo "📝 Helm values.yaml 파일 업데이트 중..."
+            - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/control-panel/values.yaml
+            - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/k6-runner/values.yaml
+            - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/mock-server/values.yaml
+            - echo "✅ Helm values 업데이트 완료"
+
+            # Git 사용자 설정
             - git config user.email "$GIT_USER_EMAIL"
             - git config user.name "$GIT_USER_NAME"
 
-            # Commit and push changes
-            - git add k8s/helm/*/values.yaml
-            - |
-              if ! git diff --staged --quiet; then
-                git commit -m "[CI] Update image tags to $GIT_COMMIT [skip ci]"
-                git push origin main
-              else
-                echo "No changes to commit"
-              fi
+            # Git 작업 실행: add, commit, push
+            - echo "🔧 Git 명령어 실행 중..."
+            - git add .
+            - git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"
+            - git push origin main
+            - echo "🚀 IAC 저장소에 변경사항 푸시 완료 (ArgoCD webhook 트리거됨)"
 
-# Required environment variables to be set in Bitbucket repository settings:
-# - DOCKER_HUB_USERNAME: Your Docker Hub username (leehyeontae)
-# - DOCKER_HUB_PASSWORD: Your Docker Hub password or access token
-# - GIT_USER_EMAIL: Git user email for commits
-# - GIT_USER_NAME: Git user name for commits
+# Bitbucket 저장소 설정에서 설정해야 할 필수 환경 변수:
+# - DOCKER_HUB_USERNAME: Docker Hub 사용자명 (예: leehyeontae)
+# - DOCKER_HUB_PASSWORD: Docker Hub 액세스 토큰 (비밀번호 아님)
+# - CONFIG_REPO_URL: Config 저장소 URL (git@bitbucket.org:inhuman-z/local_k8s.git)
+# - CONFIG_REPO_SSH_KEY: Config 저장소 접근용 Base64 인코딩된 SSH 개인키
+# - GIT_USER_EMAIL: Git 커밋 이메일
+# - GIT_USER_NAME: Git 커밋 사용자명 (예: "CI Pipeline")
