@@ -12,6 +12,7 @@ definitions:
   steps:
     - step: &build-push-multiplatform
         name: Build Multi-Platform Images
+        deployment: production  # Production 환경 변수 사용
         services:
           - docker
         caches:
@@ -20,21 +21,21 @@ definitions:
           # Docker buildx 설정 (멀티 플랫폼 빌드용)
           - export DOCKER_BUILDKIT=1
           - docker version
-
+          #
           # QEMU 설정 (멀티 아키텍처 지원)
           - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
           # buildx 빌더 생성 및 설정
           - docker buildx create --name multiplatform-builder --use
           - docker buildx inspect --bootstrap
-
+          #
           # Docker Hub 로그인
           - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
 
           # 태깅용 git commit SHA 가져오기
           - export GIT_COMMIT=$(git rev-parse --short HEAD)
           - echo "🏷️ 태그로 빌드 중: $GIT_COMMIT"
-
+          #
           # Control Panel 빌드 및 푸시 (멀티 플랫폼)
           - |
             docker buildx build \
@@ -43,7 +44,7 @@ definitions:
               --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest \
               --push \
               ./apps/control-panel
-
+          #
           # K6 Runner 빌드 및 푸시 (멀티 플랫폼)
           - |
             docker buildx build \
@@ -52,7 +53,7 @@ definitions:
               --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest \
               --push \
               ./apps/k6-runner-v2
-
+          #
           # Mock Server 빌드 및 푸시 (멀티 플랫폼)
           - |
             docker buildx build \
@@ -61,7 +62,7 @@ definitions:
               --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest \
               --push \
               ./apps/mock-server
-
+          #
           - echo "✅ 멀티 플랫폼 이미지 푸시 완료! 태그: $GIT_COMMIT"
 
 pipelines:
@@ -143,7 +144,6 @@ pipelines:
             - git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"
             - git push origin main
             - echo "🚀 IAC 저장소에 변경사항 푸시 완료 (ArgoCD webhook 트리거됨)"
-
 # Bitbucket 저장소 설정에서 설정해야 할 필수 환경 변수:
 # - DOCKER_HUB_USERNAME: Docker Hub 사용자명 (예: leehyeontae)
 # - DOCKER_HUB_PASSWORD: Docker Hub 액세스 토큰 (비밀번호 아님)
