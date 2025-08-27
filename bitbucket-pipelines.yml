@@ -106,33 +106,26 @@ pipelines:
           name: Update IAC Repository (Helm Values)
           image: alpine:latest
           script:
-            # 필수 도구 설치 (git, yq, ssh)
             - apk add --no-cache git wget openssh-client
             - wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
             - chmod +x /usr/local/bin/yq
-            # Config Repository 접근을 위한 SSH 설정
             - mkdir -p ~/.ssh
             - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
             - chmod 600 ~/.ssh/id_rsa
             - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-            # IAC Repository 클론
             - echo Cloning IAC repository
             - git clone $CONFIG_REPO_URL /tmp/iac-repo
             - cd /tmp/iac-repo
-            # 메인 저장소의 git commit SHA와 현재 날짜 가져오기
             - export GIT_COMMIT=$(cd $BITBUCKET_CLONE_DIR && git rev-parse --short HEAD)
             - export CURRENT_DATE=$(date +"%Y-%m-%d %H:%M:%S")
             - echo Updating image tag
-            # Helm Chart의 이미지 태그 업데이트
             - echo Updating Helm values.yaml files
             - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/control-panel/values.yaml
             - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/k6-runner/values.yaml
             - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/mock-server/values.yaml
             - echo Helm values update completed
-            # Git 사용자 설정
             - git config user.email "$GIT_USER_EMAIL"
             - git config user.name "$GIT_USER_NAME"
-            # Git 작업 실행: add, commit, push
             - echo Executing git commands
             - git add .
             - git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"
