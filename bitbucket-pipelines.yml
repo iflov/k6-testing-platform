@@ -128,7 +128,7 @@ pipelines:
             - git config user.name "$GIT_USER_NAME"
             - echo Executing git commands
             - git add .
-            - git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"
+            - 'git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"'
             - git push origin main
             - echo Changes pushed to IAC repository
 # Bitbucket 저장소 설정에서 설정해야 할 필수 환경 변수:
