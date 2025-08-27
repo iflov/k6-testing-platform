@@ -47,8 +47,8 @@ pipelines:
           name: Production Deployment
           deployment: production
           steps:
+            # Control Panel 빌드
             - parallel:
-                # Control Panel 빌드
                 - step:
                     name: Build Control Panel
                     services:
