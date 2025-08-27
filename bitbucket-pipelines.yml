@@ -11,6 +11,20 @@ definitions:
 
 pipelines:
   branches:
+    # 모든 브랜치에서 테스트 실행 (main 브랜치 제외)
+    "**":
+      - parallel:
+          - step:
+              name: Test K6 Runner
+              image: node:22-slim
+              caches:
+                - node
+              script:
+                - cd apps/k6-runner-v2
+                - npm ci
+                - npm run lint
+                - npm test
+
     # main 브랜치: 테스트 → Docker 빌드/푸시 → IAC 저장소 업데이트
     main:
       # 1단계: K6 Runner 테스트 실행
@@ -21,12 +35,12 @@ pipelines:
               caches:
                 - node
               script:
-                - echo "🧪 K6 Runner 테스트 시작..."
+                - echo "Starting K6 Runner tests..."
                 - cd apps/k6-runner-v2
                 - npm ci
                 - npm run lint
                 - npm test
-                - echo "✅ K6 Runner 테스트 성공!"
+                - echo "K6 Runner tests passed!"
 
       # 2단계: Docker 이미지 병렬 빌드 및 푸시 (성능 최적화)
       - parallel:
@@ -45,9 +59,9 @@ pipelines:
                 - docker buildx inspect --bootstrap
                 - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                 - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                - echo "🏷️ Control Panel 빌드 중: $GIT_COMMIT"
+                - echo "Control Panel build: $GIT_COMMIT"
                 - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest --push ./apps/control-panel
-                - echo "✅ Control Panel 푸시 완료"
+                - echo "Control Panel push completed"
 
           # K6 Runner 빌드
           - step:
@@ -64,9 +78,9 @@ pipelines:
                 - docker buildx inspect --bootstrap
                 - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                 - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                - echo "🏷️ K6 Runner 빌드 중: $GIT_COMMIT"
+                - echo "K6 Runner build: $GIT_COMMIT"
                 - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest --push ./apps/k6-runner-v2
-                - echo "✅ K6 Runner 푸시 완료"
+                - echo "K6 Runner push completed"
 
           # Mock Server 빌드
           - step:
@@ -83,9 +97,9 @@ pipelines:
                 - docker buildx inspect --bootstrap
                 - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                 - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                - echo "🏷️ Mock Server 빌드 중: $GIT_COMMIT"
+                - echo "Mock Server build: $GIT_COMMIT"
                 - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest --push ./apps/mock-server
-                - echo "✅ Mock Server 푸시 완료"
+                - echo "Mock Server push completed"
 
       # 3단계: IAC Repository 업데이트 (Helm values.yaml 수정)
       - step:
@@ -104,32 +118,32 @@ pipelines:
             - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
 
             # IAC Repository 클론
-            - echo "📥 IAC 저장소 클론 중..."
+            - echo "Cloning IAC repository..."
             - git clone $CONFIG_REPO_URL /tmp/iac-repo
             - cd /tmp/iac-repo
 
             # 메인 저장소의 git commit SHA와 현재 날짜 가져오기
             - export GIT_COMMIT=$(cd $BITBUCKET_CLONE_DIR && git rev-parse --short HEAD)
             - export CURRENT_DATE=$(date +"%Y-%m-%d %H:%M:%S")
-            - echo "🏷️ 이미지 태그 업데이트 중: $GIT_COMMIT"
+            - echo "Updating image tag: $GIT_COMMIT"
 
             # Helm Chart의 이미지 태그 업데이트
-            - echo "📝 Helm values.yaml 파일 업데이트 중..."
+            - echo "Updating Helm values.yaml files..."
             - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/control-panel/values.yaml
             - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/k6-runner/values.yaml
             - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/mock-server/values.yaml
-            - echo "✅ Helm values 업데이트 완료"
+            - echo "Helm values update completed"
 
             # Git 사용자 설정
             - git config user.email "$GIT_USER_EMAIL"
             - git config user.name "$GIT_USER_NAME"
 
             # Git 작업 실행: add, commit, push
-            - echo "🔧 Git 명령어 실행 중..."
+            - echo "Executing git commands..."
             - git add .
             - git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"
             - git push origin main
-            - echo "🚀 IAC 저장소에 변경사항 푸시 완료 (ArgoCD webhook 트리거됨)"
+            - echo "Changes pushed to IAC repository (ArgoCD webhook triggered)"
 # Bitbucket 저장소 설정에서 설정해야 할 필수 환경 변수:
 # - DOCKER_HUB_USERNAME: Docker Hub 사용자명 (예: leehyeontae)
 # - DOCKER_HUB_PASSWORD: Docker Hub 액세스 토큰 (비밀번호 아님)
