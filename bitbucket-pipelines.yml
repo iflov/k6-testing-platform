@@ -11,20 +11,6 @@ definitions:
 
 pipelines:
   branches:
-    # 모든 브랜치에서 테스트 실행 (main 브랜치 제외)
-    "**":
-      - parallel:
-          - step:
-              name: Test K6 Runner
-              image: node:22-slim
-              caches:
-                - node
-              script:
-                - cd apps/k6-runner-v2
-                - npm ci
-                - npm run lint
-                - npm test
-
     # main 브랜치: 테스트 → Docker 빌드/푸시 → IAC 저장소 업데이트
     main:
       # 1단계: K6 Runner 테스트 실행
@@ -62,7 +48,7 @@ pipelines:
                 - echo "🏷️ Control Panel 빌드 중: $GIT_COMMIT"
                 - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest --push ./apps/control-panel
                 - echo "✅ Control Panel 푸시 완료"
-          
+
           # K6 Runner 빌드
           - step:
               name: Build K6 Runner
@@ -81,7 +67,7 @@ pipelines:
                 - echo "🏷️ K6 Runner 빌드 중: $GIT_COMMIT"
                 - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest --push ./apps/k6-runner-v2
                 - echo "✅ K6 Runner 푸시 완료"
-          
+
           # Mock Server 빌드
           - step:
               name: Build Mock Server
