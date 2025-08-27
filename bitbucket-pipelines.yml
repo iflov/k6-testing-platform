@@ -91,7 +91,7 @@ pipelines:
                 - echo "✅ K6 Runner 테스트 성공!"
 
       # 2단계: Docker 이미지 빌드 및 Docker Hub 푸시
-      - step: *build-push-multiplatform
+      - *build-push-multiplatform
 
       # 3단계: IAC Repository 업데이트 (Helm values.yaml 수정)
       - step:
