@@ -1,6 +1,0 @@
-apiVersion: v2
-name: k6-runner
-description: K6 Testing Platform Runner Service
-type: application
-version: 0.1.0
-appVersion: "1.0.0"
