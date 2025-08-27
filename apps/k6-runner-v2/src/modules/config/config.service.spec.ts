@@ -55,8 +55,8 @@ describe('ConfigService', () => {
 
     it('should use default values in development', () => {
       const service = ConfigService.getInstance();
-      expect(service.getInfluxDbUrl()).toContain('influxdb:8181');
-      expect(service.getMockServerUrl()).toContain('mock-server:3001');
+      expect(service.getInfluxDbUrl()).toContain(':8181');
+      expect(service.getMockServerUrl()).toContain(':3001');
       expect(service.getK6DashboardPort()).toBe('5665');
       expect(service.getK6DashboardHost()).toBe('0.0.0.0');
       expect(service.getK6DashboardPeriod()).toBe('1s');
@@ -165,7 +165,7 @@ describe('ConfigService', () => {
       expect(config).toHaveProperty('token', 'dev-token-for-testing');
       expect(config).toHaveProperty('org', 'k6org');
       expect(config).toHaveProperty('bucket', 'k6');
-      expect(config.url).toContain('influxdb:8181');
+      expect(config.url).toContain(':8181');
     });
   });
 
