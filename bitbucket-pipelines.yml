@@ -9,54 +9,6 @@ definitions:
     docker:
       memory: 4096
 
-  steps:
-    - step: &build-push-multiplatform
-        name: Build Multi-Platform Images
-        deployment: production  # Production 환경 변수 사용
-        services:
-          - docker
-        caches:
-          - docker
-        script:
-          # Docker buildx 설정 (멀티 플랫폼 빌드용)
-          - export DOCKER_BUILDKIT=1
-          - docker version
-          # QEMU 설정 (멀티 아키텍처 지원)
-          - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          # buildx 빌더 생성 및 설정
-          - docker buildx create --name multiplatform-builder --use
-          - docker buildx inspect --bootstrap
-          # Docker Hub 로그인
-          - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
-          # 태깅용 git commit SHA 가져오기
-          - export GIT_COMMIT=$(git rev-parse --short HEAD)
-          - echo "🏷️ 태그로 빌드 중: $GIT_COMMIT"
-          # Control Panel 빌드 및 푸시 (멀티 플랫폼)
-          - |
-            docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT \
-              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest \
-              --push \
-              ./apps/control-panel
-          # K6 Runner 빌드 및 푸시 (멀티 플랫폼)
-          - |
-            docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT \
-              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest \
-              --push \
-              ./apps/k6-runner-v2
-          # Mock Server 빌드 및 푸시 (멀티 플러폼)
-          - |
-            docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT \
-              --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest \
-              --push \
-              ./apps/mock-server
-          - echo "✅ 멀티 플랫폼 이미지 푸시 완료! 태그: $GIT_COMMIT"
-
 pipelines:
   branches:
     # 모든 브랜치에서 테스트 실행 (main 브랜치 제외)
@@ -90,9 +42,88 @@ pipelines:
                 - npm test
                 - echo "✅ K6 Runner 테스트 성공!"
 
-      # 2단계: Docker 이미지 빌드 및 Docker Hub 푸시
-      - step:
-          <<: *build-push-multiplatform
+      # 2단계: Docker 이미지 병렬 빌드 및 푸시 (성능 최적화)
+      - parallel:
+          # Control Panel 빌드
+          - step:
+              name: Build Control Panel
+              deployment: production
+              services:
+                - docker
+              caches:
+                - docker
+              script:
+                - export DOCKER_BUILDKIT=1
+                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+                - docker buildx create --name builder-cp --use
+                - docker buildx inspect --bootstrap
+                - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
+                - export GIT_COMMIT=$(git rev-parse --short HEAD)
+                - echo "🏷️ Control Panel 빌드 중: $GIT_COMMIT"
+                - |
+                  docker buildx build \
+                    --platform linux/amd64,linux/arm64 \
+                    --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:cache \
+                    --cache-to type=inline \
+                    --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT \
+                    --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest \
+                    --push \
+                    ./apps/control-panel
+                - echo "✅ Control Panel 푸시 완료"
+          
+          # K6 Runner 빌드
+          - step:
+              name: Build K6 Runner
+              deployment: production
+              services:
+                - docker
+              caches:
+                - docker
+              script:
+                - export DOCKER_BUILDKIT=1
+                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+                - docker buildx create --name builder-k6 --use
+                - docker buildx inspect --bootstrap
+                - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
+                - export GIT_COMMIT=$(git rev-parse --short HEAD)
+                - echo "🏷️ K6 Runner 빌드 중: $GIT_COMMIT"
+                - |
+                  docker buildx build \
+                    --platform linux/amd64,linux/arm64 \
+                    --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:cache \
+                    --cache-to type=inline \
+                    --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT \
+                    --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest \
+                    --push \
+                    ./apps/k6-runner-v2
+                - echo "✅ K6 Runner 푸시 완료"
+          
+          # Mock Server 빌드
+          - step:
+              name: Build Mock Server
+              deployment: production
+              services:
+                - docker
+              caches:
+                - docker
+              script:
+                - export DOCKER_BUILDKIT=1
+                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+                - docker buildx create --name builder-mock --use
+                - docker buildx inspect --bootstrap
+                - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
+                - export GIT_COMMIT=$(git rev-parse --short HEAD)
+                - echo "🏷️ Mock Server 빌드 중: $GIT_COMMIT"
+                - |
+                  docker buildx build \
+                    --platform linux/amd64,linux/arm64 \
+                    --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:cache \
+                    --cache-to type=inline \
+                    --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT \
+                    --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest \
+                    --push \
+                    ./apps/mock-server
+                - echo "✅ Mock Server 푸시 완료"
 
       # 3단계: IAC Repository 업데이트 (Helm values.yaml 수정)
       - step:
