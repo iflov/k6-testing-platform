@@ -55,13 +55,13 @@ pipelines:
                   - docker
                 script:
                   - export DOCKER_BUILDKIT=1
-                  - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-                  - docker buildx create --name builder-cp --use
+                  # Bitbucket Pipelines doesn't support privileged mode, build for amd64 only
+                  - docker buildx create --name builder-cp --driver docker-container --use
                   - docker buildx inspect --bootstrap
                   - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                   - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                  - echo Control Panel build started
-                  - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest --push ./apps/control-panel
+                  - echo Control Panel build started for linux/amd64
+                  - docker buildx build --platform linux/amd64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest --push ./apps/control-panel
                   - echo Control Panel push completed
 
             - step:
@@ -72,13 +72,13 @@ pipelines:
                   - docker
                 script:
                   - export DOCKER_BUILDKIT=1
-                  - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-                  - docker buildx create --name builder-k6 --use
+                  # Bitbucket Pipelines doesn't support privileged mode, build for amd64 only
+                  - docker buildx create --name builder-k6 --driver docker-container --use
                   - docker buildx inspect --bootstrap
                   - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                   - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                  - echo K6 Runner build started
-                  - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest --push ./apps/k6-runner-v2
+                  - echo K6 Runner build started for linux/amd64
+                  - docker buildx build --platform linux/amd64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest --push ./apps/k6-runner-v2
                   - echo K6 Runner push completed
 
             - step:
@@ -89,13 +89,13 @@ pipelines:
                   - docker
                 script:
                   - export DOCKER_BUILDKIT=1
-                  - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-                  - docker buildx create --name builder-mock --use
+                  # Bitbucket Pipelines doesn't support privileged mode, build for amd64 only
+                  - docker buildx create --name builder-mock --driver docker-container --use
                   - docker buildx inspect --bootstrap
                   - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                   - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                  - echo Mock Server build started
-                  - docker buildx build --platform linux/amd64,linux/arm64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest --push ./apps/mock-server
+                  - echo Mock Server build started for linux/amd64
+                  - docker buildx build --platform linux/amd64 --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:cache --cache-to type=inline --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest --push ./apps/mock-server
                   - echo Mock Server push completed
 
             # IAC Repository 업데이트 (Helm values.yaml 수정)
