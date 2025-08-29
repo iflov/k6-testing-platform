@@ -5,97 +5,79 @@ pipelines:
     - step:
         name: Test SSH Connection to IAC Repository
         script:
-          # Install required packages
           - apk add --no-cache git openssh-client
-          # Debug environment variables
           - echo "========================================="
           - echo "Starting SSH Configuration Test"
           - echo "========================================="
-          # Check if CONFIG_REPO_SSH_KEY is set
           - |
             if [ -z "$CONFIG_REPO_SSH_KEY" ]; then 
-              echo "❌ ERROR: CONFIG_REPO_SSH_KEY is not set!"
+              echo "ERROR: CONFIG_REPO_SSH_KEY is not set!"
               echo "Please add CONFIG_REPO_SSH_KEY as a Repository Variable"
               exit 1
             else
-              echo "✅ CONFIG_REPO_SSH_KEY is set"
+              echo "CONFIG_REPO_SSH_KEY is set"
             fi
-          # Check if CONFIG_REPO_URL is set
           - |
             if [ -z "$CONFIG_REPO_URL" ]; then 
-              echo "❌ ERROR: CONFIG_REPO_URL is not set!"
+              echo "ERROR: CONFIG_REPO_URL is not set!"
               echo "Please add CONFIG_REPO_URL as a Repository Variable"
               echo "Expected format: git@bitbucket.org:username/repository.git"
               exit 1
             else
-              echo "✅ CONFIG_REPO_URL is set: $CONFIG_REPO_URL"
+              echo "CONFIG_REPO_URL is set: $CONFIG_REPO_URL"
             fi
-          # Setup SSH
           - echo "========================================="
           - echo "Setting up SSH..."
           - echo "========================================="
           - mkdir -p ~/.ssh
-
-          # Decode and save SSH key
           - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
           - chmod 600 ~/.ssh/id_rsa
-
-          # Verify SSH key was created properly
           - |
             if [ -f ~/.ssh/id_rsa ]; then
-              echo "✅ SSH key file created successfully"
+              echo "SSH key file created successfully"
               echo "File permissions:"
               ls -la ~/.ssh/id_rsa
               echo "Key type check:"
               head -n 1 ~/.ssh/id_rsa
             else
-              echo "❌ Failed to create SSH key file"
+              echo "Failed to create SSH key file"
               exit 1
             fi
-
-          # Add Bitbucket to known hosts
           - echo "========================================="
           - echo "Adding Bitbucket to known hosts..."
           - echo "========================================="
           - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-          - echo "✅ Bitbucket added to known hosts"
-
-          # Test SSH connection
+          - echo "Bitbucket added to known hosts"
           - echo "========================================="
           - echo "Testing SSH connection to Bitbucket..."
           - echo "========================================="
           - ssh -vT git@bitbucket.org 2>&1 || true
-
-          # Try to clone the repository
           - echo "========================================="
           - echo "Attempting to clone IAC repository..."
           - echo "========================================="
           - echo "Repository URL: $CONFIG_REPO_URL"
           - |
             if GIT_SSH_COMMAND="ssh -v" git clone $CONFIG_REPO_URL /tmp/iac-repo; then
-              echo "✅ Successfully cloned IAC repository!"
+              echo "Successfully cloned IAC repository!"
               echo "Repository contents:"
               ls -la /tmp/iac-repo/
-              
-              # Check if helm directory exists
               if [ -d "/tmp/iac-repo/helm" ]; then
-                echo "✅ Helm directory found"
+                echo "Helm directory found"
                 ls -la /tmp/iac-repo/helm/
               else
-                echo "⚠️ Helm directory not found"
+                echo "Helm directory not found"
               fi
             else
-              echo "❌ Failed to clone repository"
+              echo "Failed to clone repository"
               echo "========================================="
               echo "Troubleshooting steps:"
               echo "1. Verify CONFIG_REPO_SSH_KEY contains the base64 encoded private key"
-              echo "2. Verify the public key is added to IAC repository's Access Keys"
+              echo "2. Verify the public key is added to IAC repository Access Keys"
               echo "3. Verify CONFIG_REPO_URL is correct (git@bitbucket.org:username/repo.git)"
               echo "4. Check if the repository exists and you have access"
               echo "========================================="
               exit 1
             fi
-
           - echo "========================================="
-          - echo "✅ All tests passed successfully!"
+          - echo "All tests passed successfully!"
           - echo "========================================="
