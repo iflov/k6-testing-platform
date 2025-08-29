@@ -55,23 +55,25 @@ pipelines:
                   - docker
                 script:
                   - export DOCKER_BUILDKIT=1
-                  # Use docker-container driver for multi-platform builds without privileged mode
-                  - docker buildx create --name builder-cp --driver docker-container --driver-opt image=moby/buildkit:master --use
-                  - docker buildx inspect --bootstrap
                   - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                   - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                  - echo "Control Panel multi-arch build started (amd64, arm64)"
-                  # Multi-platform build using docker-container driver
+                  - echo "Control Panel build started"
+                  # Try buildx without privileged mode - uses default docker driver
                   - |
-                    docker buildx build \
-                      --platform linux/amd64,linux/arm64 \
-                      --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:buildcache \
-                      --cache-to type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:buildcache,mode=max \
-                      --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT \
-                      --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest \
-                      --push \
-                      ./apps/control-panel
-                  - echo "Control Panel multi-arch push completed"
+                    if docker buildx version > /dev/null 2>&1; then
+                      echo "Using buildx for multi-arch build"
+                      docker buildx build --platform linux/amd64,linux/arm64 \
+                        --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT \
+                        --tag $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest \
+                        --push ./apps/control-panel
+                    else
+                      echo "Fallback to standard build (amd64 only)"
+                      docker build -t $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT \
+                        -t $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest ./apps/control-panel
+                      docker push $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:$GIT_COMMIT
+                      docker push $DOCKER_HUB_USERNAME/k6-testing-platform-control-panel:latest
+                    fi
+                  - echo "Control Panel push completed"
 
             - step:
                 name: Build K6 Runner
@@ -81,23 +83,25 @@ pipelines:
                   - docker
                 script:
                   - export DOCKER_BUILDKIT=1
-                  # Use docker-container driver for multi-platform builds without privileged mode
-                  - docker buildx create --name builder-k6 --driver docker-container --driver-opt image=moby/buildkit:master --use
-                  - docker buildx inspect --bootstrap
                   - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                   - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                  - echo "K6 Runner multi-arch build started (amd64, arm64)"
-                  # Multi-platform build using docker-container driver
+                  - echo "K6 Runner build started"
+                  # Try buildx without privileged mode - uses default docker driver
                   - |
-                    docker buildx build \
-                      --platform linux/amd64,linux/arm64 \
-                      --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:buildcache \
-                      --cache-to type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:buildcache,mode=max \
-                      --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT \
-                      --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest \
-                      --push \
-                      ./apps/k6-runner-v2
-                  - echo "K6 Runner multi-arch push completed"
+                    if docker buildx version > /dev/null 2>&1; then
+                      echo "Using buildx for multi-arch build"
+                      docker buildx build --platform linux/amd64,linux/arm64 \
+                        --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT \
+                        --tag $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest \
+                        --push ./apps/k6-runner-v2
+                    else
+                      echo "Fallback to standard build (amd64 only)"
+                      docker build -t $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT \
+                        -t $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest ./apps/k6-runner-v2
+                      docker push $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:$GIT_COMMIT
+                      docker push $DOCKER_HUB_USERNAME/k6-testing-platform-k6-runner:latest
+                    fi
+                  - echo "K6 Runner push completed"
 
             - step:
                 name: Build Mock Server
@@ -107,23 +111,25 @@ pipelines:
                   - docker
                 script:
                   - export DOCKER_BUILDKIT=1
-                  # Use docker-container driver for multi-platform builds without privileged mode
-                  - docker buildx create --name builder-mock --driver docker-container --driver-opt image=moby/buildkit:master --use
-                  - docker buildx inspect --bootstrap
                   - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin || exit 1
                   - export GIT_COMMIT=$(git rev-parse --short HEAD)
-                  - echo "Mock Server multi-arch build started (amd64, arm64)"
-                  # Multi-platform build using docker-container driver
+                  - echo "Mock Server build started"
+                  # Try buildx without privileged mode - uses default docker driver
                   - |
-                    docker buildx build \
-                      --platform linux/amd64,linux/arm64 \
-                      --cache-from type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:buildcache \
-                      --cache-to type=registry,ref=$DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:buildcache,mode=max \
-                      --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT \
-                      --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest \
-                      --push \
-                      ./apps/mock-server
-                  - echo "Mock Server multi-arch push completed"
+                    if docker buildx version > /dev/null 2>&1; then
+                      echo "Using buildx for multi-arch build"
+                      docker buildx build --platform linux/amd64,linux/arm64 \
+                        --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT \
+                        --tag $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest \
+                        --push ./apps/mock-server
+                    else
+                      echo "Fallback to standard build (amd64 only)"
+                      docker build -t $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT \
+                        -t $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest ./apps/mock-server
+                      docker push $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:$GIT_COMMIT
+                      docker push $DOCKER_HUB_USERNAME/k6-testing-platform-mock-server:latest
+                    fi
+                  - echo "Mock Server push completed"
 
             # IAC Repository 업데이트 (Helm values.yaml 수정)
             - step:
