@@ -37,4 +37,4 @@ pipelines:
           - if [ -d "/tmp/iac-repo/helm" ]; then echo "Helm directory found"; ls -la /tmp/iac-repo/helm/; else echo "Helm directory not found"; fi
           - echo "========================================="
           - echo "All tests passed successfully!"
-          - echo "========================================="
+          - echo "==========================================="
