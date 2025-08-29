@@ -7,12 +7,10 @@ pipelines:
         script:
           # Install required packages
           - apk add --no-cache git openssh-client
-          
           # Debug environment variables
           - echo "========================================="
           - echo "Starting SSH Configuration Test"
           - echo "========================================="
-          
           # Check if CONFIG_REPO_SSH_KEY is set
           - |
             if [ -z "$CONFIG_REPO_SSH_KEY" ]; then 
@@ -22,7 +20,6 @@ pipelines:
             else
               echo "✅ CONFIG_REPO_SSH_KEY is set"
             fi
-          
           # Check if CONFIG_REPO_URL is set
           - |
             if [ -z "$CONFIG_REPO_URL" ]; then 
@@ -33,17 +30,16 @@ pipelines:
             else
               echo "✅ CONFIG_REPO_URL is set: $CONFIG_REPO_URL"
             fi
-          
           # Setup SSH
           - echo "========================================="
           - echo "Setting up SSH..."
           - echo "========================================="
           - mkdir -p ~/.ssh
-          
+
           # Decode and save SSH key
           - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
           - chmod 600 ~/.ssh/id_rsa
-          
+
           # Verify SSH key was created properly
           - |
             if [ -f ~/.ssh/id_rsa ]; then
@@ -56,20 +52,20 @@ pipelines:
               echo "❌ Failed to create SSH key file"
               exit 1
             fi
-          
+
           # Add Bitbucket to known hosts
           - echo "========================================="
           - echo "Adding Bitbucket to known hosts..."
           - echo "========================================="
           - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
           - echo "✅ Bitbucket added to known hosts"
-          
+
           # Test SSH connection
           - echo "========================================="
           - echo "Testing SSH connection to Bitbucket..."
           - echo "========================================="
           - ssh -vT git@bitbucket.org 2>&1 || true
-          
+
           # Try to clone the repository
           - echo "========================================="
           - echo "Attempting to clone IAC repository..."
@@ -99,7 +95,7 @@ pipelines:
               echo "========================================="
               exit 1
             fi
-          
+
           - echo "========================================="
           - echo "✅ All tests passed successfully!"
           - echo "========================================="
