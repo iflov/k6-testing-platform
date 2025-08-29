@@ -1,4 +1,3 @@
-# yaml-language-server: $schema=https://bitbucket.org/pipelines-json-schema/pipelines-schema.json
 image: atlassian/default-image:4
 
 options:
