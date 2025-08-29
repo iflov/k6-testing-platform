@@ -1,4 +1,3 @@
-// 문자열 정제
 export const sanitizeString = (str: unknown): string => {
   if (typeof str !== 'string') return '';
 
