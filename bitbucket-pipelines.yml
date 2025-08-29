@@ -142,8 +142,8 @@ pipelines:
                   - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
                   - chmod 600 ~/.ssh/id_rsa
                   - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-                  - echo "Cloning IAC repository using SSH"
-                  - git clone git@bitbucket.org:inhuman-z/local_k8s.git /tmp/iac-repo || exit 1
+                  - echo "Cloning IAC repository from $CONFIG_REPO_URL"
+                  - git clone $CONFIG_REPO_URL /tmp/iac-repo || exit 1
                   - cd /tmp/iac-repo
                   - git config user.email "$GIT_USER_EMAIL"
                   - git config user.name "$GIT_USER_NAME"
