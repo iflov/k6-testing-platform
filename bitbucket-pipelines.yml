@@ -139,14 +139,11 @@ pipelines:
                   - wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
                   - chmod +x /usr/local/bin/yq
                   - mkdir -p ~/.ssh
-                  - if [ -z "$CONFIG_REPO_SSH_KEY" ]; then echo "ERROR CONFIG_REPO_SSH_KEY is not set"; exit 1; fi
                   - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
                   - chmod 600 ~/.ssh/id_rsa
-                  - ls -la ~/.ssh/
                   - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-                  - ssh -T git@bitbucket.org 2>&1 || true
-                  - echo "CONFIG_REPO_URL is $CONFIG_REPO_URL"
-                  - git clone $CONFIG_REPO_URL /tmp/iac-repo || exit 1
+                  - echo "Cloning IAC repository using SSH"
+                  - git clone git@bitbucket.org:inhuman-z/local_k8s.git /tmp/iac-repo || exit 1
                   - cd /tmp/iac-repo
                   - git config user.email "$GIT_USER_EMAIL"
                   - git config user.name "$GIT_USER_NAME"
@@ -174,7 +171,7 @@ pipelines:
 # Bitbucket 저장소 설정에서 설정해야 할 필수 환경 변수:
 # - DOCKER_HUB_USERNAME: Docker Hub 사용자명 (예: leehyeontae)
 # - DOCKER_HUB_PASSWORD: Docker Hub 액세스 토큰 (비밀번호 아님)
-# - CONFIG_REPO_URL: Config 저장소 URL (git@bitbucket.org:ihyeontae/local_k8s.git)
-# - CONFIG_REPO_SSH_KEY: Config 저장소 접근용 Base64 인코딩된 SSH 개인키
+# - CONFIG_REPO_SSH_KEY: 개인 계정 SSH Key (Base64 인코딩, Push 권한 필요)
+#   주의: Repository Access Key가 아닌 Personal SSH Key 사용
 # - GIT_USER_EMAIL: Git 커밋 이메일
 # - GIT_USER_NAME: Git 커밋 사용자명 (예: "CI Pipeline")
