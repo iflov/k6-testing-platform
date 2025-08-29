@@ -139,17 +139,13 @@ pipelines:
                   - wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
                   - chmod +x /usr/local/bin/yq
                   - mkdir -p ~/.ssh
-                  - echo "Checking CONFIG_REPO_SSH_KEY variable..."
-                  - if [ -z "$CONFIG_REPO_SSH_KEY" ]; then echo "ERROR: CONFIG_REPO_SSH_KEY is not set!"; exit 1; fi
+                  - if [ -z "$CONFIG_REPO_SSH_KEY" ]; then echo "ERROR CONFIG_REPO_SSH_KEY is not set"; exit 1; fi
                   - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
                   - chmod 600 ~/.ssh/id_rsa
-                  - echo "SSH key file created. Checking permissions..."
                   - ls -la ~/.ssh/
                   - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-                  - echo "Testing SSH connection to Bitbucket..."
                   - ssh -T git@bitbucket.org 2>&1 || true
-                  - echo "CONFIG_REPO_URL: $CONFIG_REPO_URL"
-                  - echo "Cloning IAC repository..."
+                  - echo "CONFIG_REPO_URL is $CONFIG_REPO_URL"
                   - git clone $CONFIG_REPO_URL /tmp/iac-repo || exit 1
                   - cd /tmp/iac-repo
                   - git config user.email "$GIT_USER_EMAIL"
