@@ -10,7 +10,7 @@ definitions:
 
 pipelines:
   branches:
-    # 모든 브랜치에서 테스트 실행 (main 브랜치 제외)
+    # 모든 브랜치에서 테스트 실행 (main 브랜치 제외!)
     "**":
       - parallel:
           - step:
