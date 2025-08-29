@@ -9,40 +9,15 @@ pipelines:
           - echo "========================================="
           - echo "Starting SSH Configuration Test"
           - echo "========================================="
-          - |
-            if [ -z "$CONFIG_REPO_SSH_KEY" ]; then 
-              echo "ERROR: CONFIG_REPO_SSH_KEY is not set!"
-              echo "Please add CONFIG_REPO_SSH_KEY as a Repository Variable"
-              exit 1
-            else
-              echo "CONFIG_REPO_SSH_KEY is set"
-            fi
-          - |
-            if [ -z "$CONFIG_REPO_URL" ]; then 
-              echo "ERROR: CONFIG_REPO_URL is not set!"
-              echo "Please add CONFIG_REPO_URL as a Repository Variable"
-              echo "Expected format: git@bitbucket.org:username/repository.git"
-              exit 1
-            else
-              echo "CONFIG_REPO_URL is set: $CONFIG_REPO_URL"
-            fi
+          - if [ -z "$CONFIG_REPO_SSH_KEY" ]; then echo "ERROR CONFIG_REPO_SSH_KEY is not set"; exit 1; else echo "CONFIG_REPO_SSH_KEY is set"; fi
+          - if [ -z "$CONFIG_REPO_URL" ]; then echo "ERROR CONFIG_REPO_URL is not set"; exit 1; else echo "CONFIG_REPO_URL is set $CONFIG_REPO_URL"; fi
           - echo "========================================="
           - echo "Setting up SSH..."
           - echo "========================================="
           - mkdir -p ~/.ssh
           - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
           - chmod 600 ~/.ssh/id_rsa
-          - |
-            if [ -f ~/.ssh/id_rsa ]; then
-              echo "SSH key file created successfully"
-              echo "File permissions:"
-              ls -la ~/.ssh/id_rsa
-              echo "Key type check:"
-              head -n 1 ~/.ssh/id_rsa
-            else
-              echo "Failed to create SSH key file"
-              exit 1
-            fi
+          - if [ -f ~/.ssh/id_rsa ]; then echo "SSH key file created"; ls -la ~/.ssh/id_rsa; head -n 1 ~/.ssh/id_rsa; else echo "Failed to create SSH key"; exit 1; fi
           - echo "========================================="
           - echo "Adding Bitbucket to known hosts..."
           - echo "========================================="
@@ -55,29 +30,11 @@ pipelines:
           - echo "========================================="
           - echo "Attempting to clone IAC repository..."
           - echo "========================================="
-          - echo "Repository URL: $CONFIG_REPO_URL"
-          - |
-            if GIT_SSH_COMMAND="ssh -v" git clone $CONFIG_REPO_URL /tmp/iac-repo; then
-              echo "Successfully cloned IAC repository!"
-              echo "Repository contents:"
-              ls -la /tmp/iac-repo/
-              if [ -d "/tmp/iac-repo/helm" ]; then
-                echo "Helm directory found"
-                ls -la /tmp/iac-repo/helm/
-              else
-                echo "Helm directory not found"
-              fi
-            else
-              echo "Failed to clone repository"
-              echo "========================================="
-              echo "Troubleshooting steps:"
-              echo "1. Verify CONFIG_REPO_SSH_KEY contains the base64 encoded private key"
-              echo "2. Verify the public key is added to IAC repository Access Keys"
-              echo "3. Verify CONFIG_REPO_URL is correct (git@bitbucket.org:username/repo.git)"
-              echo "4. Check if the repository exists and you have access"
-              echo "========================================="
-              exit 1
-            fi
+          - echo "Repository URL $CONFIG_REPO_URL"
+          - GIT_SSH_COMMAND="ssh -v" git clone $CONFIG_REPO_URL /tmp/iac-repo || (echo "Failed to clone repository"; echo "Check 1. CONFIG_REPO_SSH_KEY has base64 private key"; echo "Check 2. Public key is in IAC repo Access Keys"; echo "Check 3. CONFIG_REPO_URL format"; exit 1)
+          - echo "Successfully cloned IAC repository"
+          - ls -la /tmp/iac-repo/
+          - if [ -d "/tmp/iac-repo/helm" ]; then echo "Helm directory found"; ls -la /tmp/iac-repo/helm/; else echo "Helm directory not found"; fi
           - echo "========================================="
           - echo "All tests passed successfully!"
           - echo "========================================="
