@@ -1,4 +1,3 @@
-// 기간 파싱
 type TimeUnit = 's' | 'm' | 'h';
 
 export const parseDuration = (duration: string): number => {
