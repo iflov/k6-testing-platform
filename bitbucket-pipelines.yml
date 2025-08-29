@@ -139,28 +139,52 @@ pipelines:
                   - apk add --no-cache git wget openssh-client
                   - wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
                   - chmod +x /usr/local/bin/yq
+                  
+                  # SSH 설정
                   - mkdir -p ~/.ssh
                   - echo "$CONFIG_REPO_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
                   - chmod 600 ~/.ssh/id_rsa
                   - ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-                  - echo Cloning IAC repository
-                  - git clone $CONFIG_REPO_URL /tmp/iac-repo
+                  
+                  # SSH 연결 테스트
+                  - ssh -T git@bitbucket.org || true
+                  
+                  # IAC 저장소 클론
+                  - echo "Cloning IAC repository from $CONFIG_REPO_URL"
+                  - git clone $CONFIG_REPO_URL /tmp/iac-repo || exit 1
                   - cd /tmp/iac-repo
+                  
+                  # Git 설정
+                  - git config user.email "$GIT_USER_EMAIL"
+                  - git config user.name "$GIT_USER_NAME"
+                  
+                  # 변수 설정
                   - export GIT_COMMIT=$(cd $BITBUCKET_CLONE_DIR && git rev-parse --short HEAD)
                   - export CURRENT_DATE=$(date +"%Y-%m-%d %H:%M:%S")
-                  - echo Updating image tag
-                  - echo Updating Helm values.yaml files
+                  
+                  # Helm values 업데이트
+                  - echo "Updating Helm values.yaml files with tag: $GIT_COMMIT"
                   - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/control-panel/values.yaml
                   - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/k6-runner/values.yaml
                   - yq eval -i ".image.tag = \"$GIT_COMMIT\"" helm/mock-server/values.yaml
-                  - echo Helm values update completed
-                  - git config user.email "$GIT_USER_EMAIL"
-                  - git config user.name "$GIT_USER_NAME"
-                  - echo Executing git commands
+                  
+                  # 변경사항 확인
+                  - git diff
+                  
+                  # Commit and Push
                   - git add .
-                  - 'git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"'
-                  - git push origin main
-                  - echo Changes pushed to IAC repository
+                  - |
+                    if git diff --staged --quiet; then
+                      echo "No changes to commit"
+                    else
+                      git commit -m "Update By CI/CD at $CURRENT_DATE - Image tag: $GIT_COMMIT"
+                      git push origin main || {
+                        echo "Push failed. Checking remote configuration..."
+                        git remote -v
+                        exit 1
+                      }
+                    fi
+                  - echo "Changes pushed to IAC repository"
 # Bitbucket 저장소 설정에서 설정해야 할 필수 환경 변수:
 # - DOCKER_HUB_USERNAME: Docker Hub 사용자명 (예: leehyeontae)
 # - DOCKER_HUB_PASSWORD: Docker Hub 액세스 토큰 (비밀번호 아님)
