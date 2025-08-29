@@ -62,6 +62,7 @@ export default function Home() {
 
       if (response.ok) {
         console.log("Test results saved successfully");
+        console.log("🚀 Control Panel v2.0 - CI/CD Test");
       } else {
         const errorData = await response.json();
         console.error("Failed to save test results:", {
