@@ -1,7 +1,8 @@
 # Multi-stage build for k6-runner-v2 with xk6-output-influxdb extension
 
 # Stage 1: Build custom k6 with xk6-output-influxdb extension
-FROM golang:1.23-alpine AS xk6-builder
+# k6 v1.5.0 requires Go 1.24+
+FROM golang:1.24-alpine AS xk6-builder
 
 # Install build dependencies
 RUN apk add --no-cache git

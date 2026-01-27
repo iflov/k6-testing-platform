@@ -38,32 +38,32 @@ export default function TestResults({
         Test Results
       </h2>
 
-      {metrics ? (
+      {metrics && metrics.http_req_duration && metrics.http_reqs && metrics.http_req_failed ? (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-50 p-4 rounded">
               <p className="text-sm text-gray-600">Avg Response Time</p>
               <p className="text-2xl font-bold text-gray-900">
-                {metrics.http_req_duration.avg.toFixed(2)} ms
+                {(metrics.http_req_duration.avg ?? 0).toFixed(2)} ms
               </p>
             </div>
 
             <div className="bg-gray-50 p-4 rounded">
               <p className="text-sm text-gray-600">Request Rate</p>
               <p className="text-2xl font-bold text-gray-900">
-                {metrics.http_reqs.rate.toFixed(1)} req/s
+                {(metrics.http_reqs.rate ?? 0).toFixed(1)} req/s
               </p>
             </div>
 
             <div className="bg-gray-50 p-4 rounded">
               <p className="text-sm text-gray-600">Active VUs</p>
-              <p className="text-2xl font-bold text-gray-900">{metrics.vus}</p>
+              <p className="text-2xl font-bold text-gray-900">{metrics.vus ?? 0}</p>
             </div>
 
             <div className="bg-gray-50 p-4 rounded">
               <p className="text-sm text-gray-600">Error Rate</p>
               <p className="text-2xl font-bold text-gray-900">
-                {(metrics.http_req_failed.rate * 100).toFixed(2)}%
+                {((metrics.http_req_failed.rate ?? 0) * 100).toFixed(2)}%
               </p>
             </div>
           </div>
@@ -76,19 +76,19 @@ export default function TestResults({
               <div className="flex justify-between">
                 <span className="text-gray-600">Min:</span>
                 <span className="font-mono text-gray-900">
-                  {metrics.http_req_duration.min.toFixed(2)} ms
+                  {(metrics.http_req_duration.min ?? 0).toFixed(2)} ms
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">P95:</span>
                 <span className="font-mono text-gray-900">
-                  {metrics.http_req_duration.p95.toFixed(2)} ms
+                  {(metrics.http_req_duration.p95 ?? 0).toFixed(2)} ms
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Max:</span>
                 <span className="font-mono text-gray-900">
-                  {metrics.http_req_duration.max.toFixed(2)} ms
+                  {(metrics.http_req_duration.max ?? 0).toFixed(2)} ms
                 </span>
               </div>
             </div>
