@@ -33,7 +33,6 @@ services:
       - influxdb
       - postgres
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock # For Docker API access
       - /tmp:/tmp # For temporary test files
       # 개발용 소스 코드 마운트 (hot reload)
       - ./apps/control-panel:/app

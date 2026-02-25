@@ -8,7 +8,7 @@ import TestResults from "@/components/TestResults";
 import TestProgress from "@/components/TestProgress";
 
 interface Metrics {
-  http_req_duration: { avg: number; min: number; max: number; p95: number };
+  http_req_duration: { avg: number; min: number; max: number; p95: number | null };
   http_reqs: { rate: number };
   vus: number;
   http_req_failed: { rate: number };
@@ -61,8 +61,7 @@ export default function Home() {
       });
 
       if (response.ok) {
-        console.log("Test results saved successfully");
-        console.log("🚀 Control Panel v2.0 - CI/CD Test");
+        // Test results saved successfully
       } else {
         const errorData = await response.json();
         console.error("Failed to save test results:", {
@@ -80,7 +79,7 @@ export default function Home() {
   const checkStatus = useCallback(async () => {
     // 현재 상태가 running이 아니면 중지
     if (statusRef.current !== "running") {
-      console.log("Status is not running, stopping polling");
+      // Status is not running, stopping polling
       return;
     }
 
@@ -88,14 +87,12 @@ export default function Home() {
       const response = await fetch("/api/k6/status");
       const data = await response.json();
 
-      console.log("Status check result:", data);
 
       // 에러 카운트 리셋
       errorCountRef.current = 0;
 
       // 테스트가 더 이상 실행 중이지 않으면
       if (!data.running) {
-        console.log("Test completed, stopping all polling");
 
         // 테스트 완료 시 최종 메트릭을 가져와서 저장
         if (testIdRef.current) {
@@ -136,7 +133,6 @@ export default function Home() {
 
       // 연속 에러가 10번 이상 발생하면 폴링 중지
       if (errorCountRef.current >= 10) {
-        console.error("Too many consecutive errors, stopping polling");
         setTestStatus("idle");
         setTestId(null);
         setMetrics(null);
@@ -156,7 +152,6 @@ export default function Home() {
   // 메트릭 폴링 함수 (setTimeout 재귀 방식)
   const pollMetrics = useCallback(async () => {
     if (statusRef.current !== "running" || !testIdRef.current) {
-      console.log("Stopping metrics polling");
       return;
     }
 
@@ -174,10 +169,8 @@ export default function Home() {
       try {
         const response = await fetch("/api/k6/status");
         const data = await response.json();
-        console.log("Initial status check on mount:", data);
 
         if (data.running && data.testId) {
-          console.log("Found running test on mount, setting status to running");
           setTestStatus("running");
           setTestId(data.testId);
         } else {
@@ -196,7 +189,6 @@ export default function Home() {
   // 테스트 상태에 따른 폴링 시작/중지
   useEffect(() => {
     if (testStatus === "running") {
-      console.log("Starting polling for running test");
 
       // 이전 타임아웃 정리
       if (pollingTimeoutRef.current) {
@@ -210,7 +202,6 @@ export default function Home() {
       checkStatus();
       pollMetrics();
     } else {
-      console.log("Test not running, cleaning up polling");
 
       // 모든 폴링 중지
       if (pollingTimeoutRef.current) {
@@ -250,7 +241,6 @@ export default function Home() {
         <div className="space-y-6">
           <TestController
             onTestStart={(id) => {
-              console.log("Test starting with ID:", id);
               // 모든 폴링 정리
               if (pollingTimeoutRef.current) {
                 clearTimeout(pollingTimeoutRef.current);
@@ -267,7 +257,6 @@ export default function Home() {
               errorCountRef.current = 0;
             }}
             onTestStop={() => {
-              console.log("Test stopping");
               // 모든 폴링 정리
               if (pollingTimeoutRef.current) {
                 clearTimeout(pollingTimeoutRef.current);

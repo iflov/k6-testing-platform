@@ -9,9 +9,20 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 
 app.use(express.json());
+const ALLOWED_ORIGINS = [
+  process.env.CONTROL_PANEL_URL || 'http://localhost:3000',
+  'http://control-panel:3000',
+];
+
 app.use(
   cors({
-    origin: '*', // Control Panel에서 접근
+    origin: (origin, callback) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
   }),

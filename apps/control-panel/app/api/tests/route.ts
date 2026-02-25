@@ -2,15 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { test_status } from "@prisma/client";
 
 import { prisma } from "@/src/lib/prisma";
-
-// BigInt 직렬화 커스텀 함수
-function serializeBigInt(obj: any): any {
-  return JSON.parse(
-    JSON.stringify(obj, (key, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    )
-  );
-}
+import { serializeBigInt } from "@/lib/serialize";
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,16 +37,11 @@ export async function GET(request: NextRequest) {
       offset,
     });
   } catch (error) {
-    console.error("Failed to fetch test runs:", error);
-
     // Prisma 초기화 오류 처리
     if (
       error instanceof Error &&
       error.name === "PrismaClientInitializationError"
     ) {
-      console.error(
-        "Database connection error - please check DATABASE_URL configuration"
-      );
       return NextResponse.json(
         {
           error:

@@ -7,7 +7,7 @@ interface TestResultsProps {
 }
 
 interface Metrics {
-  http_req_duration: { avg: number; min: number; max: number; p95: number };
+  http_req_duration: { avg: number; min: number; max: number; p95: number | null };
   http_reqs: { rate: number };
   vus: number;
   http_req_failed: { rate: number };
@@ -82,7 +82,9 @@ export default function TestResults({
               <div className="flex justify-between">
                 <span className="text-gray-600">P95:</span>
                 <span className="font-mono text-gray-900">
-                  {(metrics.http_req_duration.p95 ?? 0).toFixed(2)} ms
+                  {metrics.http_req_duration.p95 != null
+                    ? `${metrics.http_req_duration.p95.toFixed(2)} ms`
+                    : "N/A"}
                 </span>
               </div>
               <div className="flex justify-between">

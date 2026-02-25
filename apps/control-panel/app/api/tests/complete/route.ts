@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 테스트 실행 상태 업데이트
-    const updatedTestRun = await prisma.testRun.update({
+    await prisma.testRun.update({
       where: { id: testRun.id },
       data: {
         status: "completed",
@@ -67,16 +67,11 @@ export async function POST(request: NextRequest) {
       testResultId: testResult.id,
     });
   } catch (error) {
-    console.error("Failed to save test results:", error);
-
     // Prisma 초기화 오류 처리
     if (
       error instanceof Error &&
       error.name === "PrismaClientInitializationError"
     ) {
-      console.error(
-        "Database connection error - please check DATABASE_URL configuration"
-      );
       return NextResponse.json(
         {
           error:

@@ -55,8 +55,8 @@ export default function TestProgress({ testId, isRunning }: TestProgressProps) {
     // Initial fetch
     fetchProgress();
 
-    // Poll for updates every second
-    const interval = setInterval(fetchProgress, 1000);
+    // Poll for updates every 2 seconds (consistent with status/metrics polling)
+    const interval = setInterval(fetchProgress, 2000);
 
     return () => clearInterval(interval);
   }, [testId, isRunning]);

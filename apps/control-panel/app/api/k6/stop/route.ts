@@ -46,10 +46,8 @@ export async function POST(request: NextRequest) {
               completedAt: new Date(),
             },
           });
-          console.log("Test run status updated to CANCELLED:", testRun.id);
         }
-      } catch (dbError) {
-        console.error("Failed to update test status in database:", dbError);
+      } catch {
         // DB 업데이트 실패해도 stop은 성공으로 처리
       }
     }
@@ -59,10 +57,9 @@ export async function POST(request: NextRequest) {
       status: result.status || "stopped",
       testId: testId || result.testId,
     });
-  } catch (error) {
-    console.error("Failed to stop test:", error);
+  } catch {
     return NextResponse.json(
-      { error: "Failed to stop test", details: error },
+      { error: "Failed to stop test" },
       { status: 500 }
     );
   }

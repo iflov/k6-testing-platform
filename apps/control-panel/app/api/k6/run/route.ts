@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import config from "@/lib/config";
 import { prisma } from "@/src/lib/prisma";
+
+function safeJsonParse(value: string): Prisma.InputJsonValue {
+  try {
+    return JSON.parse(value) as Prisma.InputJsonValue;
+  } catch {
+    return value;
+  }
+}
 
 // K6 Runner 서비스를 통해 테스트 실행
 export async function POST(request: NextRequest) {
@@ -61,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // DB에 테스트 실행 정보 저장
     try {
-      const testRun = await prisma.testRun.create({
+      await prisma.testRun.create({
         data: {
           testId: testId,
           scenario: scenario || "default",
@@ -72,26 +81,14 @@ export async function POST(request: NextRequest) {
           targetUrl: targetUrl || config.mockServerUrl,
           urlPath: urlPath || "/",
           httpMethod: httpMethod || "GET",
-          requestBody: requestBody ? JSON.parse(requestBody) : null,
+          requestBody: requestBody
+            ? safeJsonParse(requestBody)
+            : Prisma.JsonNull,
           status: "running",
           startedAt: new Date(),
         },
       });
-
-      console.log("Test run saved to database:", testRun.id);
-
-      // 카오스 shutdown(서버 종료) 엔드포인트인 경우 로그 출력
-      if (urlPath && urlPath.includes("/chaos/shutdown")) {
-        console.log("⚠️ CHAOS SHUTDOWN TEST STARTED!");
-        console.log("  - Test ID:", testId);
-        console.log("  - Target URL:", targetUrl || config.mockServerUrl);
-        console.log("  - Endpoint:", urlPath);
-        console.log(
-          "  - Expected behavior: Mock server will shutdown after first request"
-        );
-      }
-    } catch (dbError) {
-      console.error("Failed to save test run to database:", dbError);
+    } catch {
       // DB 저장 실패 시 테스트 실행 계속 진행
     }
 
@@ -101,10 +98,9 @@ export async function POST(request: NextRequest) {
       dashboardUrl: result.dashboardUrl || config.k6DashboardUrl,
       status: result.status,
     });
-  } catch (error) {
-    console.error("Failed to start test:", error);
+  } catch {
     return NextResponse.json(
-      { error: "Failed to start test", details: error },
+      { error: "Failed to start test" },
       { status: 500 }
     );
   }
@@ -135,14 +131,13 @@ export async function GET() {
           ]
         : [],
     });
-  } catch (error) {
-    console.error("Failed to get test status:", error);
+  } catch {
     return NextResponse.json({ activeTests: [] }, { status: 200 });
   }
 }
 
 // 테스트 중지
-export async function DELETE() {
+export async function DELETE(_request: NextRequest) {
   try {
     const response = await fetch(config.k6RunnerTestStopUrl, {
       method: "POST",
@@ -158,14 +153,36 @@ export async function DELETE() {
 
     const result = await response.json();
 
+    // DB 상태 업데이트 (POST /api/k6/stop과 동일하게 처리)
+    const testId = result.testId;
+    if (testId) {
+      try {
+        const testRun = await prisma.testRun.findUnique({
+          where: { testId },
+        });
+
+        if (testRun && testRun.status === "running") {
+          await prisma.testRun.update({
+            where: { id: testRun.id },
+            data: {
+              status: "cancelled",
+              completedAt: new Date(),
+            },
+          });
+        }
+      } catch {
+        // DB 업데이트 실패해도 stop은 성공으로 처리
+      }
+    }
+
     return NextResponse.json({
       message: "Test stopped successfully",
       status: result.status,
+      testId,
     });
-  } catch (error) {
-    console.error("Failed to stop test:", error);
+  } catch {
     return NextResponse.json(
-      { error: "Failed to stop test", details: error },
+      { error: "Failed to stop test" },
       { status: 500 }
     );
   }

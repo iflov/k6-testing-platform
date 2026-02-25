@@ -852,6 +852,32 @@ docker push leehyeontae/k6-testing-platform-mock-server:latest
 - [K6 Performance Testing Guide](https://k6.io/docs/testing-guides/)
 - [Load Testing Best Practices](https://k6.io/docs/testing-guides/load-testing-websites/)
 
+## Known Issues & Future Improvements
+
+### Architecture
+
+| # | Issue | Description | Priority |
+|---|-------|-------------|----------|
+| 1 | No shared types | Control Panel and K6 Runner define types independently. API contract changes require manual sync. | Medium |
+| 2 | No API versioning | All endpoints are unversioned. Breaking changes affect all consumers simultaneously. | Low |
+| 3 | Single instance K6 Runner | Only one K6 test can run at a time (`currentTest` field). Not suitable for multi-user scenarios. | Low |
+| 4 | In-memory progress tracking | Test progress stored in `ProcessManagerService` Map. K6 Runner restart during test loses all progress data. | Medium |
+| 5 | No retry logic for InfluxDB writes | K6 process writes to InfluxDB via `xk6-output-influxdb`. Temporary InfluxDB unavailability causes metric loss. | Low |
+
+### Bugs / Edge Cases
+
+| # | Issue | Description | Priority |
+|---|-------|-------------|----------|
+| 6 | Race condition on test completion | `checkStatus()` fetches final metrics on completion, but `pollMetrics()` runs independently every 2s. Metrics may be stale if test completes between polling cycles. | Medium |
+| 7 | TestController.tsx is 1007 lines | Component handles too many responsibilities (scenario selection, execution mode, target server, endpoint, request body, error simulation). Should be split into smaller components. | Medium |
+
+### Configuration
+
+| # | Issue | Description | Priority |
+|---|-------|-------------|----------|
+| 8 | `.env` committed to repo | Root `.env` contains `POSTGRES_PASSWORD=testpassword` and `INFLUXDB_TOKEN=dev-token-for-testing`. Already in `.gitignore` but previously tracked files remain. | Low |
+| 9 | InfluxDB `--without-auth` | InfluxDB runs without authentication in development. Must be changed for production deployment. | High (prod) |
+
 <div align="center">
   <strong>Built with ❤️ for Performance Testing</strong>
   <br>

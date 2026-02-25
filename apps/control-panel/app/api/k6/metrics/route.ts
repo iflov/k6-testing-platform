@@ -2,10 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 
 import config from "@/lib/config";
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidTestId(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const testId = searchParams.get("testId");
   const realtime = searchParams.get("realtime") === "true";
+
+  if (testId && !isValidTestId(testId)) {
+    return NextResponse.json(
+      { error: "Invalid testId format" },
+      { status: 400 }
+    );
+  }
 
   // 실제 InfluxDB 3.x에서 메트릭 조회
   try {
@@ -14,8 +28,7 @@ export async function GET(request: NextRequest) {
 
     // InfluxDB 3.x (SQL 쿼리 사용)
     return await queryInfluxDb3Metrics(timeRange, testId);
-  } catch (error) {
-    console.error("Failed to fetch metrics from InfluxDB:", error);
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch metrics" },
       { status: 500 }
@@ -79,10 +92,6 @@ async function queryInfluxDb3(query: string) {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error("InfluxDB 3.x query failed:", response.statusText);
-    console.error("Error details:", errorText);
-    console.error("Query was:", query);
     throw new Error(`InfluxDB 3.x query failed: ${response.statusText}`);
   }
 
@@ -114,12 +123,12 @@ async function queryInfluxDb3HttpReqDuration(
       avg: parseFloat(result[0].avg) || 0,
       min: parseFloat(result[0].min) || 0,
       max: parseFloat(result[0].max) || 0,
-      p95: 0, // Not supported in InfluxDB 3.x SQL
-      p99: 0, // Not supported in InfluxDB 3.x SQL
+      p95: null,
+      p99: null,
     };
   }
 
-  return { avg: 0, min: 0, max: 0, p95: 0, p99: 0 };
+  return { avg: 0, min: 0, max: 0, p95: null, p99: null };
 }
 
 async function queryInfluxDb3HttpReqs(
