@@ -24,11 +24,14 @@ export async function POST(request: NextRequest) {
       urlPath,
       httpMethod,
       requestBody,
+      contentType = "json",
+      formFields = [],
       enableDashboard = false,
       enableErrorSimulation = false,
       errorRate = 10,
       errorTypes = {},
     } = await request.json();
+    const normalizedFormFields = Array.isArray(formFields) ? formFields : [];
 
     // k6-runner 서비스로 요청 전달
     const response = await fetch(config.k6RunnerTestStartUrl, {
@@ -46,6 +49,8 @@ export async function POST(request: NextRequest) {
         urlPath: urlPath,
         httpMethod: httpMethod || "GET",
         requestBody: requestBody,
+        contentType: contentType,
+        formFields: normalizedFormFields,
         enableDashboard: enableDashboard,
         enableErrorSimulation: enableErrorSimulation,
         errorRate: errorRate,
@@ -67,6 +72,12 @@ export async function POST(request: NextRequest) {
 
     const result = await response.json();
     const testId = result.testId || Date.now().toString();
+    const requestBodyForStorage =
+      contentType === "json"
+        ? requestBody
+        : normalizedFormFields.length > 0
+        ? JSON.stringify({ contentType, formFields: normalizedFormFields }, null, 2)
+        : null;
 
     // DB에 테스트 실행 정보 저장
     try {
@@ -81,8 +92,8 @@ export async function POST(request: NextRequest) {
           targetUrl: targetUrl || config.mockServerUrl,
           urlPath: urlPath || "/",
           httpMethod: httpMethod || "GET",
-          requestBody: requestBody
-            ? safeJsonParse(requestBody)
+          requestBody: requestBodyForStorage
+            ? safeJsonParse(requestBodyForStorage)
             : Prisma.JsonNull,
           status: "running",
           startedAt: new Date(),

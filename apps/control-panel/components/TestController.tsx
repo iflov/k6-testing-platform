@@ -17,6 +17,80 @@ interface TestControllerProps {
   testId?: string | null;
 }
 
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+type RequestContentType = "json" | "form-data" | "x-www-form-urlencoded";
+type FormFieldType = "text" | "file";
+
+interface FormFieldInput {
+  id: string;
+  key: string;
+  value: string;
+  fieldType: FormFieldType;
+  filename: string;
+  contentType: string;
+}
+
+interface TestControllerConfig {
+  scenario: ScenarioId;
+  vus: number;
+  duration: string;
+  iterations: number;
+  executionMode: ExecutionMode;
+  targetUrl: string;
+  selectedEndpoint: string;
+  urlPath: string;
+  httpMethod: HttpMethod;
+  requestBody: string;
+  contentType: RequestContentType;
+  formFields: FormFieldInput[];
+  enableDashboard: boolean;
+  enableErrorSimulation: boolean;
+  errorRate: number;
+  errorTypes: Record<string, boolean>;
+  useCustomEndpoint: boolean;
+}
+
+interface StartRequestPayload {
+  scenario: ScenarioId;
+  vus: number;
+  duration: string;
+  iterations: number;
+  executionMode: ExecutionMode;
+  targetUrl: string;
+  urlPath: string;
+  httpMethod: HttpMethod;
+  contentType?: RequestContentType;
+  requestBody?: string;
+  formFields?: Array<{
+    key: string;
+    value: string;
+    type: FormFieldType;
+    filename?: string;
+    contentType?: string;
+  }>;
+  enableDashboard: boolean;
+  enableErrorSimulation: boolean;
+  errorRate: number;
+  errorTypes: Record<string, boolean>;
+}
+
+const BODY_METHODS: HttpMethod[] = ["POST", "PUT", "PATCH"];
+
+const createDefaultRequestBody = () =>
+  JSON.stringify({ message: "Hello from k6!" }, null, 2);
+
+const createFormFieldId = () =>
+  `field-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createEmptyFormField = (): FormFieldInput => ({
+  id: createFormFieldId(),
+  key: "",
+  value: "",
+  fieldType: "text",
+  filename: "",
+  contentType: "application/octet-stream",
+});
+
 // 중앙 설정에서 시나리오 목록 가져오기
 const scenarios = getScenarioList();
 
@@ -67,7 +141,7 @@ export default function TestController({
   // 초기 시나리오 설정 가져오기
   const initialScenario = getScenarioConfig("load");
 
-  const [config, setConfig] = useState({
+  const [config, setConfig] = useState<TestControllerConfig>({
     scenario: "load" as ScenarioId,
     vus: initialScenario.defaultVus,
     duration: initialScenario.defaultDuration,
@@ -76,8 +150,10 @@ export default function TestController({
     targetUrl: configModule.mockServerUrl,
     selectedEndpoint: "GET /health",
     urlPath: "/health",
-    httpMethod: "GET" as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
-    requestBody: JSON.stringify({ message: "Hello from k6!" }, null, 2),
+    httpMethod: "GET",
+    requestBody: createDefaultRequestBody(),
+    contentType: "json",
+    formFields: [createEmptyFormField()],
     enableDashboard: true, // 항상 대시보드 활성화
     // Error simulation settings
     enableErrorSimulation: false,
@@ -95,6 +171,123 @@ export default function TestController({
     useCustomEndpoint: false,
   });
   const [loading, setLoading] = useState(false);
+  const shouldShowRequestEditor = BODY_METHODS.includes(config.httpMethod);
+
+  const handleContentTypeChange = (nextContentType: RequestContentType) => {
+    setConfig((previousConfig) => {
+      if (nextContentType === "json") {
+        return {
+          ...previousConfig,
+          contentType: nextContentType,
+        };
+      }
+
+      const normalizedFormFields =
+        previousConfig.formFields.length > 0
+          ? previousConfig.formFields.map((field) => ({
+              ...field,
+              fieldType:
+                nextContentType === "x-www-form-urlencoded"
+                  ? "text"
+                  : field.fieldType,
+            }))
+          : [createEmptyFormField()];
+
+      return {
+        ...previousConfig,
+        contentType: nextContentType,
+        formFields: normalizedFormFields,
+      };
+    });
+  };
+
+  const handleAddFormField = () => {
+    setConfig((previousConfig) => ({
+      ...previousConfig,
+      formFields: [...previousConfig.formFields, createEmptyFormField()],
+    }));
+  };
+
+  const handleRemoveFormField = (fieldIdToRemove: string) => {
+    setConfig((previousConfig) => {
+      const remainingFields = previousConfig.formFields.filter(
+        (formField) => formField.id !== fieldIdToRemove
+      );
+
+      return {
+        ...previousConfig,
+        formFields:
+          remainingFields.length > 0 ? remainingFields : [createEmptyFormField()],
+      };
+    });
+  };
+
+  const handleFormFieldChange = (
+    targetFieldId: string,
+    updates: Partial<FormFieldInput>
+  ) => {
+    setConfig((previousConfig) => ({
+      ...previousConfig,
+      formFields: previousConfig.formFields.map((formField) =>
+        formField.id === targetFieldId ? { ...formField, ...updates } : formField
+      ),
+    }));
+  };
+
+  const buildStartPayload = (): StartRequestPayload => {
+    const payload: StartRequestPayload = {
+      scenario: config.scenario,
+      vus: config.vus,
+      duration: config.duration,
+      iterations: config.iterations,
+      executionMode: config.executionMode,
+      targetUrl: config.targetUrl,
+      urlPath: config.urlPath,
+      httpMethod: config.httpMethod,
+      enableDashboard: config.enableDashboard,
+      enableErrorSimulation: config.enableErrorSimulation,
+      errorRate: config.errorRate,
+      errorTypes: config.errorTypes,
+    };
+
+    if (!shouldShowRequestEditor) {
+      return payload;
+    }
+
+    payload.contentType = config.contentType;
+
+    if (config.contentType === "json") {
+      payload.requestBody = config.requestBody;
+      return payload;
+    }
+
+    const normalizedFormFields = config.formFields
+      .map((formField) => ({
+        ...formField,
+        key: formField.key.trim(),
+      }))
+      .filter((formField) => formField.key.length > 0);
+
+    payload.formFields = normalizedFormFields.map((formField) => {
+      if (formField.fieldType === "file") {
+        return {
+          key: formField.key,
+          value: formField.value,
+          type: formField.fieldType,
+          filename: formField.filename.trim() || undefined,
+          contentType: formField.contentType.trim() || undefined,
+        };
+      }
+
+      return {
+        key: formField.key,
+        value: formField.value,
+        type: formField.fieldType,
+      };
+    });
+
+    return payload;
+  };
 
   const handleStart = async () => {
     // Warning for chaos shutdown endpoint
@@ -109,10 +302,11 @@ export default function TestController({
 
     setLoading(true);
     try {
+      const requestPayload = buildStartPayload();
       const response = await fetch("/api/k6/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify(requestPayload),
       });
       const data = await response.json();
 
@@ -525,12 +719,7 @@ export default function TestController({
                     targetUrl: configModule.mockServerUrl,
                     selectedEndpoint: "GET /success",
                     urlPath: "/success",
-                    httpMethod: "GET" as
-                      | "GET"
-                      | "POST"
-                      | "PUT"
-                      | "DELETE"
-                      | "PATCH",
+                    httpMethod: "GET" as HttpMethod,
                   })
                 }
                 className={`px-3 py-2 rounded-md border transition-colors ${
@@ -551,12 +740,7 @@ export default function TestController({
                     targetUrl: "",
                     selectedEndpoint: "custom",
                     urlPath: "/",
-                    httpMethod: "GET" as
-                      | "GET"
-                      | "POST"
-                      | "PUT"
-                      | "DELETE"
-                      | "PATCH",
+                    httpMethod: "GET" as HttpMethod,
                   })
                 }
                 className={`px-3 py-2 rounded-md border transition-colors ${
@@ -618,12 +802,7 @@ export default function TestController({
                   setConfig({
                     ...config,
                     selectedEndpoint: selectedValue,
-                    httpMethod: endpoint.method as
-                      | "GET"
-                      | "POST"
-                      | "PUT"
-                      | "DELETE"
-                      | "PATCH",
+                    httpMethod: endpoint.method as HttpMethod,
                     urlPath: endpoint.path,
                   });
                 }
@@ -663,12 +842,7 @@ export default function TestController({
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      httpMethod: e.target.value as
-                        | "GET"
-                        | "POST"
-                        | "PUT"
-                        | "DELETE"
-                        | "PATCH",
+                      httpMethod: e.target.value as HttpMethod,
                     })
                   }
                   className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
@@ -721,34 +895,185 @@ export default function TestController({
           )}
         </div>
 
-        {(config.httpMethod === "POST" ||
-          config.httpMethod === "PUT" ||
-          config.httpMethod === "PATCH") && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Request Body (JSON)
-            </label>
-            <textarea
-              value={config.requestBody}
-              onChange={(e) =>
-                setConfig({ ...config, requestBody: e.target.value })
-              }
-              rows={5}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 font-mono text-sm"
-              style={{
-                color:
-                  testStatus === "running"
-                    ? "rgb(156, 163, 175)"
-                    : "rgb(0, 0, 0)",
-                WebkitTextFillColor:
-                  testStatus === "running"
-                    ? "rgb(156, 163, 175)"
-                    : "rgb(0, 0, 0)",
-                opacity: 1,
-              }}
-              disabled={testStatus === "running"}
-              placeholder='{"key": "value"}'
-            />
+        {shouldShowRequestEditor && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Content Type
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(
+                  [
+                    { label: "JSON", value: "json" },
+                    { label: "Form Data", value: "form-data" },
+                    {
+                      label: "x-www-form-urlencoded",
+                      value: "x-www-form-urlencoded",
+                    },
+                  ] as Array<{
+                    label: string;
+                    value: RequestContentType;
+                  }>
+                ).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleContentTypeChange(option.value)}
+                    className={`px-3 py-2 rounded-md border text-sm transition-colors ${
+                      config.contentType === option.value
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                    disabled={testStatus === "running"}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {config.contentType === "json" ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Request Body (JSON)
+                </label>
+                <textarea
+                  value={config.requestBody}
+                  onChange={(e) =>
+                    setConfig({ ...config, requestBody: e.target.value })
+                  }
+                  rows={5}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 font-mono text-sm"
+                  style={{
+                    color:
+                      testStatus === "running"
+                        ? "rgb(156, 163, 175)"
+                        : "rgb(0, 0, 0)",
+                    WebkitTextFillColor:
+                      testStatus === "running"
+                        ? "rgb(156, 163, 175)"
+                        : "rgb(0, 0, 0)",
+                    opacity: 1,
+                  }}
+                  disabled={testStatus === "running"}
+                  placeholder='{"key": "value"}'
+                />
+              </div>
+            ) : (
+              <div className="border border-gray-200 rounded-lg p-3 space-y-3">
+                {config.formFields.map((formField) => (
+                  <div
+                    key={formField.id}
+                    className="border border-gray-200 rounded-md p-3 space-y-2"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                      <input
+                        type="text"
+                        value={formField.key}
+                        onChange={(e) =>
+                          handleFormFieldChange(formField.id, {
+                            key: e.target.value,
+                          })
+                        }
+                        placeholder="Field key"
+                        className="md:col-span-3 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
+                        disabled={testStatus === "running"}
+                      />
+                      <input
+                        type="text"
+                        value={formField.value}
+                        onChange={(e) =>
+                          handleFormFieldChange(formField.id, {
+                            value: e.target.value,
+                          })
+                        }
+                        placeholder={
+                          config.contentType === "form-data" &&
+                          formField.fieldType === "file"
+                            ? "/data/sample.xlsx"
+                            : "Field value"
+                        }
+                        className="md:col-span-5 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
+                        disabled={testStatus === "running"}
+                      />
+                      {config.contentType === "form-data" && (
+                        <select
+                          value={formField.fieldType}
+                          onChange={(e) =>
+                            handleFormFieldChange(formField.id, {
+                              fieldType: e.target.value as FormFieldType,
+                            })
+                          }
+                          className="md:col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
+                          disabled={testStatus === "running"}
+                        >
+                          <option value="text">text</option>
+                          <option value="file">file</option>
+                        </select>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFormField(formField.id)}
+                        className={`${
+                          config.contentType === "form-data"
+                            ? "md:col-span-2"
+                            : "md:col-span-4"
+                        } px-3 py-2 rounded-md border border-red-300 text-red-600 hover:bg-red-50 text-sm disabled:opacity-50`}
+                        disabled={testStatus === "running"}
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    {config.contentType === "form-data" &&
+                      formField.fieldType === "file" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            value={formField.filename}
+                            onChange={(e) =>
+                              handleFormFieldChange(formField.id, {
+                                filename: e.target.value,
+                              })
+                            }
+                            placeholder="Filename (optional)"
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
+                            disabled={testStatus === "running"}
+                          />
+                          <input
+                            type="text"
+                            value={formField.contentType}
+                            onChange={(e) =>
+                              handleFormFieldChange(formField.id, {
+                                contentType: e.target.value,
+                              })
+                            }
+                            placeholder="MIME Type (optional)"
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
+                            disabled={testStatus === "running"}
+                          />
+                        </div>
+                      )}
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddFormField}
+                    className="px-3 py-2 rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 text-sm disabled:opacity-50"
+                    disabled={testStatus === "running"}
+                  >
+                    + Add Field
+                  </button>
+                  {config.contentType === "form-data" && (
+                    <p className="text-xs text-gray-500">
+                      File path is based on the k6 runtime (container) path.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

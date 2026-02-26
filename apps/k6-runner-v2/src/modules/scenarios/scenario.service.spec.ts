@@ -206,6 +206,66 @@ describe('ScenarioService', () => {
       });
     });
   });
+
+  describe('generateK6Script', () => {
+    const baseConfig = {
+      fullUrl: 'https://example.com/api/test',
+      httpMethod: 'POST',
+      options: { scenarios: {} },
+    };
+
+    it('should generate JSON body script by default', () => {
+      const script = scenarioService.generateK6Script({
+        ...baseConfig,
+        requestBody: '{"message":"hello"}',
+      });
+
+      expect(script).toContain(`"Content-Type": "application/json"`);
+      expect(script).toContain('const requestBody =');
+      expect(script).toContain('const res = http.post(');
+    });
+
+    it('should generate multipart form-data script with file open() in init context', () => {
+      const script = scenarioService.generateK6Script({
+        ...baseConfig,
+        contentType: 'form-data',
+        formFields: [
+          {
+            key: 'file',
+            value: '/data/test.xlsx',
+            type: 'file',
+            filename: 'test.xlsx',
+            contentType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+          {
+            key: 'dryRun',
+            value: 'true',
+            type: 'text',
+          },
+        ],
+      });
+
+      expect(script).toContain(`const fileData0 = open("/data/test.xlsx", 'b');`);
+      expect(script).toContain('http.file(fileData0, "test.xlsx"');
+      expect(script).not.toContain(`'Content-Type': 'application/json'`);
+    });
+
+    it('should generate x-www-form-urlencoded script with encoded body', () => {
+      const script = scenarioService.generateK6Script({
+        ...baseConfig,
+        contentType: 'x-www-form-urlencoded',
+        formFields: [
+          { key: 'username', value: 'test user', type: 'text' },
+          { key: 'password', value: 'test+pass', type: 'text' },
+        ],
+      });
+
+      expect(script).toContain(`"Content-Type": "application/x-www-form-urlencoded"`);
+      expect(script).toContain('const formEntries = [');
+      expect(script).toContain('encodeURIComponent(fieldKey)');
+    });
+  });
 });
 
 describe('ScenarioService with mocked dependencies', () => {

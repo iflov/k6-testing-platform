@@ -39,6 +39,8 @@ export class TestService {
       errorRate = CONSTANTS.DEFAULT_ERROR_RATE,
       errorTypes = {},
       useHeaderForChaos = false,
+      contentType = 'json',
+      formFields = [],
     } = body;
 
     // K6 옵션 생성
@@ -73,6 +75,8 @@ export class TestService {
       fullUrl,
       httpMethod,
       requestBody: requestBody || undefined,
+      contentType,
+      formFields,
       urlPath,
       options,
       useHeaderForChaos,

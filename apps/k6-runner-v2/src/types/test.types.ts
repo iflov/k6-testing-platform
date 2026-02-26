@@ -1,5 +1,15 @@
 import { ChildProcess } from 'child_process';
 
+export type ContentType = 'json' | 'form-data' | 'x-www-form-urlencoded';
+
+export interface FormDataField {
+  key: string;
+  value: string;
+  type: 'text' | 'file';
+  filename?: string;
+  contentType?: string;
+}
+
 export interface TestConfig {
   vus?: number;
   duration?: string;
@@ -15,6 +25,8 @@ export interface TestConfig {
   errorRate?: number;
   errorTypes?: Record<string, boolean>;
   useHeaderForChaos?: boolean; // 헤더로 chaos 파라미터 전송 여부
+  contentType?: ContentType;
+  formFields?: FormDataField[];
 }
 
 export interface CurrentTest {

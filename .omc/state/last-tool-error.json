@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"/Users/admin/Desktop/k6-testing-platform/apps/mock-server/src\"}",
+  "error": "EISDIR: illegal operation on a directory, read '/Users/admin/Desktop/k6-testing-platform/apps/mock-server/src'",
+  "timestamp": "2026-02-26T01:06:08.638Z",
+  "retry_count": 1
+}
