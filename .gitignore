@@ -37,6 +37,8 @@ Thumbs.db
 grafana-data/
 influxdb-data/
 
-# Claude
-.serena
-.claude
+# Local agent/tool state
+/.serena/
+/.claude/
+/.omc/
+/.omx/
