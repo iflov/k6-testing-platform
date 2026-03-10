@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k6-runner
+  labels:
+    {{- include "k6-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/name: k6-runner
+spec:
+  replicas: {{ .Values.k6Runner.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: k6-runner
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k6-runner
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- if .Values.k6Runner.serviceAccount.create }}
+      serviceAccountName: {{ .Values.k6Runner.serviceAccount.name }}
+      {{- end }}
+      containers:
+        - name: k6-runner
+          image: "{{ .Values.k6Runner.image.repository }}:{{ .Values.k6Runner.image.tag }}"
+          imagePullPolicy: {{ .Values.k6Runner.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3002
+              protocol: TCP
+            - name: dashboard
+              containerPort: 5665
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.k6Runner.env.NODE_ENV | quote }}
+            - name: K6_DASHBOARD_HOST
+              value: {{ .Values.k6Runner.env.K6_DASHBOARD_HOST | quote }}
+            - name: K6_DASHBOARD_PORT
+              value: "5665"
+            - name: K6_DASHBOARD_PERIOD
+              value: {{ .Values.k6Runner.env.K6_DASHBOARD_PERIOD | quote }}
+            - name: INFLUXDB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: k6-platform-config
+                  key: INFLUXDB_URL
+            - name: INFLUXDB_ORG
+              valueFrom:
+                configMapKeyRef:
+                  name: k6-platform-config
+                  key: INFLUXDB_ORG
+            - name: INFLUXDB_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: k6-platform-config
+                  key: INFLUXDB_BUCKET
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.influxdb.existingSecret | default "influxdb-token" }}
+                  key: {{ .Values.influxdb.secretKeys.token }}
+            - name: MOCK_SERVER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: k6-platform-config
+                  key: MOCK_SERVER_URL
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.k6Runner.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

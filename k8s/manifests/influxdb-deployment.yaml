@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb
+  labels:
+    app: influxdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: influxdb
+  template:
+    metadata:
+      labels:
+        app: influxdb
+    spec:
+      containers:
+        - name: influxdb
+          image: influxdb:3-core
+          args:
+            - serve
+            - --node-id
+            - kind-local
+            - --object-store
+            - memory
+            - --without-auth
+          env:
+            - name: INFLUXDB_HTTP_BIND_ADDRESS
+              value: ":8181"
+          ports:
+            - containerPort: 8181
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+          volumeMounts:
+            - name: influxdb-tmp
+              mountPath: /var/lib/influxdb3
+      volumes:
+        - name: influxdb-tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb
+spec:
+  type: ClusterIP
+  selector:
+    app: influxdb
+  ports:
+    - port: 8181
+      targetPort: http
+      name: http

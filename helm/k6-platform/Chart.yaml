@@ -1,0 +1,13 @@
+apiVersion: v2
+name: k6-platform
+description: K6 Testing Platform - Load testing with real-time metrics
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - k6
+  - load-testing
+  - performance
+  - influxdb
+maintainers:
+  - name: k6-platform-team

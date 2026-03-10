@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # K6 Testing Platform - Kubernetes Deployment Script
-# This script handles deployment to local Kind cluster and remote EKS clusters
+# This script handles deployment to local Kind clusters and remote GKE clusters
 
 set -e
 
@@ -67,8 +67,8 @@ setup_kind_cluster() {
 build_and_load_images() {
     print_info "Building Docker images..."
     
-    # Build images
-    make build
+    # Build Kind-compatible images with commit tags
+    make k8s-build
     
     print_info "Loading images to Kind cluster..."
     make k8s-load
@@ -123,8 +123,9 @@ configure_argocd_ssh() {
 wait_for_pods() {
     print_info "Waiting for pods to be ready..."
     
-    kubectl wait --for=condition=ready pod -l app=control-panel -n ${NAMESPACE} --timeout=120s || true
-    kubectl wait --for=condition=ready pod -l app=k6-runner -n ${NAMESPACE} --timeout=120s || true
+    kubectl rollout status deployment/control-panel -n ${NAMESPACE} --timeout=180s || true
+    kubectl rollout status deployment/k6-runner -n ${NAMESPACE} --timeout=180s || true
+    kubectl rollout status deployment/mock-server -n ${NAMESPACE} --timeout=180s || true
     
     print_success "Pods are ready."
 }
@@ -140,23 +141,23 @@ display_access_info() {
     echo ""
     echo "1. Control Panel:"
     echo "   URL: http://localhost:3000"
-    echo "   Command: kubectl port-forward svc/control-panel-service -n ${NAMESPACE} 3000:3000"
+    echo "   Command: kubectl port-forward svc/control-panel -n ${NAMESPACE} 3000:3000"
     echo ""
     echo "2. K6 Runner:"
     echo "   URL: http://localhost:3002"
-    echo "   Command: kubectl port-forward svc/k6-runner-service -n ${NAMESPACE} 3002:3002"
+    echo "   Command: kubectl port-forward svc/k6-runner -n ${NAMESPACE} 3002:3002"
     echo ""
     echo "3. K6 Dashboard:"
     echo "   URL: http://localhost:5665"
-    echo "   Command: kubectl port-forward svc/k6-runner-service -n ${NAMESPACE} 5665:5665"
+    echo "   Command: kubectl port-forward svc/k6-runner -n ${NAMESPACE} 5665:5665"
     echo ""
     echo "4. InfluxDB:"
     echo "   URL: http://localhost:8181"
-    echo "   Command: kubectl port-forward svc/influxdb-service -n ${NAMESPACE} 8181:8181"
+    echo "   Command: kubectl port-forward svc/influxdb -n ${NAMESPACE} 8181:8181"
     echo ""
     echo "5. PostgreSQL:"
     echo "   Host: localhost:5432"
-    echo "   Command: kubectl port-forward svc/postgres-service -n ${NAMESPACE} 5432:5432"
+    echo "   Command: kubectl port-forward svc/postgres -n ${NAMESPACE} 5432:5432"
     echo ""
     
     if kubectl get namespace argocd &> /dev/null; then
@@ -198,9 +199,9 @@ deploy_mode() {
             configure_argocd_ssh
             print_warning "ArgoCD will handle deployment. Monitor the ArgoCD UI for progress."
             ;;
-        "eks")
-            print_info "Deploying to EKS cluster..."
-            print_warning "Make sure you're connected to the correct EKS cluster."
+        "gke")
+            print_info "Deploying to GKE cluster..."
+            print_warning "Make sure you're connected to the correct GKE cluster."
             kubectl config current-context
             read -p "Is this the correct cluster? (y/n) " -n 1 -r
             echo
@@ -213,7 +214,7 @@ deploy_mode() {
             ;;
         *)
             print_error "Unknown deployment mode: $mode"
-            echo "Usage: $0 [local|local-argocd|eks]"
+            echo "Usage: $0 [local|local-argocd|gke]"
             exit 1
             ;;
     esac
@@ -235,14 +236,14 @@ main() {
         echo "Select deployment mode:"
         echo "1) Local (Kind) - Direct deployment"
         echo "2) Local (Kind) - With ArgoCD"
-        echo "3) Remote (EKS)"
+        echo "3) Remote (GKE)"
         echo ""
         read -p "Enter choice [1-3]: " choice
         
         case $choice in
             1) mode="local" ;;
             2) mode="local-argocd" ;;
-            3) mode="eks" ;;
+            3) mode="gke" ;;
             *) print_error "Invalid choice"; exit 1 ;;
         esac
     else

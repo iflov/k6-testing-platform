@@ -3,9 +3,16 @@ import { Prisma } from "@prisma/client";
 import config from "@/lib/config";
 import { prisma } from "@/src/lib/prisma";
 
-function safeJsonParse(value: string): Prisma.InputJsonValue {
+type TestRunRequestBodyInput = NonNullable<
+  Prisma.TestRunUncheckedCreateInput["requestBody"]
+>;
+
+function safeJsonParse(value: string): Exclude<TestRunRequestBodyInput, typeof Prisma.JsonNull> {
   try {
-    return JSON.parse(value) as Prisma.InputJsonValue;
+    return JSON.parse(value) as Exclude<
+      TestRunRequestBodyInput,
+      typeof Prisma.JsonNull
+    >;
   } catch {
     return value;
   }

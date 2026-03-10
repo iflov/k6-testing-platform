@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: datasources
+    app.kubernetes.io/part-of: k6-platform
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: InfluxDB-K6
+        type: influxdb
+        access: proxy
+        url: http://INFLUXDB_VM_PRIVATE_IP:8181
+        database: k6
+        isDefault: true
+        jsonData:
+          version: Flux
+          organization: k6org
+          defaultBucket: k6
+        secureJsonData:
+          token: $__env{INFLUXDB_TOKEN}
+      - name: Cloud Monitoring
+        type: stackdriver
+        access: proxy
+        jsonData:
+          tokenUri: https://oauth2.googleapis.com/token
+          authenticationType: gce
+          defaultProject: PROJECT_ID

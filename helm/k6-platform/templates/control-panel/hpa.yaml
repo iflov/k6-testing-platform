@@ -1,0 +1,22 @@
+{{- if .Values.controlPanel.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: control-panel
+  labels:
+    {{- include "k6-platform.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: control-panel
+  minReplicas: {{ .Values.controlPanel.hpa.minReplicas }}
+  maxReplicas: {{ .Values.controlPanel.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.controlPanel.hpa.targetCPUUtilization }}
+{{- end }}

@@ -45,23 +45,25 @@ export class Config {
     this.k6RunnerBaseUrl =
       process.env.K6_RUNNER_BASE_URL ||
       (isK8s
-        ? "http://k6-runner-service.k6-platform.svc.cluster.local:3002"
-        : "http://k6-runner-service:3002");
+        ? "http://k6-runner.k6-platform.svc.cluster.local:3002"
+        : "http://k6-runner:3002");
     this.mockServerUrl =
       process.env.MOCK_SERVER_URL ||
       (isK8s
-        ? "http://mock-server-service.k6-platform.svc.cluster.local:3001"
+        ? "http://mock-server.k6-platform.svc.cluster.local:3001"
         : "http://host.docker.internal:3001");
     this.k6DashboardUrl =
       process.env.K6_DASHBOARD_URL ||
       (isK8s
-        ? "http://k6-runner-service.k6-platform.svc.cluster.local:5665"
-        : "http://k6-runner-service:5665");
+        ? "http://k6-runner.k6-platform.svc.cluster.local:5665"
+        : "http://k6-runner:5665");
 
     // InfluxDB 3.x 설정 (필수)
     this.influxDbUrl =
       process.env.INFLUXDB_URL ||
-      (isK8s ? "http://influxdb-service:8181" : "http://influxdb:8181");
+      (isK8s
+        ? "http://influxdb.k6-platform.svc.cluster.local:8181"
+        : "http://influxdb:8181");
     this.influxDbToken = process.env.INFLUXDB_TOKEN || "dev-token-for-testing";
     this.influxDbOrg = process.env.INFLUXDB_ORG || "k6org";
     this.influxDbBucket = process.env.INFLUXDB_BUCKET || "k6";

@@ -8,7 +8,6 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-# Use npm install instead of npm ci since we don't have package-lock.json
 RUN npm ci
 
 # Copy Prisma schema
@@ -26,9 +25,9 @@ RUN npm run build
 # Production stage
 FROM node:22-slim
 
-# Install OpenSSL for Prisma, Docker CLI to communicate with Docker daemon, and curl for health checks
+# Install OpenSSL for Prisma and curl for health checks
 RUN apt-get update && \
-    apt-get install -y openssl docker.io curl && \
+    apt-get install -y openssl curl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

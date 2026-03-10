@@ -42,3 +42,5 @@ influxdb-data/
 /.claude/
 /.omc/
 /.omx/
+/.codex/
+/.agents/

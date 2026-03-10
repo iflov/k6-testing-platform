@@ -6,7 +6,7 @@ echo "=========================================="
 
 # Configuration
 INFLUXDB_HOST="${INFLUXDB_HOST:-influxdb}"
-INFLUXDB_PORT="${INFLUXDB_PORT:-8086}"
+INFLUXDB_PORT="${INFLUXDB_PORT:-8181}"
 INFLUXDB_URL="http://${INFLUXDB_HOST}:${INFLUXDB_PORT}"
 INFLUXDB_TOKEN="${INFLUXDB_TOKEN:-dev-token-for-testing}"
 INFLUXDB_ORG="${INFLUXDB_ORG:-k6org}"

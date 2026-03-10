@@ -1,0 +1,49 @@
+# Local Kind cluster overrides
+controlPanel:
+  image:
+    pullPolicy: Never
+  service:
+    type: NodePort
+    nodePort: 30000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+k6Runner:
+  image:
+    pullPolicy: Never
+  service:
+    type: NodePort
+    nodePort: 30002
+    dashboardNodePort: 30665
+  resources:
+    requests:
+      cpu: 200m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+mockServer:
+  image:
+    pullPolicy: Never
+  service:
+    type: NodePort
+    nodePort: 30001
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+influxdb:
+  url: "http://influxdb:8181"
+
+networkPolicy:
+  enabled: false

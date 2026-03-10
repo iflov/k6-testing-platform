@@ -1,0 +1,118 @@
+name: cd
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+env:
+  REGISTRY_HOST: asia-northeast3-docker.pkg.dev
+  ARTIFACT_REGISTRY_REPOSITORY: k6-platform
+
+jobs:
+  build-and-push:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: control-panel
+            context: ./apps/control-panel
+            image_name: control-panel
+          - name: k6-runner
+            context: ./apps/k6-runner-v2
+            image_name: k6-runner
+          - name: mock-server
+            context: ./apps/mock-server
+            image_name: mock-server
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Authenticate to GCP
+        uses: ./.github/actions/setup-gcp
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          registry_host: ${{ env.REGISTRY_HOST }}
+
+      - name: Set image tags
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_BASE="${REGISTRY_HOST}/${{ secrets.GCP_PROJECT_ID }}/${ARTIFACT_REGISTRY_REPOSITORY}/${{ matrix.image_name }}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_base=${IMAGE_BASE}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push ${{ matrix.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.image_base }}:${{ steps.tags.outputs.short_sha }}
+            ${{ steps.tags.outputs.image_base }}:main
+
+  update-helm-values:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update GKE image tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SHORT_SHA="${GITHUB_SHA::7}"
+          python3 - <<'PY'
+import os
+import re
+from pathlib import Path
+
+short_sha = os.environ["SHORT_SHA"]
+path = Path("helm/k6-platform/values-gke-dev.yaml")
+text = path.read_text()
+
+for service in ("controlPanel", "k6Runner", "mockServer"):
+    pattern = rf"({service}:\n  image:\n    tag: )([^\n]+)"
+    updated, count = re.subn(pattern, rf"\g<1>{short_sha}", text, count=1)
+    if count != 1:
+        raise SystemExit(f"failed to update tag for {service}")
+    text = updated
+
+path.write_text(text)
+PY
+
+      - name: Commit updated Helm values
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet helm/k6-platform/values-gke-dev.yaml; then
+            echo "No Helm value changes detected"
+            exit 0
+          fi
+          git add helm/k6-platform/values-gke-dev.yaml
+          git commit -m "chore: update gke image tags [skip ci]"
+          git push
