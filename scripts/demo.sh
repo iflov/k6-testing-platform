@@ -5,6 +5,8 @@ DRY_RUN="${DRY_RUN:-false}"
 RUN_CLUSTER_START="${RUN_CLUSTER_START:-true}"
 RUN_CLUSTER_STOP="${RUN_CLUSTER_STOP:-false}"
 VALUES_FILE="${VALUES_FILE:-helm/k6-platform/values-gke-dev.yaml}"
+CONTROL_PANEL_BASE_URL="${CONTROL_PANEL_BASE_URL:-http://localhost:3000}"
+TEST_TARGET_URL="${TEST_TARGET_URL:-http://mock-server:3001}"
 
 run() {
   echo "+ $*"
@@ -40,13 +42,13 @@ else
   fi
 fi
 
-echo "[5/6] Run a smoke test from k6-runner"
+echo "[5/6] Run a smoke test through control-panel"
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "+ curl -sf -X POST http://localhost:3002/api/test/start -H 'Content-Type: application/json' -d '{"scenario":"smoke","vus":1,"duration":"30s","targetUrl":"http://mock-server:3001"}'"
+  echo "+ curl -sf -X POST ${CONTROL_PANEL_BASE_URL}/api/k6/run -H 'Content-Type: application/json' -d '{\"scenario\":\"smoke\",\"vus\":1,\"duration\":\"30s\",\"targetUrl\":\"${TEST_TARGET_URL}\"}'"
 else
-  curl -sf -X POST http://localhost:3002/api/test/start \
+  curl -sf -X POST "${CONTROL_PANEL_BASE_URL}/api/k6/run" \
     -H 'Content-Type: application/json' \
-    -d '{"scenario":"smoke","vus":1,"duration":"30s","targetUrl":"http://mock-server:3001"}' || true
+    -d "{\"scenario\":\"smoke\",\"vus\":1,\"duration\":\"30s\",\"targetUrl\":\"${TEST_TARGET_URL}\"}" || true
 fi
 
 echo "[6/6] Wrap up demo"
