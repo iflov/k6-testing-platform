@@ -106,13 +106,15 @@ cp apps/k6-runner-v2/.env.example apps/k6-runner-v2/.env
 make dev
 
 # 또는 백그라운드 실행
-make up  # 또는 docker-compose up -d --build
+make up  # 또는 docker compose up -d --build
 
 # 백그라운드 실행 후 로그 확인
-make logs  # 또는 docker-compose logs -f
+make logs  # 또는 docker compose logs -f
 ```
 
 ### 3. 서비스 접속
+
+아래 URL은 기본 호스트 포트 기준입니다. `.env`의 포트 값이나 `make test CONTROL_PANEL_PORT=...` 같은 override를 사용하면 달라질 수 있습니다.
 
 | 서비스               | URL                   | 설명                               |
 | -------------------- | --------------------- | ---------------------------------- |
@@ -126,7 +128,7 @@ make logs  # 또는 docker-compose logs -f
 
 #### 방법 1: Control Panel UI 사용 (권장)
 
-1. http://localhost:3000 접속
+1. 기본값 기준 `http://localhost:3000` 접속
 2. **Target Server 선택**:
    - **Mock Server**: 내장된 테스트 서버 사용 (기본값)
    - **Custom URL**: 외부 API 테스트 (예: https://api.example.com)
@@ -137,11 +139,17 @@ make logs  # 또는 docker-compose logs -f
 5. VU 수와 기간 설정
 6. "Start Test" 클릭
 
-#### 방법 2: Docker Compose 사용
+#### 방법 2: CLI / Make 사용
 
 ```bash
-# 환경 변수와 함께 실행
-VUS=50 DURATION=5m docker-compose --profile test up k6
+# 기본 smoke 테스트
+make test-quick
+
+# Control Panel 호스트 포트를 바꿨다면
+make test CONTROL_PANEL_PORT=3100
+
+# 또는 base URL을 직접 지정
+make test-quick CONTROL_PANEL_BASE_URL=http://localhost:3100
 ```
 
 ## 🎯 사용 가이드
@@ -244,7 +252,9 @@ make install
 make dev
 
 # 서비스 상태 확인
-docker-compose ps
+make health
+# 또는
+docker compose ps
 ```
 
 ### 개별 서비스 개발
@@ -268,7 +278,7 @@ npm run start:dev  # http://localhost:3001
 #### K6 Runner (Express)
 
 ```bash
-cd apps/k6-runner
+cd apps/k6-runner-v2
 npm install
 npm run dev  # http://localhost:3002
 ```
@@ -433,6 +443,13 @@ duration: '2m'
 #### Control Panel (.env)
 
 ```env
+# Service Configuration
+NODE_ENV=production
+PORT=3000
+
+# Prisma - PostgreSQL
+DATABASE_URL=postgresql://test_admin:testpassword@postgres:5432/k6_test_history?schema=public
+
 # K6 Runner 연결
 K6_RUNNER_BASE_URL=http://k6-runner:3002
 
@@ -440,61 +457,61 @@ K6_RUNNER_BASE_URL=http://k6-runner:3002
 MOCK_SERVER_URL=http://mock-server:3001
 
 # K6 Dashboard URL
-K6_DASHBOARD_URL=http://localhost:5665
+K6_DASHBOARD_URL=http://k6-runner:5665
 
-# InfluxDB 설정
-K6_INFLUXDB_URL=http://influxdb:8181
-K6_INFLUXDB_DB=k6
+# InfluxDB 3.x 설정
+INFLUXDB_URL=http://influxdb:8181
+INFLUXDB_ORG=k6org
+INFLUXDB_BUCKET=k6
+INFLUXDB_TOKEN=dev-token-for-testing
 ```
 
 #### K6 Runner (.env)
 
 ```env
+# Service Configuration
+NODE_ENV=development
+
 # 서비스 포트
 PORT=3002
 
-# InfluxDB 설정
+# InfluxDB 3.x 설정
 INFLUXDB_URL=http://influxdb:8181
+INFLUXDB_ORG=k6org
+INFLUXDB_BUCKET=k6
+INFLUXDB_TOKEN=dev-token-for-testing
 
 # K6 Dashboard 설정
 K6_DASHBOARD_PORT=5665
 K6_DASHBOARD_HOST=0.0.0.0
+K6_DASHBOARD_PERIOD=10s
 
 # Mock Server URL
 MOCK_SERVER_URL=http://mock-server:3001
+
+# 완료 시 history 저장 콜백
+CONTROL_PANEL_URL=http://localhost:3000
 ```
 
 #### Mock Server 환경 변수
 
 ```env
+# Service Configuration
+NODE_ENV=development
+
 # 서비스 포트
 PORT=3001
-
-# 응답 지연 시뮬레이션
-ENABLE_DELAY=true          # 응답 지연 활성화
-MIN_DELAY=0                # 최소 지연 (ms)
-MAX_DELAY=100              # 최대 지연 (ms)
-
-# 에러 시뮬레이션
-ENABLE_ERROR_SIMULATION=true  # 에러 시뮬레이션
-ERROR_RATE=5               # 에러 발생률 (%)
-
-# 리소스 제한 시뮬레이션
-ENABLE_RATE_LIMIT=false    # Rate limiting
-RATE_LIMIT_MAX=100         # 분당 최대 요청 수
 ```
 
-### K6 테스트 환경 변수
+### 로컬 실행 / Make Override 변수
 
-| 변수명                  | 설명               | 기본값                  | 예시                    |
-| ----------------------- | ------------------ | ----------------------- | ----------------------- |
-| `VUS`                   | Virtual Users 수   | 10                      | 50, 100, 500            |
-| `DURATION`              | 테스트 기간        | 1m                      | 30s, 5m, 1h             |
-| `TARGET_URL`            | 테스트 대상 URL    | http://mock-server:3001 | http://api.example.com  |
-| `ENDPOINT`              | 테스트 엔드포인트  | /                       | /api/health, /api/users |
-| `K6_WEB_DASHBOARD`      | 웹 대시보드 활성화 | true                    | true, false             |
-| `K6_WEB_DASHBOARD_PORT` | 대시보드 포트      | 5665                    | 5665, 8080              |
-| `THINK_TIME`            | 요청 간 대기 시간  | 1s                      | 0s, 500ms, 2s           |
+| 변수명                     | 설명                         | 기본값                    | 예시                         |
+| -------------------------- | ---------------------------- | ------------------------- | ---------------------------- |
+| `CONTROL_PANEL_PORT`       | Make가 호출할 Control Panel 포트 | `3000`                    | `3100`                       |
+| `CONTROL_PANEL_BASE_URL`   | Make/스크립트가 호출할 API base URL | `http://localhost:3000` | `http://localhost:3100`      |
+| `TEST_TARGET_URL`          | 부하 테스트 대상 URL          | `http://mock-server:3001` | `http://host.docker.internal:3101` |
+| `K6_DASHBOARD_PORT`        | 대시보드 호스트 포트          | `5665`                    | `5765`                       |
+| `K6_DASHBOARD_BASE_URL`    | 대시보드 base URL            | `http://localhost:5665`   | `http://localhost:5765`      |
 
 ## 📊 K6 웹 대시보드
 
@@ -564,18 +581,21 @@ make up            # 백그라운드 실행
 make down          # 서비스 중지
 make restart       # 서비스 재시작
 make logs          # 실시간 로그 확인
-make ps            # 서비스 상태 확인
+make health        # 서비스 상태 확인
 
 # 빌드 명령어
 make build         # 모든 이미지 빌드
 make build-control # Control Panel 빌드
 make build-mock    # Mock Server 빌드
-make build-runner  # K6 Runner 빌드
+make build-runner-v2 # K6 Runner 빌드
 
 # 테스트 명령어
 make test          # 기본 테스트 실행
-make test-load     # Load 테스트 실행
+make test-quick    # Smoke 테스트 실행
 make test-stress   # Stress 테스트 실행
+make status        # 현재 테스트 상태 확인
+make test CONTROL_PANEL_PORT=3100
+make test-quick CONTROL_PANEL_BASE_URL=http://localhost:3100
 
 # 정리 명령어
 make clean         # 컨테이너 및 볼륨 정리
@@ -612,10 +632,16 @@ make clean-all     # 이미지 포함 전체 정리
 
 #### 테스트 시작 예시
 
+포트 충돌이 있으면 베이스 URL을 먼저 정해두고 호출할 수 있습니다.
+
+```bash
+export CONTROL_PANEL_BASE_URL=${CONTROL_PANEL_BASE_URL:-http://localhost:3000}
+```
+
 ##### Mock Server 테스트
 
 ```bash
-curl -X POST http://localhost:3000/api/k6/run \
+curl -X POST "$CONTROL_PANEL_BASE_URL/api/k6/run" \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "load",
@@ -631,7 +657,7 @@ curl -X POST http://localhost:3000/api/k6/run \
 ##### 외부 API 테스트
 
 ```bash
-curl -X POST http://localhost:3000/api/k6/run \
+curl -X POST "$CONTROL_PANEL_BASE_URL/api/k6/run" \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "stress",
@@ -703,9 +729,11 @@ sudo chmod 666 /var/run/docker.sock
 lsof -i :3000
 netstat -tulpn | grep 3000
 
-# docker-compose.yml에서 포트 변경
-ports:
-  - "3001:3000"  # 호스트:컨테이너
+# Make 실행 포트만 바꾸려면
+make test CONTROL_PANEL_PORT=3100
+
+# Compose 서비스 포트를 바꾸려면 (.env 사용)
+CONTROL_PANEL_PORT=3100 MOCK_SERVER_PORT=3101 K6_RUNNER_PORT=3102 docker compose up -d
 ```
 
 #### 3. 메모리 부족
@@ -717,16 +745,16 @@ ports:
 
 ```bash
 # 네트워크 재생성
-docker-compose down
+docker compose down
 docker network prune
-docker-compose up -d
+docker compose up -d
 ```
 
 #### 5. K6 Dashboard 접속 불가
 
 ```bash
 # 포트 확인
-docker-compose logs k6-runner | grep "Dashboard"
+docker compose logs k6-runner | grep "Dashboard"
 
 # 방화벽 규칙 확인
 sudo ufw allow 5665/tcp
@@ -841,7 +869,12 @@ flowchart LR
 - `scripts/cluster-start.sh`, `scripts/cluster-stop.sh` — GKE 비용 절감용 운영 스크립트
 - `scripts/demo.sh` — 데모 플로우 자동화 스크립트
 
+K8s 배포 후에는 `control-panel` Pod의 `control-panel-migrate` initContainer가 먼저 성공해야 테이블이 생성됩니다. 배포 직후 `kubectl logs <control-panel-pod> -n k6-platform -c control-panel-migrate` 와 `kubectl get pod <control-panel-pod> -n k6-platform -o jsonpath="{.status.initContainerStatuses[*].state}"` 로 migration 성공 여부를 확인하세요. 자세한 점검 순서는 `docs/runbook/demo-gitops-runbook.md` 에 정리되어 있습니다.
+
 ### 포트폴리오 문서
+
+문서 안내가 필요하면 먼저 `docs/README.md` 를 보세요.  
+현재 운영/설명용 문서와 과거 계획 문서를 구분해서 안내합니다.
 
 - `docs/architecture/cost-comparison.md`
 - `docs/architecture/multi-cloud-tradeoffs.md`
@@ -879,7 +912,7 @@ docker run -p 3001:3001 leehyeontae/k6-testing-platform-mock-server:latest
 
 ```bash
 # 1. 로컬에서 이미지 빌드
-docker-compose build --no-cache mock-server
+docker compose build --no-cache mock-server
 
 # 2. Docker Hub 태그 지정
 docker tag k6-testing-platform-mock-server:latest leehyeontae/k6-testing-platform-mock-server:latest

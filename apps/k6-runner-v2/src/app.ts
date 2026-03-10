@@ -6,13 +6,16 @@ import testRouter from './routes/route';
 import { container } from './container/container';
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 3002;
 
 app.use(express.json());
-const ALLOWED_ORIGINS = [
-  process.env.CONTROL_PANEL_URL || 'http://localhost:3000',
-  'http://control-panel:3000',
-];
+const ALLOWED_ORIGINS = Array.from(
+  new Set([
+    'http://localhost:3000',
+    process.env.CONTROL_PANEL_URL || 'http://localhost:3000',
+    'http://control-panel:3000',
+  ]),
+);
 
 app.use(
   cors({

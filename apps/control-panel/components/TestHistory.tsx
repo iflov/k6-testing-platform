@@ -53,6 +53,9 @@ export default function TestHistory() {
       setLoading(true);
       setError(null);
       const response = await fetch("/api/tests?limit=100");
+      if (!response.ok) {
+        throw new Error(`Failed to fetch test history (${response.status})`);
+      }
       const data = await response.json();
 
       // API returns data array, not tests array

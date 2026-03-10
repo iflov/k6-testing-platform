@@ -1,5 +1,8 @@
 # K6 Testing Platform - AWS 프로덕션 배포 작업 계획서
 
+> **문서 성격:** legacy planning artifact
+> **현재 상태:** 기본 방향은 GKE 기준으로 전환되었으며, 이 문서는 AWS 대안 검토 이력으로 보존
+> **현재 참고 우선순위:** 현재 구현/운영 기준은 `docs/work-plan-gke-migration-implementation-status.md` 및 `docs/runbook/demo-gitops-runbook.md`
 > **버전:** v3-final (Ralplan Consensus)
 > **작성일:** 2026-03-09
 > **컨센서스:** Planner (3 iterations) + Architect (3 reviews) + Critic (2 reviews) → APPROVED

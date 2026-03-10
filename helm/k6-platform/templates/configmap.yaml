@@ -12,5 +12,6 @@ data:
   POSTGRES_PORT: {{ .Values.postgresql.port | quote }}
   POSTGRES_DB: {{ .Values.postgresql.database | quote }}
   MOCK_SERVER_URL: "http://mock-server:{{ .Values.mockServer.service.port }}"
+  CONTROL_PANEL_URL: "http://control-panel:{{ .Values.controlPanel.service.port }}"
   K6_RUNNER_BASE_URL: "http://k6-runner:{{ .Values.k6Runner.service.port }}"
   K6_DASHBOARD_URL: "http://k6-runner:{{ .Values.k6Runner.service.dashboardPort }}"

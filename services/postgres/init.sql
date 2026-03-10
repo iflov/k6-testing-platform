@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS test_runs (
 -- Create test_results table
 CREATE TABLE IF NOT EXISTS test_results (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    test_run_id UUID NOT NULL REFERENCES test_runs(id) ON DELETE CASCADE,
+    test_run_id UUID NOT NULL UNIQUE REFERENCES test_runs(id) ON DELETE CASCADE,
     total_requests INTEGER NOT NULL,
     failed_requests INTEGER NOT NULL,
     avg_response_time DOUBLE PRECISION NOT NULL,
@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS test_results (
 CREATE INDEX idx_test_runs_test_id ON test_runs(test_id);
 CREATE INDEX idx_test_runs_status ON test_runs(status);
 CREATE INDEX idx_test_runs_started_at ON test_runs(started_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS test_results_test_run_id_key ON test_results(test_run_id);
 CREATE INDEX idx_test_results_test_run_id ON test_results(test_run_id);
 
 -- Create updated_at trigger function

@@ -16,6 +16,44 @@ export class TestService {
     private readonly processManagerService: ProcessManagerService,
   ) {}
 
+  private async notifyControlPanelTestCompletion(
+    testId: string,
+    status: 'completed' | 'failed',
+  ) {
+    try {
+      const response = await fetch(
+        `${this.configService.getControlPanelUrl()}/api/tests/complete`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            testId,
+            status,
+            completedAt: new Date().toISOString(),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to notify control-panel about test completion:', {
+          testId,
+          status,
+          statusCode: response.status,
+          errorText,
+        });
+      }
+    } catch (error) {
+      console.error('Error notifying control-panel about test completion:', {
+        testId,
+        status,
+        error,
+      });
+    }
+  }
+
   async startTest(body: TestConfig) {
     if (this.currentTest != null) {
       throw new Error('Another test is already running');
@@ -109,9 +147,14 @@ export class TestService {
     });
 
     // 프로세스 종료 시 currentTest 정리
-    k6Process.on('exit', async () => {
+    k6Process.on('exit', async (code, signal) => {
       if (this.currentTest?.testId === testId) {
         // console.warn(`Test ${testId} process exited, clearing currentTest`);
+
+        const completionStatus =
+          code === 0 && signal !== 'SIGTERM' ? 'completed' : 'failed';
+
+        await this.notifyControlPanelTestCompletion(testId, completionStatus);
 
         // timeout 정리
         if (this.currentTest.timeoutId) {

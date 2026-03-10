@@ -11,6 +11,13 @@ ARGOCD_PROJECT_MANIFEST ?= $(ARGOCD_DIR)/projects/k6-platform.yaml
 ARGOCD_APPLICATION_MANIFEST ?= $(ARGOCD_DIR)/applications/k6-platform.yaml
 ARGOCD_REPO_URL ?= https://github.com/your-org/k6-testing-platform.git
 
+# Local endpoint configuration (override when host ports differ, e.g. Kind)
+CONTROL_PANEL_PORT ?= 3000
+K6_DASHBOARD_PORT ?= 5665
+CONTROL_PANEL_BASE_URL ?= http://localhost:$(CONTROL_PANEL_PORT)
+K6_DASHBOARD_BASE_URL ?= http://localhost:$(K6_DASHBOARD_PORT)
+TEST_TARGET_URL ?= http://mock-server:3001
+
 # Default target
 help:
 	@echo "╔══════════════════════════════════════════════════════════════╗"
@@ -97,8 +104,9 @@ help:
 	@echo "💡 Tips:"
 	@echo "  - InfluxDB 3.x is now the default (token-based auth)"
 	@echo "  - K6 Runner includes xk6-output-influxdb extension"
-	@echo "  - Access Control Panel at http://localhost:3000"
-	@echo "  - Access K6 Dashboard at http://localhost:5665"
+	@echo "  - Access Control Panel at $(CONTROL_PANEL_BASE_URL)"
+	@echo "  - Access K6 Dashboard at $(K6_DASHBOARD_BASE_URL)"
+	@echo "  - Override ports/base URL if needed, e.g. make test CONTROL_PANEL_PORT=3100"
 
 # Install dependencies
 install:
@@ -149,28 +157,28 @@ build-runner-v2:
 # Run tests with InfluxDB 3.x
 test:
 	@echo "Running load test with InfluxDB 3.x..."
-	@echo "Starting test via K6 Runner API..."
-	@curl -X POST http://localhost:3002/api/test/start \
+	@echo "Starting test via Control Panel API..."
+	@curl -X POST $(CONTROL_PANEL_BASE_URL)/api/k6/run \
 		-H "Content-Type: application/json" \
-		-d '{"scenario": "load", "targetUrl": "http://mock-server:3001", "duration": "30s", "vus": 10}' | jq '.'
+		-d '{"scenario": "load", "targetUrl": "$(TEST_TARGET_URL)", "duration": "30s", "vus": 10}' | jq '.'
 
 test-stress:
 	@echo "Running stress test with InfluxDB 3.x..."
-	@curl -X POST http://localhost:3002/api/test/start \
+	@curl -X POST $(CONTROL_PANEL_BASE_URL)/api/k6/run \
 		-H "Content-Type: application/json" \
-		-d '{"scenario": "stress", "targetUrl": "http://mock-server:3001", "duration": "2m", "vus": 50}' | jq '.'
+		-d '{"scenario": "stress", "targetUrl": "$(TEST_TARGET_URL)", "duration": "2m", "vus": 50}' | jq '.'
 
 test-spike:
 	@echo "Running spike test with InfluxDB 3.x..."
-	@curl -X POST http://localhost:3002/api/test/start \
+	@curl -X POST $(CONTROL_PANEL_BASE_URL)/api/k6/run \
 		-H "Content-Type: application/json" \
-		-d '{"scenario": "spike", "targetUrl": "http://mock-server:3001", "duration": "2m", "vus": 100}' | jq '.'
+		-d '{"scenario": "spike", "targetUrl": "$(TEST_TARGET_URL)", "duration": "2m", "vus": 100}' | jq '.'
 
 test-soak:
 	@echo "Running soak test (this will take a while)..."
-	@curl -X POST http://localhost:3002/api/test/start \
+	@curl -X POST $(CONTROL_PANEL_BASE_URL)/api/k6/run \
 		-H "Content-Type: application/json" \
-		-d '{"scenario": "soak", "targetUrl": "http://mock-server:3001", "duration": "10m", "vus": 5}' | jq '.'
+		-d '{"scenario": "soak", "targetUrl": "$(TEST_TARGET_URL)", "duration": "10m", "vus": 5}' | jq '.'
 
 # Docker Hub Configuration
 DOCKER_HUB_USER ?= leehyeontae
@@ -603,26 +611,26 @@ argocd-full-deploy: argocd-setup argocd-add-repo argocd-deploy-apps ## Full Argo
 # Quick test commands
 test-quick:
 	@echo "Running quick smoke test with InfluxDB 3.x..."
-	curl -X POST http://localhost:3002/api/test/start \
+	curl -X POST $(CONTROL_PANEL_BASE_URL)/api/k6/run \
 		-H "Content-Type: application/json" \
-		-d '{"scenario": "smoke", "targetUrl": "http://mock-server:3001", "duration": "10s", "vus": 5}' | jq '.'
+		-d '{"scenario": "smoke", "targetUrl": "$(TEST_TARGET_URL)", "duration": "10s", "vus": 5}' | jq '.'
 
 test-custom:
 	@echo "Running custom test with parameters..."
 	@read -p "Enter VUs (default 10): " vus; \
 	read -p "Enter duration (default 30s): " duration; \
-	curl -X POST http://localhost:3002/api/test/start \
+	curl -X POST $(CONTROL_PANEL_BASE_URL)/api/k6/run \
 		-H "Content-Type: application/json" \
-		-d "{\"scenario\": \"custom\", \"vus\": $${vus:-10}, \"duration\": \"$${duration:-30s}\", \"targetUrl\": \"http://mock-server:3001\"}" | jq '.'
+		-d "{\"scenario\": \"custom\", \"vus\": $${vus:-10}, \"duration\": \"$${duration:-30s}\", \"targetUrl\": \"$(TEST_TARGET_URL)\"}" | jq '.'
 
 # Status commands
 status:
 	@echo "Checking test status..."
-	@curl -s http://localhost:3002/api/test/status | jq '.' || echo "No test running"
+	@curl -s $(CONTROL_PANEL_BASE_URL)/api/k6/status | jq '.' || echo "No test running"
 
 stop-test:
 	@echo "Stopping current test..."
-	@curl -X POST http://localhost:3002/api/test/stop | jq '.'
+	@curl -X POST $(CONTROL_PANEL_BASE_URL)/api/k6/stop | jq '.'
 
 # Environment setup
 setup-env:

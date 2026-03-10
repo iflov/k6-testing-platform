@@ -70,6 +70,25 @@ kubectl get pods -A
 kubectl get svc -A
 ```
 
+### Control Panel DB migration 확인
+
+`control-panel` Pod는 시작 전에 `control-panel-migrate` initContainer로
+`apps/control-panel/scripts/migrate-db.sh` 를 실행한다.
+
+확인 명령:
+
+```bash
+kubectl get pods -n k6-platform
+kubectl get pod <control-panel-pod> -n k6-platform -o jsonpath="{.status.initContainerStatuses[*].state}"
+kubectl logs <control-panel-pod> -n k6-platform -c control-panel-migrate
+```
+
+정상 기대값:
+
+- initContainer 상태가 `terminated` + `exitCode: 0`
+- 로그에 `Ensuring PostgreSQL extension uuid-ossp exists...`
+- 로그에 `Applying Prisma migrations...`
+
 ### ArgoCD UI 접근
 
 ```bash
@@ -90,6 +109,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 2. GitHub Actions(`.github/workflows/cd.yml`)가 Artifact Registry로 이미지 빌드/푸시
 3. `helm/k6-platform/values-gke-dev.yaml`의 태그가 커밋되고 ArgoCD가 변경 감지 후 sync
 4. `kubectl get pods -n k6-platform`로 rollout 확인
+5. `control-panel-migrate` initContainer 성공 여부 확인
 
 ### 발표용 설명 포인트
 
@@ -115,7 +135,94 @@ kubectl rollout status deployment/k6-runner -n k6-platform
 kubectl rollout status deployment/mock-server -n k6-platform
 ```
 
-## 7. 현재 한계
+## 7. DB 테이블 미생성 / Prisma migration 장애 대응
+
+### 증상
+
+- `control-panel` 은 떠 있지만 `/api/tests` 호출 시 500 발생
+- `test_runs`, `test_results` 테이블이 없음
+- Pod가 `Init:CrashLoopBackOff` 에 머무름
+- `control-panel-migrate` 로그에 Prisma/extension 권한 오류 표시
+
+### 1차 확인
+
+```bash
+kubectl get pods -n k6-platform
+kubectl describe pod <control-panel-pod> -n k6-platform
+kubectl logs <control-panel-pod> -n k6-platform -c control-panel-migrate
+```
+
+### DB 연결/테이블 확인
+
+Cloud SQL 또는 외부 PostgreSQL에 접근 가능한 환경이라면:
+
+```bash
+psql "$DATABASE_URL" -c '\dt'
+psql "$DATABASE_URL" -c 'select * from "_prisma_migrations" order by finished_at desc nulls last;'
+```
+
+기대 결과:
+
+- `test_runs`, `test_results` 테이블 존재
+- `_prisma_migrations` 테이블 존재
+- 최신 migration이 `finished_at` 값을 가짐
+
+### 자주 나는 원인
+
+1. **migration initContainer 실패**
+   - Helm은 배포됐지만 schema 생성 전에 Pod가 멈춤
+2. **DB 권한 부족**
+   - 특히 `CREATE EXTENSION "uuid-ossp"` 권한 없음
+3. **외부 DB는 살아 있지만 빈 스키마**
+   - 현재 구조에서는 앱 시작 전에 migration이 반드시 성공해야 함
+4. **잘못된 DATABASE_URL / Secret**
+   - `postgres-secret`, `DATABASE_URL` 주입값 불일치
+
+### extension 권한 문제일 때
+
+증상 예시:
+
+- `permission denied to create extension "uuid-ossp"`
+
+대응:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+```
+
+이 작업은 DB 관리자 권한으로 **사전에** 수행해야 할 수 있다.
+
+### Pod가 떠 있는데 테이블만 없는 것처럼 보일 때
+
+`readiness` 는 현재 `SELECT 1` 수준의 DB 연결만 확인한다.  
+즉, **DB 연결 성공 != migration 성공** 은 아니다.
+
+반드시 아래를 같이 본다:
+
+```bash
+kubectl logs <control-panel-pod> -n k6-platform -c control-panel-migrate
+psql "$DATABASE_URL" -c '\dt'
+```
+
+### 재시도 방법
+
+Secret/DB 권한/네트워크 문제를 고친 뒤:
+
+```bash
+kubectl delete pod <control-panel-pod> -n k6-platform
+kubectl rollout status deployment/control-panel -n k6-platform
+kubectl logs deployment/control-panel -n k6-platform -c control-panel-migrate --tail=100
+```
+
+### Helm 렌더 단계에서 미리 확인
+
+```bash
+helm template k6-platform ./helm/k6-platform -f ./helm/k6-platform/values-gke-dev.yaml | grep -n "control-panel-migrate"
+```
+
+출력이 없으면 migration initContainer가 템플릿에 반영되지 않은 것이다.
+
+## 8. 현재 한계
 
 - 실 GKE / ArgoCD 환경에서의 최종 sync 성공 로그와 스크린샷은 아직 수집하지 못했다.
 - `gcloud billing budgets create`, `kubectl get`, `argocd app` 류 명령은 실제 계정/클러스터가 필요하다.

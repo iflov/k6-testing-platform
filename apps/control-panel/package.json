@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "db:migrate": "sh scripts/migrate-db.sh",
     "prisma:generate": "prisma generate",
     "prisma:db:push": "prisma db push",
+    "prisma:migrate:deploy": "sh scripts/migrate-db.sh",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
   },

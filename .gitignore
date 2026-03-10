@@ -44,3 +44,6 @@ influxdb-data/
 /.omx/
 /.codex/
 /.agents/
+
+# Terraform
+**/.terraform/

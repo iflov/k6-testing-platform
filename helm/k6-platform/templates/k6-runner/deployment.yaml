@@ -34,6 +34,8 @@ spec:
           env:
             - name: NODE_ENV
               value: {{ .Values.k6Runner.env.NODE_ENV | quote }}
+            - name: PORT
+              value: {{ .Values.k6Runner.service.port | quote }}
             - name: K6_DASHBOARD_HOST
               value: {{ .Values.k6Runner.env.K6_DASHBOARD_HOST | quote }}
             - name: K6_DASHBOARD_PORT
@@ -65,6 +67,11 @@ spec:
                 configMapKeyRef:
                   name: k6-platform-config
                   key: MOCK_SERVER_URL
+            - name: CONTROL_PANEL_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: k6-platform-config
+                  key: CONTROL_PANEL_URL
           livenessProbe:
             httpGet:
               path: /health

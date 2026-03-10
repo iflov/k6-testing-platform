@@ -1,5 +1,7 @@
 # K6 Testing Platform - GKE 기반 포트폴리오 데모 배포 작업 계획서
 
+> **문서 성격:** reviewed planning artifact
+> **현재 참고 우선순위:** 구현 현황은 `docs/work-plan-gke-migration-implementation-status.md`, 운영 절차는 `docs/runbook/demo-gitops-runbook.md` 우선
 > **버전:** v2-reviewed
 > **작성일:** 2026-03-09
 > **컨센서스:** Planner + Architect (GKE 리뷰) + Critic → 조건부 APPROVED

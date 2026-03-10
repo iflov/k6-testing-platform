@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
 
     const result = await response.json();
     const testId = result.testId || Date.now().toString();
+    let historyTracked = true;
     const requestBodyForStorage =
       contentType === "json"
         ? requestBody
@@ -106,8 +107,9 @@ export async function POST(request: NextRequest) {
           startedAt: new Date(),
         },
       });
-    } catch {
-      // DB 저장 실패 시 테스트 실행 계속 진행
+    } catch (error) {
+      historyTracked = false;
+      console.error("Failed to persist test run to history:", error);
     }
 
     return NextResponse.json({
@@ -115,6 +117,7 @@ export async function POST(request: NextRequest) {
       message: "Test started successfully",
       dashboardUrl: result.dashboardUrl || config.k6DashboardUrl,
       status: result.status,
+      historyTracked,
     });
   } catch {
     return NextResponse.json(
