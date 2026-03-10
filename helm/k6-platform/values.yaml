@@ -11,6 +11,8 @@ controlPanel:
     repository: k6-testing-platform-control-panel
     tag: latest
     pullPolicy: IfNotPresent
+  migrations:
+    enabled: true
   service:
     type: ClusterIP
     port: 3000

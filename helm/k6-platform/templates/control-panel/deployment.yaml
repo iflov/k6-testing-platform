@@ -17,6 +17,33 @@ spec:
         app.kubernetes.io/name: control-panel
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      {{- if .Values.controlPanel.migrations.enabled }}
+      initContainers:
+        - name: control-panel-migrate
+          image: "{{ .Values.controlPanel.image.repository }}:{{ .Values.controlPanel.image.tag }}"
+          imagePullPolicy: {{ .Values.controlPanel.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - npm run prisma:migrate:deploy
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.controlPanel.env.NODE_ENV | quote }}
+            - name: POSTGRES_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret | default "postgres-secret" }}
+                  key: {{ .Values.postgresql.secretKeys.username }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret | default "postgres-secret" }}
+                  key: {{ .Values.postgresql.secretKeys.password }}
+            - name: DATABASE_URL
+              value: {{ include "k6-platform.databaseUrl" . | quote }}
+          resources:
+            {{- toYaml .Values.controlPanel.resources | nindent 12 }}
+      {{- end }}
       containers:
         - name: control-panel
           image: "{{ .Values.controlPanel.image.repository }}:{{ .Values.controlPanel.image.tag }}"
