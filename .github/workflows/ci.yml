@@ -30,6 +30,7 @@ jobs:
           set -euo pipefail
           bash tests/config/test-port-consistency.sh
           bash tests/config/test-env-consistency.sh
+          bash tests/config/test-make-local-docker-flow.sh
           bash tests/security/test-no-hardcoded-secrets.sh
           bash tests/docker/test-reproducible-build.sh
           bash tests/ci/test-workflows.sh

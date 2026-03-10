@@ -3,7 +3,8 @@
 	shell-control shell-mock shell-runner shell-postgres influx-cli influx-health \
 	health restart clean-all test-stress test-spike test-soak test-quick test-custom status stop-test \
 	setup-env network-create network-inspect logs-control logs-mock logs-runner logs-influx rebuild \
-	run-control run-mock run-runner db-migrate db-seed db-reset monitor init-influx validate-influx
+	run-control run-mock run-runner db-migrate db-seed db-reset monitor init-influx validate-influx \
+	local-setup local-dev local-up local-down local-logs local-health local-test local-test-quick local-status local-stop
 
 ARGOCD_DIR ?= argocd
 ARGOCD_VALUES ?= $(ARGOCD_DIR)/values.yaml
@@ -12,6 +13,7 @@ ARGOCD_APPLICATION_MANIFEST ?= $(ARGOCD_DIR)/applications/k6-platform.yaml
 ARGOCD_REPO_URL ?= https://github.com/your-org/k6-testing-platform.git
 
 # Local endpoint configuration (override when host ports differ, e.g. Kind)
+DOCKER_COMPOSE ?= docker compose
 CONTROL_PANEL_PORT ?= 3000
 K6_DASHBOARD_PORT ?= 5665
 CONTROL_PANEL_BASE_URL ?= http://localhost:$(CONTROL_PANEL_PORT)
@@ -29,7 +31,15 @@ help:
 	@echo "  make install      - Install all dependencies"
 	@echo "  make dev          - Start all services in development mode"
 	@echo ""
-	@echo "📦 Development:"
+	@echo "🐳 Local Docker (recommended start path):"
+	@echo "  make local-setup  - Create .env files for local Docker"
+	@echo "  make local-up     - Start the local Docker stack"
+	@echo "  make local-logs   - Tail local Docker logs"
+	@echo "  make local-health - Check local Docker services"
+	@echo "  make local-test-quick - Run a smoke test against control-panel"
+	@echo "  make local-down   - Stop the local Docker stack"
+	@echo ""
+	@echo "📦 Development / Compose:"
 	@echo "  make up           - Start all services in background"
 	@echo "  make down         - Stop all services"
 	@echo "  make restart      - Restart all services"
@@ -106,6 +116,7 @@ help:
 	@echo "  - K6 Runner includes xk6-output-influxdb extension"
 	@echo "  - Access Control Panel at $(CONTROL_PANEL_BASE_URL)"
 	@echo "  - Access K6 Dashboard at $(K6_DASHBOARD_BASE_URL)"
+	@echo "  - If you only need local Docker, use make local-up first"
 	@echo "  - Override ports/base URL if needed, e.g. make test CONTROL_PANEL_PORT=3100"
 
 # Install dependencies
@@ -117,24 +128,45 @@ install:
 
 # Development mode - all services with logs
 dev:
-	docker compose up --build
+	$(DOCKER_COMPOSE) up --build
 
 # Start services in background
 up:
-	docker compose up -d --build
+	$(DOCKER_COMPOSE) up -d --build
 
 # Stop services
 down:
-	docker compose down
+	$(DOCKER_COMPOSE) down
 
 # Show logs
 logs:
-	docker compose logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 # Clean up
 clean:
-	docker compose down -v
+	$(DOCKER_COMPOSE) down -v
 	docker system prune -f
+
+# Local Docker aliases (safe entrypoints when Kubernetes is not needed)
+local-setup: setup-env
+
+local-dev: dev
+
+local-up: up
+
+local-down: down
+
+local-logs: logs
+
+local-health: health
+
+local-test: test
+
+local-test-quick: test-quick
+
+local-status: status
+
+local-stop: stop-test
 
 # Build all images with xk6 support
 build: build-control build-mock build-runner-v2
