@@ -5,8 +5,8 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-# Install dependencies
-RUN npm install
+# Install dependencies (reproducible build)
+RUN npm ci
 
 # Copy all configuration files needed for NestJS build
 COPY nest-cli.json ./

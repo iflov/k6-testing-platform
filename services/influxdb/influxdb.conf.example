@@ -15,7 +15,7 @@
   
 [http]
   enabled = true
-  bind-address = ":8086"
+  bind-address = ":8181"
   auth-enabled = false
   
   # K6 대량 데이터 처리용

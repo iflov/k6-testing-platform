@@ -1,0 +1,132 @@
+# Default values for k6-platform
+
+# -- Global settings
+global:
+  namespace: k6-platform
+
+# -- Control Panel (Next.js)
+controlPanel:
+  replicaCount: 1
+  image:
+    repository: k6-testing-platform-control-panel
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+    nodePort: null
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    NODE_ENV: production
+    K6_RUNNER_BASE_URL: http://k6-runner:3002
+    K6_DASHBOARD_URL: http://k6-runner:5665
+    MOCK_SERVER_URL: http://mock-server:3001
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilization: 80
+
+# -- K6 Runner (Express + xk6)
+k6Runner:
+  replicaCount: 1
+  image:
+    repository: k6-testing-platform-k6-runner
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3002
+    dashboardPort: 5665
+    nodePort: null
+    dashboardNodePort: null
+  resources:
+    requests:
+      cpu: 500m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 768Mi
+  env:
+    NODE_ENV: production
+    K6_DASHBOARD_HOST: "0.0.0.0"
+    K6_DASHBOARD_PERIOD: "10s"
+  serviceAccount:
+    create: true
+    name: k6-runner-sa
+
+# -- Mock Server (NestJS)
+mockServer:
+  replicaCount: 1
+  image:
+    repository: k6-testing-platform-mock-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3001
+    nodePort: null
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  env:
+    NODE_ENV: production
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilization: 80
+
+# -- PostgreSQL (External service for Cloud SQL)
+postgresql:
+  external: false
+  host: postgres
+  port: 5432
+  database: k6_test_history
+  existingSecret: postgres-secret
+  secretKeys:
+    username: username
+    password: password
+
+# -- InfluxDB (External GCE VM)
+influxdb:
+  external: false
+  url: "http://influxdb:8181"
+  org: k6org
+  bucket: k6
+  existingSecret: influxdb-token
+  secretKeys:
+    token: token
+
+# -- External Secrets Operator integration (GCP Secret Manager)
+externalSecrets:
+  enabled: false
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: gcp-secret-manager
+  postgresql:
+    remoteKey: k6-testing-platform/postgres
+    usernameProperty: username
+    passwordProperty: password
+  influxdb:
+    remoteKey: k6-testing-platform/influxdb
+    tokenProperty: token
+
+# -- Network Policy
+networkPolicy:
+  enabled: false
+
+# -- RBAC
+rbac:
+  enabled: true

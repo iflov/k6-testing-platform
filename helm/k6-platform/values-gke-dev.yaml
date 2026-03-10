@@ -1,0 +1,65 @@
+# GKE Development environment overrides
+controlPanel:
+  image:
+    tag: latest
+    repository: asia-northeast3-docker.pkg.dev/PROJECT_ID/k6-platform/control-panel
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+k6Runner:
+  image:
+    tag: latest
+    repository: asia-northeast3-docker.pkg.dev/PROJECT_ID/k6-platform/k6-runner
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 500m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 768Mi
+  serviceAccount:
+    create: true
+    annotations:
+      iam.gke.io/gcp-service-account: k6-runner@PROJECT_ID.iam.gserviceaccount.com
+
+mockServer:
+  image:
+    tag: latest
+    repository: asia-northeast3-docker.pkg.dev/PROJECT_ID/k6-platform/mock-server
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+postgresql:
+  external: true
+  host: CLOUD_SQL_PRIVATE_IP
+  port: 5432
+  database: k6_test_history
+
+influxdb:
+  external: true
+  url: "http://INFLUXDB_VM_PRIVATE_IP:8181"
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: gcp-secret-manager
+
+networkPolicy:
+  enabled: true
+
+rbac:
+  enabled: true

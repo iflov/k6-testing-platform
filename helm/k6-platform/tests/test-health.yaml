@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-test-health"
+  labels:
+    {{- include "k6-platform.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test-control-panel
+      image: curlimages/curl:latest
+      command: ['curl']
+      args: ['--fail', '--connect-timeout', '10', 'http://control-panel:{{ .Values.controlPanel.service.port }}/api/health']
+    - name: test-k6-runner
+      image: curlimages/curl:latest
+      command: ['curl']
+      args: ['--fail', '--connect-timeout', '10', 'http://k6-runner:{{ .Values.k6Runner.service.port }}/health']
+    - name: test-mock-server
+      image: curlimages/curl:latest
+      command: ['curl']
+      args: ['--fail', '--connect-timeout', '10', 'http://mock-server:{{ .Values.mockServer.service.port }}/health']

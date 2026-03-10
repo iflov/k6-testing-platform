@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: k6-runner
+  labels:
+    {{- include "k6-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/name: k6-runner
+spec:
+  type: {{ .Values.k6Runner.service.type }}
+  ports:
+    - port: {{ .Values.k6Runner.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+      {{- if and (eq .Values.k6Runner.service.type "NodePort") .Values.k6Runner.service.nodePort }}
+      nodePort: {{ .Values.k6Runner.service.nodePort }}
+      {{- end }}
+    - port: {{ .Values.k6Runner.service.dashboardPort }}
+      targetPort: dashboard
+      protocol: TCP
+      name: dashboard
+      {{- if and (eq .Values.k6Runner.service.type "NodePort") .Values.k6Runner.service.dashboardNodePort }}
+      nodePort: {{ .Values.k6Runner.service.dashboardNodePort }}
+      {{- end }}
+  selector:
+    app.kubernetes.io/name: k6-runner
+    app.kubernetes.io/instance: {{ .Release.Name }}
