@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
             },
           });
         }
-      } catch {
-        // DB 업데이트 실패해도 stop은 성공으로 처리
+      } catch (error) {
+        console.error("Failed to mark cancelled test in history:", error);
       }
     }
 

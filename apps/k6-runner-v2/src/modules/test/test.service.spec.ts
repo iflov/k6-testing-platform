@@ -14,6 +14,7 @@ jest.mock('fs/promises', () => ({
 }));
 
 describe('TestService', () => {
+  const originalFetch = global.fetch;
   let testService: TestService;
   let scenarioService: ScenarioService;
   let configService: ConfigService;
@@ -38,6 +39,7 @@ describe('TestService', () => {
 
     configService = {
       getMockServerUrl: jest.fn().mockReturnValue('http://localhost:3001'),
+      getControlPanelUrl: jest.fn().mockReturnValue('http://localhost:3000'),
     } as unknown as ConfigService;
 
     // Mock ChildProcess
@@ -62,10 +64,16 @@ describe('TestService', () => {
       cleanupTest: jest.fn(),
     } as unknown as ProcessManagerService;
 
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: jest.fn().mockResolvedValue(''),
+    }) as unknown as typeof fetch;
+
     testService = new TestService(scenarioService, configService, processManagerService);
   });
 
   afterEach(() => {
+    global.fetch = originalFetch;
     jest.clearAllMocks();
     jest.clearAllTimers();
     jest.useRealTimers();
@@ -306,10 +314,16 @@ describe('TestService', () => {
       )?.[1];
 
       // Simulate process exit
-      await exitHandler();
+      await exitHandler(0, null);
 
       expect(processManagerService.cleanupTest).toHaveBeenCalled();
       expect(fs.unlink).toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/tests/complete',
+        expect.objectContaining({
+          method: 'POST',
+        }),
+      );
       expect(testService.getCurrentTest()).toBeNull();
     });
 
@@ -328,7 +342,7 @@ describe('TestService', () => {
       )?.[1];
 
       // Simulate process exit
-      await exitHandler();
+      await exitHandler(1, null);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to delete script file'),

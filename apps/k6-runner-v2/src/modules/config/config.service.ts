@@ -12,6 +12,8 @@ export class ConfigService {
   private influxdbBucket!: string;
   // Mock Server 설정
   private mockServerUrl!: string;
+  // Control Panel 설정
+  private controlPanelUrl!: string;
   // K6 Dashboard 설정
   private k6DashboardPort!: string;
   private k6DashboardHost!: string;
@@ -63,6 +65,9 @@ export class ConfigService {
       this.mockServerUrl =
         process.env.MOCK_SERVER_URL ||
         (isK8s ? 'http://mock-server-service:3001' : 'http://mock-server:3001');
+      this.controlPanelUrl =
+        process.env.CONTROL_PANEL_URL ||
+        (isK8s ? 'http://control-panel:3000' : 'http://control-panel:3000');
       this.k6DashboardPort = process.env.K6_DASHBOARD_PORT || '5665';
       this.k6DashboardHost = process.env.K6_DASHBOARD_HOST || '0.0.0.0';
       this.k6DashboardPeriod = process.env.K6_DASHBOARD_PERIOD || '1s';
@@ -72,6 +77,7 @@ export class ConfigService {
       this.influxdbOrg = process.env.INFLUXDB_ORG || 'k6org';
       this.influxdbBucket = process.env.INFLUXDB_BUCKET || 'k6';
       this.mockServerUrl = this.assertEnvVar('MOCK_SERVER_URL');
+      this.controlPanelUrl = this.assertEnvVar('CONTROL_PANEL_URL');
       this.k6DashboardPort = this.assertEnvVar('K6_DASHBOARD_PORT');
       this.k6DashboardHost = this.assertEnvVar('K6_DASHBOARD_HOST');
       this.k6DashboardPeriod = this.assertEnvVar('K6_DASHBOARD_PERIOD');
@@ -96,6 +102,10 @@ export class ConfigService {
   // 민감하지 않은 설정 가져오기
   getMockServerUrl(): string {
     return this.mockServerUrl;
+  }
+
+  getControlPanelUrl(): string {
+    return this.controlPanelUrl;
   }
 
   getInfluxDbUrl(): string {

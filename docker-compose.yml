@@ -125,6 +125,7 @@ services:
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
       - INFLUXDB_ORG=${INFLUXDB_ORG}
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - CONTROL_PANEL_URL=http://control-panel:3000
       # Mock server URL
       - MOCK_SERVER_URL=http://mock-server:3001
     depends_on:

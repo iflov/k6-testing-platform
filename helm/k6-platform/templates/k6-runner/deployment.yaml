@@ -67,6 +67,11 @@ spec:
                 configMapKeyRef:
                   name: k6-platform-config
                   key: MOCK_SERVER_URL
+            - name: CONTROL_PANEL_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: k6-platform-config
+                  key: CONTROL_PANEL_URL
           livenessProbe:
             httpGet:
               path: /health

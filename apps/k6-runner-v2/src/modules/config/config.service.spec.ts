@@ -48,6 +48,7 @@ describe('ConfigService', () => {
       delete process.env.INFLUXDB_ORG;
       delete process.env.INFLUXDB_BUCKET;
       delete process.env.MOCK_SERVER_URL;
+      delete process.env.CONTROL_PANEL_URL;
       delete process.env.K6_DASHBOARD_PORT;
       delete process.env.K6_DASHBOARD_HOST;
       delete process.env.K6_DASHBOARD_PERIOD;
@@ -57,6 +58,7 @@ describe('ConfigService', () => {
       const service = ConfigService.getInstance();
       expect(service.getInfluxDbUrl()).toContain(':8181');
       expect(service.getMockServerUrl()).toContain(':3001');
+      expect(service.getControlPanelUrl()).toContain(':3000');
       expect(service.getK6DashboardPort()).toBe('5665');
       expect(service.getK6DashboardHost()).toBe('0.0.0.0');
       expect(service.getK6DashboardPeriod()).toBe('1s');
@@ -71,6 +73,7 @@ describe('ConfigService', () => {
       process.env.INFLUXDB_ORG = 'custom-org';
       process.env.INFLUXDB_BUCKET = 'custom-bucket';
       process.env.MOCK_SERVER_URL = 'http://custom-mock:3001';
+      process.env.CONTROL_PANEL_URL = 'http://custom-control:3000';
       process.env.K6_DASHBOARD_PORT = '6000';
       process.env.K6_DASHBOARD_HOST = '127.0.0.1';
       process.env.K6_DASHBOARD_PERIOD = '5s';
@@ -80,6 +83,7 @@ describe('ConfigService', () => {
       expect(service.getInfluxDbOrg()).toBe('custom-org');
       expect(service.getInfluxDbBucket()).toBe('custom-bucket');
       expect(service.getMockServerUrl()).toBe('http://custom-mock:3001');
+      expect(service.getControlPanelUrl()).toBe('http://custom-control:3000');
       expect(service.getK6DashboardPort()).toBe('6000');
       expect(service.getK6DashboardHost()).toBe('127.0.0.1');
       expect(service.getK6DashboardPeriod()).toBe('5s');
@@ -118,6 +122,7 @@ describe('ConfigService', () => {
       process.env.INFLUXDB_ORG = 'prod-org';
       process.env.INFLUXDB_BUCKET = 'prod-bucket';
       process.env.MOCK_SERVER_URL = 'https://prod-mock.example.com';
+      process.env.CONTROL_PANEL_URL = 'https://prod-control.example.com';
       process.env.K6_DASHBOARD_PORT = '7000';
       process.env.K6_DASHBOARD_HOST = '0.0.0.0';
       process.env.K6_DASHBOARD_PERIOD = '10s';
@@ -127,6 +132,7 @@ describe('ConfigService', () => {
       expect(service.getInfluxDbOrg()).toBe('prod-org');
       expect(service.getInfluxDbBucket()).toBe('prod-bucket');
       expect(service.getMockServerUrl()).toBe('https://prod-mock.example.com');
+      expect(service.getControlPanelUrl()).toBe('https://prod-control.example.com');
       expect(service.getK6DashboardPort()).toBe('7000');
       expect(service.getK6DashboardHost()).toBe('0.0.0.0');
       expect(service.getK6DashboardPeriod()).toBe('10s');
@@ -183,6 +189,7 @@ describe('ConfigService', () => {
       process.env.INFLUXDB_URL = 'https://prod-influx.example.com';
       process.env.INFLUXDB_TOKEN = 'prod-token';
       process.env.MOCK_SERVER_URL = 'https://prod-mock.example.com';
+      process.env.CONTROL_PANEL_URL = 'https://prod-control.example.com';
       process.env.K6_DASHBOARD_PORT = '7000';
       process.env.K6_DASHBOARD_HOST = '0.0.0.0';
       process.env.K6_DASHBOARD_PERIOD = '10s';
