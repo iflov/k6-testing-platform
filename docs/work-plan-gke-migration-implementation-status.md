@@ -1,5 +1,7 @@
 # K6 Testing Platform - GKE 마이그레이션 구현 현황 (업데이트)
 
+> **문서 성격:** 현재 저장소 기준의 **구현 현황 스냅샷**
+> **우선순위:** 현재 상태 확인 시 이 문서를 `runbook/demo-gitops-runbook.md` 와 함께 우선 참고
 > 기준 문서: `docs/work-plan-gke-migration-reviewed.md`
 > 업데이트 일시: 2026-03-10
 > 작성 기준: **저장소 산출물 + 로컬에서 재현 가능한 검증 결과**
