@@ -34,6 +34,8 @@ spec:
           env:
             - name: NODE_ENV
               value: {{ .Values.k6Runner.env.NODE_ENV | quote }}
+            - name: PORT
+              value: {{ .Values.k6Runner.service.port | quote }}
             - name: K6_DASHBOARD_HOST
               value: {{ .Values.k6Runner.env.K6_DASHBOARD_HOST | quote }}
             - name: K6_DASHBOARD_PORT

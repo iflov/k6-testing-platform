@@ -6,7 +6,7 @@ import testRouter from './routes/route';
 import { container } from './container/container';
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 3002;
 
 app.use(express.json());
 const ALLOWED_ORIGINS = [
