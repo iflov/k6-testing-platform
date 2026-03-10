@@ -1,6 +1,6 @@
 # K6 Testing Platform
 
-웹 기반 통합 부하 테스트 플랫폼 - K6와 웹 대시보드를 활용한 성능 테스트 솔루션!
+웹 기반 통합 부하 테스트 플랫폼 - K6, PostgreSQL, InfluxDB 3.x, 그리고 웹 대시보드를 활용한 성능 테스트 솔루션!
 
 ## 🎯 프로젝트 개요
 
@@ -15,27 +15,25 @@ K6 Testing Platform은 마이크로서비스 아키텍처 기반의 종합적인
 - **실시간 메트릭 시각화**: K6 Web Dashboard를 통한 실시간 성능 지표 확인
 - **유연한 테스트 타겟**: Mock 서버 제공 및 커스텀 URL 테스트 지원
 - **다양한 HTTP 메서드 지원**: GET, POST, PUT, DELETE, PATCH 지원
-- **컨테이너 기반 아키텍처**: Docker Compose를 통한 쉬운 배포 및 확장
+- **다중 실행 경로 지원**: Docker Compose 로컬 개발, Kind/Helm 검증, GKE GitOps 배포 지원
 
 ## 🏗️ 시스템 아키텍처
 
 ### 프로젝트 구조
 
-```
+```text
 k6-testing-platform/
 ├── apps/
-│   ├── control-panel/      # Next.js 15 기반 웹 UI (React 19, TypeScript 5)
-│   │   ├── lib/
-│   │   │   └── scenario.ts    # 📌 중앙 시나리오 설정 (TypeScript)
-│   │   └── components/
-│   │       └── TestController.tsx  # 시나리오 설정 소비자
-│   ├── mock-server/        # NestJS 10 기반 테스트 타겟 서버
-│   └── k6-runner/          # Express 기반 K6 테스트 실행 서비스
-│       └── scenario-config.js  # 📌 중앙 시나리오 설정 (JavaScript)
+│   ├── control-panel/       # Next.js 15 기반 웹 UI + API (Prisma/PostgreSQL)
+│   ├── mock-server/         # NestJS 기반 테스트 타겟 서버
+│   └── k6-runner-v2/        # Express + TypeScript 기반 K6 실행 서비스
 ├── services/
-│   └── influxdb/          # 시계열 메트릭 데이터베이스
-├── docker-compose.yml      # 컨테이너 오케스트레이션
-└── Makefile               # 빌드 및 배포 자동화
+│   ├── influxdb/            # InfluxDB 3.x bootstrap 스크립트
+│   └── postgres/            # 로컬 PostgreSQL init SQL
+├── helm/k6-platform/        # Kind/GKE용 Helm 차트
+├── docs/                    # 운영/아키텍처/면접 문서
+├── docker-compose.yml       # 로컬 Compose 스택
+└── Makefile                 # 로컬/K8s 배포 자동화
 ```
 
 ### 기술 스택
@@ -51,8 +49,10 @@ k6-testing-platform/
 | **K6 Runner**      | Express     | 4.18.x | K6 실행 관리         |
 |                    | Node.js     | 20+    | 런타임               |
 | **Testing Engine** | K6          | Latest | 부하 테스트 엔진     |
-| **Database**       | InfluxDB    | 1.8    | 메트릭 저장          |
-| **Container**      | Docker      | 20+    | 컨테이너화           |
+| **History DB**     | PostgreSQL  | 16     | 테스트 이력 저장     |
+| **Metrics DB**     | InfluxDB    | 3.x Core | 시계열 메트릭 저장 |
+| **Container**      | Docker      | 20+    | 로컬 컨테이너화      |
+| **Kubernetes**     | Kind / GKE  | Latest | Helm/GitOps 배포     |
 
 ### 아키텍처 특징
 
@@ -82,7 +82,7 @@ export interface ScenarioMetadata {
 
 ### 사전 요구사항
 
-- Docker & Docker Compose (필수)
+- Docker Engine 또는 Docker Desktop (Compose v2 포함)
 - Node.js 20+ & npm 10+ (로컬 개발 시)
 - Make (선택사항, 자동화 명령어용)
 - 최소 4GB RAM (Docker Desktop)
@@ -94,9 +94,8 @@ export interface ScenarioMetadata {
 git clone https://github.com/your-org/k6-testing-platform.git
 cd k6-testing-platform
 
-# 환경 변수 설정 (선택사항)
-cp apps/control-panel/.env.example apps/control-panel/.env
-cp apps/k6-runner-v2/.env.example apps/k6-runner-v2/.env
+# 환경 변수 파일 생성
+make setup-env
 ```
 
 ### 2. 서비스 시작
@@ -119,6 +118,7 @@ make logs  # 또는 docker compose logs -f
 | 서비스               | URL                   | 설명                               |
 | -------------------- | --------------------- | ---------------------------------- |
 | **Control Panel**    | http://localhost:3000 | 웹 기반 테스트 관리 UI             |
+| **Test History**     | http://localhost:3000/history | 저장된 테스트 이력 조회     |
 | **Mock Server**      | http://localhost:3001 | 테스트 타겟 API 서버               |
 | **K6 Runner API**    | http://localhost:3002 | K6 실행 관리 API                   |
 | **K6 Web Dashboard** | http://localhost:5665 | 실시간 메트릭 대시보드 (테스트 중) |
@@ -248,6 +248,9 @@ Control Panel에서 외부 API를 테스트하는 방법:
 # 전체 프로젝트 의존성 설치
 make install
 
+# 개발용 환경 파일 생성
+make setup-env
+
 # 개발 서버 시작 (모든 서비스)
 make dev
 
@@ -296,6 +299,12 @@ cd apps/mock-server
 npm run lint
 npm run test
 npm run test:cov  # 커버리지 확인
+
+# K6 Runner
+cd apps/k6-runner-v2
+npm run lint
+npm test -- --runInBand
+npm run build
 ```
 
 ## 🧪 테스트 시나리오
@@ -612,6 +621,8 @@ make clean-all     # 이미지 포함 전체 정리
 | `/api/k6/stop`    | POST   | 테스트 중지      | -                   |
 | `/api/k6/status`  | GET    | 테스트 상태 조회 | -                   |
 | `/api/k6/metrics` | GET    | 메트릭 조회      | -                   |
+| `/api/tests`      | GET    | 저장된 테스트 이력 조회 | `limit`, `offset`, `status` |
+| `/api/tests/complete` | POST | 테스트 완료/결과 저장 | 내부/서버 측 사용 |
 
 #### 테스트 시작 요청 본문
 
@@ -686,25 +697,27 @@ curl -X POST "$CONTROL_PANEL_BASE_URL/api/k6/run" \
 
 ### K6 Runner API
 
-| 엔드포인트     | 메소드 | 설명                  |
-| -------------- | ------ | --------------------- |
-| `/test/start`  | POST   | K6 테스트 시작        |
-| `/test/stop`   | POST   | 실행 중인 테스트 중지 |
-| `/test/status` | GET    | 테스트 상태 확인      |
-| `/health`      | GET    | 서비스 헬스 체크      |
-| `/config`      | GET    | 현재 설정 확인        |
+| 엔드포인트              | 메소드 | 설명                  |
+| ----------------------- | ------ | --------------------- |
+| `/api/test/start`       | POST   | K6 테스트 시작        |
+| `/api/test/stop`        | POST   | 실행 중인 테스트 중지 |
+| `/api/test/status`      | GET    | 테스트 상태 확인      |
+| `/api/test/progress/:testId?` | GET | 진행률 확인      |
+| `/api/scenarios`        | GET    | 사용 가능한 시나리오 목록 |
+| `/health`               | GET    | 서비스 헬스 체크      |
+| `/config`               | GET    | 현재 설정 확인        |
 
 ### InfluxDB 데이터 쿼리
 
 ```sql
--- 평균 응답 시간 조회
-SELECT mean("value") FROM "http_req_duration"
-WHERE time > now() - 1h
-GROUP BY time(10s)
+-- InfluxDB 3.x query_sql 예시
+SELECT AVG(value) AS avg_duration
+FROM http_req_duration
+WHERE time > now() - INTERVAL '1 hour';
 
--- 에러율 계산
-SELECT sum("value") FROM "http_req_failed"
-WHERE time > now() - 1h
+SELECT COUNT(value) AS failed_requests, AVG(value) AS error_rate
+FROM http_req_failed
+WHERE time > now() - INTERVAL '1 hour';
 ```
 
 ## 🐛 문제 해결
@@ -770,49 +783,33 @@ sudo ufw allow 5665/tcp
 
 ### 프로덕션 환경 보안 설정
 
-#### InfluxDB 인증 활성화
+#### InfluxDB / PostgreSQL 시크릿 관리
 
-프로덕션 환경에서는 InfluxDB 인증을 반드시 활성화해야 합니다:
+현재 저장소 기준 운영 배포에서는 DB 인증값을 애플리케이션 코드에 두지 않고
+**Kubernetes Secret / External Secret / Secret Manager** 경로로 주입하는 구성을 전제로 합니다.
 
-1. **환경 변수 설정** (.env.production)
-
-```bash
-# InfluxDB 관리자 계정
-INFLUXDB_ADMIN_USER=admin
-INFLUXDB_ADMIN_PASSWORD=secure-admin-password
-
-# K6 사용자 계정
-INFLUXDB_USER=k6
-INFLUXDB_USER_PASSWORD=your_k6_password_here
-```
-
-2. **프로덕션 Docker Compose 실행**
+대표 값:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-3. **Kubernetes Helm 배포**
-
-```bash
-# values.yaml에서 인증 설정 확인
-helm install k6-platform ./helm/k6-platform \
-  --set influxdb.setDefaultUser.enabled=true \
-  --set-string influxdb.setDefaultUser.user.password=secure-password
+INFLUXDB_TOKEN=...
+POSTGRES_USERNAME=...
+POSTGRES_PASSWORD=...
+DATABASE_URL=postgresql://<user>:<password>@<host>:5432/k6_test_history?schema=public
 ```
 
 #### PostgreSQL 보안
 
-프로덕션 환경에서 PostgreSQL 보안 설정:
+프로덕션 환경에서 PostgreSQL은 외부 DB(예: Cloud SQL/RDS) 또는
+Kubernetes Secret 기반 계정 주입을 전제로 합니다.
 
 ```yaml
 # Helm values.yaml
 postgresql:
-  auth:
-    postgresPassword: "secure-admin-password"
-    username: "k6user"
-    password: "secure-user-password"
-    database: "k6_test_history"
+  external: true
+  host: <private-db-host>
+  port: 5432
+  database: k6_test_history
+  existingSecret: postgres-secret
 ```
 
 ### 보안 모범 사례
