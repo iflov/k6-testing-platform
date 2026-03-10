@@ -1,0 +1,35 @@
+name: setup-gcp
+description: Authenticate to GCP with Workload Identity Federation and configure Artifact Registry access
+inputs:
+  workload_identity_provider:
+    description: Full Workload Identity Provider resource name
+    required: true
+  service_account:
+    description: Service account email used by GitHub Actions
+    required: true
+  project_id:
+    description: GCP project ID
+    required: true
+  registry_host:
+    description: Artifact Registry hostname (for example asia-northeast3-docker.pkg.dev)
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ inputs.project_id }}
+
+    - name: Configure Docker authentication for Artifact Registry
+      if: ${{ inputs.registry_host != '' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        gcloud auth configure-docker "${{ inputs.registry_host }}" --quiet

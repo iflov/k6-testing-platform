@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k6-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: k6-platform
+  source:
+    repoURL: https://github.com/your-org/k6-testing-platform.git
+    targetRevision: main
+    path: helm/k6-platform
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-gke-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: k6-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - PrunePropagationPolicy=foreground
+  revisionHistoryLimit: 10

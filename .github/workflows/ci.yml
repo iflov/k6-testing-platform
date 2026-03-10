@@ -1,0 +1,103 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Run repository shell validations
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/config/test-port-consistency.sh
+          bash tests/config/test-env-consistency.sh
+          bash tests/security/test-no-hardcoded-secrets.sh
+          bash tests/docker/test-reproducible-build.sh
+          bash tests/ci/test-workflows.sh
+          bash tests/k8s/test-manifest-coverage.sh
+          bash tests/terraform/test-repository-layout.sh
+          bash tests/e2e/test-demo-dry-run.sh
+
+  application-builds:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: control-panel
+            directory: apps/control-panel
+            install: npm ci
+            verify: npm run build
+          - name: k6-runner-v2
+            directory: apps/k6-runner-v2
+            install: npm ci
+            verify: npm run lint && npm test -- --runInBand && npm run build
+          - name: mock-server
+            directory: apps/mock-server
+            install: npm ci
+            verify: npm test -- --runInBand && npm run build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.directory }}
+        shell: bash
+        run: ${{ matrix.install }}
+
+      - name: Verify ${{ matrix.name }}
+        working-directory: ${{ matrix.directory }}
+        shell: bash
+        run: ${{ matrix.verify }}
+
+  helm-and-terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Helm lint and render
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm lint helm/k6-platform
+          helm template k6-platform helm/k6-platform -f helm/k6-platform/values-local.yaml >/tmp/k6-platform-rendered.yaml
+          test -s /tmp/k6-platform-rendered.yaml
+
+      - name: Terraform formatting check
+        shell: bash
+        run: terraform fmt -check -recursive terraform

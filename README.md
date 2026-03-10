@@ -96,7 +96,7 @@ cd k6-testing-platform
 
 # 환경 변수 설정 (선택사항)
 cp apps/control-panel/.env.example apps/control-panel/.env
-cp apps/k6-runner/.env.example apps/k6-runner/.env
+cp apps/k6-runner-v2/.env.example apps/k6-runner-v2/.env
 ```
 
 ### 2. 서비스 시작
@@ -792,7 +792,7 @@ postgresql:
 1. **환경 변수 관리**
 
    - 프로덕션 환경변수는 절대 코드 저장소에 커밋하지 않음
-   - Kubernetes Secrets 또는 AWS Secrets Manager 사용 권장
+   - Kubernetes Secrets 또는 GCP Secret Manager 사용 권장
 
 2. **네트워크 보안**
 
@@ -807,6 +807,47 @@ postgresql:
 4. **모니터링**
    - 인증 실패 로그 모니터링
    - 비정상적인 쿼리 패턴 감지
+
+## ☁️ GKE GitOps 배포 경로
+
+로컬 Docker Compose 개발 흐름과 별개로, 저장소에는 GKE 기반 GitOps 산출물이 포함되어 있습니다.
+
+### 배포 모드 요약
+
+| 모드 | 진입점 | 목적 |
+|------|--------|------|
+| Local Compose | `make up` | 일상 개발 및 빠른 기능 확인 |
+| Local Kind | `make k8s-setup && make k8s-deploy` | Helm / Kind 통합 검증 |
+| GKE GitOps | `.github/workflows/cd.yml` + `argocd/` | Artifact Registry + ArgoCD 기반 선언형 배포 |
+
+### GitOps 흐름
+
+```mermaid
+flowchart LR
+  A[GitHub Push] --> B[GitHub Actions CI/CD]
+  B --> C[Artifact Registry]
+  B --> D[helm/k6-platform/values-gke-dev.yaml tag update]
+  D --> E[ArgoCD auto-sync]
+  E --> F[GKE namespace k6-platform]
+```
+
+### 핵심 산출물
+
+- `helm/k6-platform/` — 애플리케이션 Helm 차트
+- `argocd/values.yaml` — ArgoCD 리소스 튜닝 값
+- `argocd/projects/k6-platform.yaml` — AppProject
+- `argocd/applications/k6-platform.yaml` — GitOps Application
+- `scripts/setup-argocd.sh` — ArgoCD 설치 + 매니페스트 적용
+- `scripts/cluster-start.sh`, `scripts/cluster-stop.sh` — GKE 비용 절감용 운영 스크립트
+- `scripts/demo.sh` — 데모 플로우 자동화 스크립트
+
+### 포트폴리오 문서
+
+- `docs/architecture/cost-comparison.md`
+- `docs/architecture/multi-cloud-tradeoffs.md`
+- `docs/architecture/adr-001-why-gke.md`
+- `docs/interview-prep/gke-portfolio-qa.md`
+- `docs/runbook/demo-gitops-runbook.md`
 
 ## 📚 추가 리소스
 
