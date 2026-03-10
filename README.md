@@ -1,956 +1,288 @@
 # K6 Testing Platform
 
-웹 기반 통합 부하 테스트 플랫폼 - K6, PostgreSQL, InfluxDB 3.x, 그리고 웹 대시보드를 활용한 성능 테스트 솔루션!
+웹 기반 부하 테스트 플랫폼. Control Panel UI에서 테스트를 설정하고, K6 엔진으로 실행하며, 실시간 메트릭을 모니터링합니다.
 
-## 🎯 프로젝트 개요
+## 아키텍처
 
-K6 Testing Platform은 마이크로서비스 아키텍처 기반의 종합적인 부하 테스트 플랫폼입니다.
-실시간 모니터링, 다양한 테스트 시나리오, 그리고 직관적인 웹 인터페이스를 제공합니다.
-
-### 주요 특징
-
-- **통합 웹 대시보드**: Next.js 기반 실시간 테스트 제어 및 모니터링
-- **중앙 집중식 시나리오 관리**: 단일 소스로부터 모든 시나리오 설정 관리
-- **다양한 테스트 시나리오**: Smoke, Load, Stress, Spike, Soak 등 7가지 내장 시나리오
-- **실시간 메트릭 시각화**: K6 Web Dashboard를 통한 실시간 성능 지표 확인
-- **유연한 테스트 타겟**: Mock 서버 제공 및 커스텀 URL 테스트 지원
-- **다양한 HTTP 메서드 지원**: GET, POST, PUT, DELETE, PATCH 지원
-- **다중 실행 경로 지원**: Docker Compose 로컬 개발, Kind/Helm 검증, GKE GitOps 배포 지원
-
-## 🏗️ 시스템 아키텍처
-
-### 프로젝트 구조
-
-```text
-k6-testing-platform/
-├── apps/
-│   ├── control-panel/       # Next.js 15 기반 웹 UI + API (Prisma/PostgreSQL)
-│   ├── mock-server/         # NestJS 기반 테스트 타겟 서버
-│   └── k6-runner-v2/        # Express + TypeScript 기반 K6 실행 서비스
-├── services/
-│   ├── influxdb/            # InfluxDB 3.x bootstrap 스크립트
-│   └── postgres/            # 로컬 PostgreSQL init SQL
-├── helm/k6-platform/        # Kind/GKE용 Helm 차트
-├── docs/                    # 운영/아키텍처/면접 문서
-├── docker-compose.yml       # 로컬 Compose 스택
-└── Makefile                 # 로컬/K8s 배포 자동화
+```
+┌─────────────────┐     ┌─────────────┐     ┌──────────────────┐
+│  Control Panel  │────▶│  K6 Runner  │────▶│   Target Server  │
+│  (Next.js 15)   │     │  (Express)  │     │  (Mock or Custom)│
+│  :3000          │     │  :3002      │     │  :3001           │
+└────────┬────────┘     └──────┬──────┘     └──────────────────┘
+         │                     │
+    ┌────▼────┐          ┌─────▼──────┐
+    │ Postgres│          │ InfluxDB 3 │
+    │ :5432   │          │ :8181      │
+    └─────────┘          └────────────┘
 ```
 
-### 기술 스택
+| 서비스 | 기술 | 역할 |
+|--------|------|------|
+| **Control Panel** | Next.js 15, Prisma, TailwindCSS | 테스트 제어 UI + API |
+| **K6 Runner** | Express, TypeScript, xk6 | K6 스크립트 생성 및 실행 |
+| **Mock Server** | NestJS | 부하 테스트 타겟 (샌드박스) |
+| **PostgreSQL** | 16-alpine | 테스트 이력 저장 |
+| **InfluxDB** | 3.x Core | 시계열 메트릭 저장 |
 
-| 서비스             | 기술        | 버전   | 용도                 |
-| ------------------ | ----------- | ------ | -------------------- |
-| **Control Panel**  | Next.js     | 15.4.6 | 웹 UI 및 테스트 제어 |
-|                    | React       | 19.1.0 | UI 컴포넌트          |
-|                    | TypeScript  | 5.x    | 타입 안정성          |
-|                    | TailwindCSS | 4.x    | 스타일링             |
-| **Mock Server**    | NestJS      | 10.x   | RESTful API 모킹     |
-|                    | TypeScript  | 5.x    | 타입 안정성          |
-| **K6 Runner**      | Express     | 4.18.x | K6 실행 관리         |
-|                    | Node.js     | 20+    | 런타임               |
-| **Testing Engine** | K6          | Latest | 부하 테스트 엔진     |
-| **History DB**     | PostgreSQL  | 16     | 테스트 이력 저장     |
-| **Metrics DB**     | InfluxDB    | 3.x Core | 시계열 메트릭 저장 |
-| **Container**      | Docker      | 20+    | 로컬 컨테이너화      |
-| **Kubernetes**     | Kind / GKE  | Latest | Helm/GitOps 배포     |
+### Mock Server 역할
 
-### 아키텍처 특징
+Mock Server는 **실서버를 대체하는 것이 아니라, 플랫폼 자체의 동작을 검증하는 샌드박스**입니다.
+외부 서버 없이도 파이프라인(K6 실행 → 메트릭 수집 → 대시보드 표시)이 정상 동작하는지 확인할 수 있습니다.
+실제 부하 테스트 시에는 Control Panel에서 `targetUrl`을 실서버 주소로 지정합니다.
 
-#### 🎯 중앙 집중식 시나리오 관리
-
-시나리오 설정이 중앙에서 관리되어 일관성과 유지보수성이 향상되었습니다:
-
-- **단일 진실 공급원 (Single Source of Truth)**: 모든 시나리오 메타데이터가 한 곳에서 정의
-- **타입 안정성**: TypeScript 인터페이스로 시나리오 설정 검증
-- **동적 설정**: 실행 시간에 시나리오별 설정 동적 적용
-- **코드 중복 제거**: ~200줄의 중복 코드 제거로 유지보수성 향상
-
-```typescript
-// apps/control-panel/lib/scenario.ts
-export interface ScenarioMetadata {
-  id: ScenarioId;
-  name: string;
-  description: string;
-  defaultVus: number;
-  defaultDuration: string;
-  supportedModes: ExecutionModes;
-  rampPattern?: RampPattern;
-}
-```
-
-## 🚀 빠른 시작
+## 빠른 시작
 
 ### 사전 요구사항
 
 - Docker Engine 또는 Docker Desktop (Compose v2 포함)
-- Node.js 20+ & npm 10+ (로컬 개발 시)
-- Make (선택사항, 자동화 명령어용)
-- 최소 4GB RAM (Docker Desktop)
+- 최소 4GB RAM
 
-### 1. 프로젝트 클론 및 설정
+### 실행
 
 ```bash
-# 저장소 클론
-git clone https://github.com/your-org/k6-testing-platform.git
-cd k6-testing-platform
+# 1. 로컬 Docker 실행 준비
+make local-setup
 
-# 환경 변수 파일 생성
-make setup-env
+# 2. 로컬 Docker 스택 시작
+make local-up
+
+# 3. 상태 확인
+make local-health
+
+# 필요하면 로그 확인 / 종료
+make local-logs
+make local-down
 ```
 
-### 2. 서비스 시작
+### 접속
+
+| 서비스 | URL | 설명 |
+|--------|-----|------|
+| Control Panel | http://localhost:3000 | 테스트 관리 UI |
+| Test History | http://localhost:3000/history | 테스트 이력 조회 |
+| Mock Server | http://localhost:3001 | 테스트 타겟 서버 |
+| K6 Runner API | http://localhost:3002 | K6 실행 관리 |
+| K6 Dashboard | http://localhost:5665 | 실시간 메트릭 (테스트 중) |
+| InfluxDB | http://localhost:8181 | 시계열 DB |
+
+> 포트는 `.env`에서 변경 가능합니다.
+> Kubernetes를 쓰지 않고 **최소 로컬 Docker로만** 실행하려면 `make local-up` 경로만 사용하면 됩니다.
+
+## 테스트 실행
+
+### UI (권장)
+
+1. http://localhost:3000 접속
+2. Target Server 선택 (Mock Server 또는 Custom URL 입력)
+3. 시나리오, VU 수, 기간 설정
+4. "Start Test" 클릭
+
+### CLI
 
 ```bash
-# 모든 서비스 시작 (포그라운드 - 로그 출력)
-make dev
+make local-test-quick              # 로컬 Docker smoke 테스트
+make local-status                  # 로컬 Docker 테스트 상태 확인
+make local-stop                    # 로컬 Docker 테스트 중지
 
-# 또는 백그라운드 실행
-make up  # 또는 docker compose up -d --build
-
-# 백그라운드 실행 후 로그 확인
-make logs  # 또는 docker compose logs -f
+# 기존 target도 계속 사용 가능
+make test-quick                    # Smoke 테스트 (10s, 5 VUs)
+make test                          # Load 테스트 (30s, 10 VUs)
+make test-stress                   # Stress 테스트 (2m, 50 VUs)
 ```
 
-### 3. 서비스 접속
-
-아래 URL은 기본 호스트 포트 기준입니다. `.env`의 포트 값이나 `make test CONTROL_PANEL_PORT=...` 같은 override를 사용하면 달라질 수 있습니다.
-
-| 서비스               | URL                   | 설명                               |
-| -------------------- | --------------------- | ---------------------------------- |
-| **Control Panel**    | http://localhost:3000 | 웹 기반 테스트 관리 UI             |
-| **Test History**     | http://localhost:3000/history | 저장된 테스트 이력 조회     |
-| **Mock Server**      | http://localhost:3001 | 테스트 타겟 API 서버               |
-| **K6 Runner API**    | http://localhost:3002 | K6 실행 관리 API                   |
-| **K6 Web Dashboard** | http://localhost:5665 | 실시간 메트릭 대시보드 (테스트 중) |
-| **InfluxDB**         | http://localhost:8181 | 시계열 메트릭 DB                   |
-
-### 4. 테스트 실행
-
-#### 방법 1: Control Panel UI 사용 (권장)
-
-1. 기본값 기준 `http://localhost:3000` 접속
-2. **Target Server 선택**:
-   - **Mock Server**: 내장된 테스트 서버 사용 (기본값)
-   - **Custom URL**: 외부 API 테스트 (예: https://api.example.com)
-3. **Endpoint 설정**:
-   - Mock Server: 미리 정의된 엔드포인트 선택
-   - Custom URL: HTTP 메서드와 경로 직접 입력
-4. 테스트 시나리오 선택
-5. VU 수와 기간 설정
-6. "Start Test" 클릭
-
-#### 방법 2: CLI / Make 사용
+### API
 
 ```bash
-# 기본 smoke 테스트
-make test-quick
-
-# Control Panel 호스트 포트를 바꿨다면
-make test CONTROL_PANEL_PORT=3100
-
-# 또는 base URL을 직접 지정
-make test-quick CONTROL_PANEL_BASE_URL=http://localhost:3100
-```
-
-## 🎯 사용 가이드
-
-### 커스텀 URL 테스트
-
-Control Panel에서 외부 API를 테스트하는 방법:
-
-1. **Target Server 설정**
-
-   - "Custom URL" 버튼 클릭
-   - 대상 서버 URL 입력 (예: `https://api.github.com`)
-
-2. **Endpoint 구성**
-
-   - HTTP 메서드 선택: GET, POST, PUT, DELETE, PATCH
-   - 엔드포인트 경로 입력 (예: `/users/octocat`)
-   - 전체 URL 미리보기 확인
-
-3. **Request Body 설정** (POST/PUT/PATCH)
-
-   ```json
-   {
-     "name": "Test User",
-     "email": "test@example.com",
-     "age": 25
-   }
-   ```
-
-4. **테스트 시나리오 선택**
-   - 시나리오 타입 선택
-   - VUs와 Duration 설정
-   - 실행 모드 선택
-
-### Mock Server vs Custom URL
-
-| 구분            | Mock Server               | Custom URL                    |
-| --------------- | ------------------------- | ----------------------------- |
-| **용도**        | 개발/테스트 환경          | 실제 API 테스트               |
-| **엔드포인트**  | 사전 정의된 목록에서 선택 | 자유롭게 입력                 |
-| **HTTP 메서드** | GET, POST                 | GET, POST, PUT, DELETE, PATCH |
-| **응답 시간**   | 시뮬레이션 (0-5초)        | 실제 서버 응답 시간           |
-| **에러 처리**   | 시뮬레이션된 에러         | 실제 서버 에러                |
-
-### HTTP 상태 코드 검증
-
-플랫폼은 HTTP 메서드별로 적절한 성공 상태 코드를 자동으로 검증합니다:
-
-| HTTP 메서드 | 성공으로 간주되는 상태 코드 | 설명                     |
-| ----------- | --------------------------- | ------------------------ |
-| **GET**     | 200                         | OK                       |
-| **POST**    | 200, 201                    | OK, Created              |
-| **PUT**     | 200, 204                    | OK, No Content           |
-| **PATCH**   | 200, 204                    | OK, No Content           |
-| **DELETE**  | 200, 202, 204               | OK, Accepted, No Content |
-
-### 실전 예시
-
-#### 1. GitHub API 테스트
-
-```javascript
-// Target Server: https://api.github.com
-// Method: GET
-// Path: /users/torvalds
-// VUs: 10
-// Duration: 1m
-```
-
-#### 2. REST API CRUD 테스트
-
-```javascript
-// Target Server: https://jsonplaceholder.typicode.com
-// Method: POST
-// Path: /posts
-// Body: {"title": "foo", "body": "bar", "userId": 1}
-// VUs: 50
-// Duration: 5m
-```
-
-#### 3. GraphQL API 테스트
-
-```javascript
-// Target Server: https://api.example.com
-// Method: POST
-// Path: /graphql
-// Body: {"query": "{ user(id: 1) { name email } }"}
-// VUs: 100
-// Duration: 10m
-```
-
-## 💻 개발 환경
-
-### 로컬 개발 환경 구성
-
-```bash
-# 전체 프로젝트 의존성 설치
-make install
-
-# 개발용 환경 파일 생성
-make setup-env
-
-# 개발 서버 시작 (모든 서비스)
-make dev
-
-# 서비스 상태 확인
-make health
-# 또는
-docker compose ps
-```
-
-### 개별 서비스 개발
-
-#### Control Panel (Next.js)
-
-```bash
-cd apps/control-panel
-npm install
-npm run dev  # http://localhost:3000
-```
-
-#### Mock Server (NestJS)
-
-```bash
-cd apps/mock-server
-npm install
-npm run start:dev  # http://localhost:3001
-```
-
-#### K6 Runner (Express)
-
-```bash
-cd apps/k6-runner-v2
-npm install
-npm run dev  # http://localhost:3002
-```
-
-### 코드 품질 관리
-
-```bash
-# Control Panel
-cd apps/control-panel
-npm run lint
-npm run build
-
-# Mock Server
-cd apps/mock-server
-npm run lint
-npm run test
-npm run test:cov  # 커버리지 확인
-
-# K6 Runner
-cd apps/k6-runner-v2
-npm run lint
-npm test -- --runInBand
-npm run build
-```
-
-## 🧪 테스트 시나리오
-
-플랫폼에서 제공하는 7가지 사전 정의된 테스트 시나리오:
-
-### 시나리오 관리 시스템
-
-모든 시나리오는 중앙 설정 파일에서 관리되며, 각 시나리오마다 다음 속성들이 정의됩니다:
-
-- **기본 설정**: VUs 수, 실행 시간, 반복 횟수
-- **실행 모드**: Duration, Iterations, Hybrid 지원 여부
-- **Ramp 패턴**: none, standard, aggressive, gradual
-- **Stage 사용**: 단계적 부하 증가 여부
-
-### 📊 시나리오 비교표
-
-| 시나리오       | 용도             | 기본 VUs | 기본 기간 | 실행 모드        | Ramp 패턴  |
-| -------------- | ---------------- | -------- | --------- | ---------------- | ---------- |
-| **Smoke**      | 기본 동작 확인   | 1        | 1m        | ✅ All           | none       |
-| **Load**       | 일반 부하 테스트 | 20       | 5m        | Duration, Hybrid | standard   |
-| **Stress**     | 한계 테스트      | 50       | 10m       | Duration only    | gradual    |
-| **Spike**      | 급증 대응        | 100      | 5m        | Duration only    | aggressive |
-| **Soak**       | 장기 안정성      | 30       | 30m       | ✅ All           | none       |
-| **Breakpoint** | 최대 용량        | 100      | 20m       | Duration only    | gradual    |
-| **Simple**     | 커스텀 테스트    | 10       | 2m        | ✅ All           | none       |
-
-### 상세 시나리오 설명
-
-#### 1. 🚬 Smoke Test
-
-```javascript
-// 최소 부하로 시스템 정상 작동 확인
-executor: 'constant-vus',
-vus: 1,
-duration: '1m'
-```
-
-- **용도**: 배포 후 기본 기능 검증
-- **실행 모드**: Duration, Iterations, Hybrid 모두 지원
-- **성공 기준**: 에러율 0%, 응답시간 < 1초
-
-#### 2. 📈 Load Test
-
-```javascript
-// 표준 ramp 패턴 적용 (15% up, 70% steady, 15% down)
-executor: 'ramping-vus',
-startVUs: 1,
-stages: [
-  { duration: '45s', target: 20 },  // Ramp-up (15%)
-  { duration: '3m30s', target: 20 }, // Steady (70%)
-  { duration: '45s', target: 0 }     // Ramp-down (15%)
-]
-```
-
-- **용도**: 일상적인 트래픽 처리 능력 평가
-- **실행 모드**: Duration, Hybrid (Iterations 미지원 - ramp 패턴 때문)
-- **성공 기준**: 에러율 < 1%, P95 < 500ms
-
-#### 3. 💪 Stress Test
-
-```javascript
-// 점진적(gradual) 부하 증가 패턴
-executor: 'ramping-vus',
-stages: [
-  { duration: '2m', target: 12 },  // Step 1 (25%)
-  { duration: '2m', target: 25 },  // Step 2 (50%)
-  { duration: '2m', target: 37 },  // Step 3 (75%)
-  { duration: '2m', target: 50 },  // Step 4 (100%)
-  { duration: '2m', target: 0 }    // Ramp-down
-]
-```
-
-- **용도**: Breaking point 발견 및 복구 능력 테스트
-- **실행 모드**: Duration만 지원 (단계적 부하 증가 필요)
-- **관찰 포인트**: CPU/메모리 사용률, 에러 발생 시점
-
-#### 4. ⚡ Spike Test
-
-```javascript
-// 공격적(aggressive) 스파이크 패턴
-executor: 'ramping-vus',
-startVUs: 10,  // 기본 VUs의 10%에서 시작
-stages: [
-  { duration: '1m30s', target: 20 },   // 평상시 (20%)
-  { duration: '15s', target: 100 },    // 급증! (5%)
-  { duration: '1m30s', target: 100 },  // 스파이크 유지 (30%)
-  { duration: '15s', target: 20 },     // 급감! (5%)
-  { duration: '1m30s', target: 20 }    // 평상시 복귀 (30%)
-]
-```
-
-- **용도**: 블랙프라이데이, 이벤트 트래픽 대응 능력
-- **실행 모드**: Duration만 지원 (정밀한 타이밍 제어 필요)
-- **성공 기준**: 복구 시간 < 1분, 데이터 무결성 유지
-
-#### 5. 🏊 Soak Test
-
-```javascript
-// 장시간 일정 부하 유지
-executor: 'constant-vus',
-vus: 30,
-duration: '30m'  // 기본 30분, 최대 24시간까지 확장 가능
-```
-
-- **용도**: 메모리 누수, 리소스 고갈 검증
-- **실행 모드**: Duration, Iterations, Hybrid 모두 지원
-- **관찰 포인트**: 메모리 사용 추세, 응답시간 변화
-
-#### 6. 🎯 Breakpoint Test
-
-```javascript
-// 점진적(gradual) 부하 증가로 한계점 탐색
-executor: 'ramping-vus',
-stages: [
-  { duration: '4m', target: 25 },   // Step 1 (25%)
-  { duration: '4m', target: 50 },   // Step 2 (50%)
-  { duration: '4m', target: 75 },   // Step 3 (75%)
-  { duration: '4m', target: 100 },  // Step 4 (100%)
-  { duration: '4m', target: 0 }     // Ramp-down
-]
-```
-
-- **용도**: 최대 처리 용량 확인
-- **실행 모드**: Duration만 지원 (연속적인 부하 증가 필요)
-- **중단 조건**: 에러율 > 5% 또는 P95 > 2초
-
-#### 7. 🎯 Simple Test
-
-```javascript
-// 사용자 정의 가능한 기본 테스트
-executor: 'constant-vus',
-vus: 10,
-duration: '2m'
-```
-
-- **용도**: 커스터마이징 가능한 기본 부하 테스트
-- **실행 모드**: Duration, Iterations, Hybrid 모두 지원
-- **특징**: 가장 유연한 설정 가능
-
-## ⚙️ 설정 및 환경 변수
-
-### 서비스별 환경 변수
-
-#### Control Panel (.env)
-
-```env
-# Service Configuration
-NODE_ENV=production
-PORT=3000
-
-# Prisma - PostgreSQL
-DATABASE_URL=postgresql://test_admin:testpassword@postgres:5432/k6_test_history?schema=public
-
-# K6 Runner 연결
-K6_RUNNER_BASE_URL=http://k6-runner:3002
-
-# Mock Server URL
-MOCK_SERVER_URL=http://mock-server:3001
-
-# K6 Dashboard URL
-K6_DASHBOARD_URL=http://k6-runner:5665
-
-# InfluxDB 3.x 설정
-INFLUXDB_URL=http://influxdb:8181
-INFLUXDB_ORG=k6org
-INFLUXDB_BUCKET=k6
-INFLUXDB_TOKEN=dev-token-for-testing
-```
-
-#### K6 Runner (.env)
-
-```env
-# Service Configuration
-NODE_ENV=development
-
-# 서비스 포트
-PORT=3002
-
-# InfluxDB 3.x 설정
-INFLUXDB_URL=http://influxdb:8181
-INFLUXDB_ORG=k6org
-INFLUXDB_BUCKET=k6
-INFLUXDB_TOKEN=dev-token-for-testing
-
-# K6 Dashboard 설정
-K6_DASHBOARD_PORT=5665
-K6_DASHBOARD_HOST=0.0.0.0
-K6_DASHBOARD_PERIOD=10s
-
-# Mock Server URL
-MOCK_SERVER_URL=http://mock-server:3001
-
-# 완료 시 history 저장 콜백
-CONTROL_PANEL_URL=http://localhost:3000
-```
-
-#### Mock Server 환경 변수
-
-```env
-# Service Configuration
-NODE_ENV=development
-
-# 서비스 포트
-PORT=3001
-```
-
-### 로컬 실행 / Make Override 변수
-
-| 변수명                     | 설명                         | 기본값                    | 예시                         |
-| -------------------------- | ---------------------------- | ------------------------- | ---------------------------- |
-| `CONTROL_PANEL_PORT`       | Make가 호출할 Control Panel 포트 | `3000`                    | `3100`                       |
-| `CONTROL_PANEL_BASE_URL`   | Make/스크립트가 호출할 API base URL | `http://localhost:3000` | `http://localhost:3100`      |
-| `TEST_TARGET_URL`          | 부하 테스트 대상 URL          | `http://mock-server:3001` | `http://host.docker.internal:3101` |
-| `K6_DASHBOARD_PORT`        | 대시보드 호스트 포트          | `5665`                    | `5765`                       |
-| `K6_DASHBOARD_BASE_URL`    | 대시보드 base URL            | `http://localhost:5665`   | `http://localhost:5765`      |
-
-## 📊 K6 웹 대시보드
-
-### 실시간 모니터링 기능
-
-K6 Web Dashboard는 테스트 실행 중 실시간으로 성능 메트릭을 시각화합니다.
-
-#### 주요 기능
-
-- **🔴 실시간 메트릭 업데이트**: 1초 단위 실시간 갱신
-- **📈 인터랙티브 차트**: 줌, 패닝 가능한 시계열 그래프
-- **🎯 임계값 모니터링**: Pass/Fail 상태 실시간 표시
-- **💾 리포트 저장**: HTML/JSON 형식 내보내기
-- **⏸️ 테스트 제어**: 일시정지/재개/중지 기능
-
-#### 대시보드 섹션
-
-| 섹션           | 내용             | 주요 지표                         |
-| -------------- | ---------------- | --------------------------------- |
-| **Overview**   | 테스트 요약 정보 | VUs, RPS, Error Rate, Duration    |
-| **Timings**    | 응답 시간 분해   | DNS, TCP, TLS, Waiting, Receiving |
-| **Thresholds** | 성공 기준 상태   | Pass/Fail 상태, 임계값            |
-| **HTTP**       | HTTP 메트릭      | Status Codes, Request Rate        |
-| **Checks**     | 검증 결과        | Pass Rate, Failed Checks          |
-
-### 메트릭 상세 설명
-
-#### 핵심 성능 지표
-
-| 메트릭                | 설명             | 정상 범위  | 경고 수준 |
-| --------------------- | ---------------- | ---------- | --------- |
-| **http_req_duration** | 전체 요청 시간   | < 500ms    | > 1s      |
-| **http_req_waiting**  | 서버 처리 시간   | < 200ms    | > 500ms   |
-| **http_req_failed**   | 실패율           | < 1%       | > 5%      |
-| **http_reqs**         | 초당 요청 수     | 시나리오별 | -         |
-| **vus**               | 활성 가상 사용자 | 설정값     | -         |
-| **data_received**     | 수신 데이터양    | -          | -         |
-| **data_sent**         | 송신 데이터양    | -          | -         |
-
-#### 백분위수 지표
-
-```javascript
-// K6 임계값 설정 예시
-export let options = {
-  thresholds: {
-    http_req_duration: ["p(95)<500", "p(99)<1000"],
-    http_req_failed: ["rate<0.1"],
-    http_reqs: ["rate>100"],
-  },
-};
-```
-
-- **P50 (Median)**: 중간값, 일반적인 사용자 경험
-- **P90**: 상위 10% 느린 요청
-- **P95**: 상위 5% 느린 요청 (SLA 기준)
-- **P99**: 상위 1% 느린 요청 (극단적 케이스)
-
-## 🛠️ CLI 명령어
-
-### Makefile 명령어
-
-```bash
-# 기본 명령어
-make help          # 사용 가능한 명령어 목록
-make dev           # 개발 모드 시작 (포그라운드)
-make up            # 백그라운드 실행
-make down          # 서비스 중지
-make restart       # 서비스 재시작
-make logs          # 실시간 로그 확인
-make health        # 서비스 상태 확인
-
-# 빌드 명령어
-make build         # 모든 이미지 빌드
-make build-control # Control Panel 빌드
-make build-mock    # Mock Server 빌드
-make build-runner-v2 # K6 Runner 빌드
-
-# 테스트 명령어
-make test          # 기본 테스트 실행
-make test-quick    # Smoke 테스트 실행
-make test-stress   # Stress 테스트 실행
-make status        # 현재 테스트 상태 확인
-make test CONTROL_PANEL_PORT=3100
-make test-quick CONTROL_PANEL_BASE_URL=http://localhost:3100
-
-# 정리 명령어
-make clean         # 컨테이너 및 볼륨 정리
-make clean-all     # 이미지 포함 전체 정리
-```
-
-## 📝 API 명세
-
-### Control Panel API
-
-| 엔드포인트        | 메소드 | 설명             | 요청 본문           |
-| ----------------- | ------ | ---------------- | ------------------- |
-| `/api/k6/run`     | POST   | 테스트 시작      | 아래 상세 설명 참조 |
-| `/api/k6/stop`    | POST   | 테스트 중지      | -                   |
-| `/api/k6/status`  | GET    | 테스트 상태 조회 | -                   |
-| `/api/k6/metrics` | GET    | 메트릭 조회      | -                   |
-| `/api/tests`      | GET    | 저장된 테스트 이력 조회 | `limit`, `offset`, `status` |
-| `/api/tests/complete` | POST | 테스트 완료/결과 저장 | 내부/서버 측 사용 |
-
-#### 테스트 시작 요청 본문
-
-```typescript
-{
-  scenario: string;           // 시나리오 타입
-  vus: number;               // Virtual Users 수
-  duration: string;          // 테스트 기간 (예: "5m", "1h")
-  iterations?: number;       // 반복 횟수 (iterations 모드)
-  executionMode: string;     // "duration" | "iterations" | "hybrid"
-  targetUrl: string;         // 테스트 대상 URL
-  urlPath: string;          // 엔드포인트 경로
-  httpMethod: string;       // "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
-  requestBody?: string;     // POST/PUT/PATCH 요청 시 body (JSON)
-  enableDashboard?: boolean; // K6 대시보드 활성화 여부
-}
-```
-
-#### 테스트 시작 예시
-
-포트 충돌이 있으면 베이스 URL을 먼저 정해두고 호출할 수 있습니다.
-
-```bash
-export CONTROL_PANEL_BASE_URL=${CONTROL_PANEL_BASE_URL:-http://localhost:3000}
-```
-
-##### Mock Server 테스트
-
-```bash
-curl -X POST "$CONTROL_PANEL_BASE_URL/api/k6/run" \
+curl -X POST http://localhost:3000/api/k6/run \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "load",
-    "vus": 50,
+    "vus": 20,
     "duration": "5m",
-    "executionMode": "duration",
-    "targetUrl": "http://mock-server:3001",
-    "urlPath": "/api/users",
+    "targetUrl": "https://api.example.com",
+    "urlPath": "/v1/products",
     "httpMethod": "GET"
   }'
 ```
 
-##### 외부 API 테스트
+## 테스트 시나리오
+
+| 시나리오 | 용도 | 기본 VUs | 기본 기간 | 패턴 |
+|----------|------|----------|-----------|------|
+| **Smoke** | 기본 동작 확인 | 1 | 1m | 일정 부하 |
+| **Load** | 일반 부하 테스트 | 20 | 5m | Ramp up → Steady → Ramp down |
+| **Stress** | 한계 테스트 | 50 | 10m | 단계적 증가 |
+| **Spike** | 급증 대응 | 100 | 5m | 급격한 스파이크 |
+| **Soak** | 장기 안정성 | 30 | 30m | 일정 부하 (장시간) |
+| **Breakpoint** | 최대 용량 탐색 | 100 | 20m | 단계적 증가 |
+| **Simple** | 커스텀 테스트 | 10 | 2m | 일정 부하 |
+
+각 시나리오는 Duration, Iterations, Hybrid 실행 모드를 지원합니다 (일부 제한 있음).
+
+## Mock Server API
+
+테스트 타겟으로 사용되는 엔드포인트:
+
+| 엔드포인트 | 설명 |
+|------------|------|
+| `GET /health` | 헬스 체크 |
+| `GET /ready` | 준비 상태 확인 |
+| `GET /success` | 200 정상 응답 |
+| `POST /success` | 201 정상 응답 |
+| `GET /performance/slow?delay=3000` | 지연 응답 시뮬레이션 |
+| `GET /performance/timeout?timeout=30000` | 타임아웃 시뮬레이션 |
+| `GET /performance/variable-latency?min=100&max=3000` | 랜덤 지연 |
+| `GET /performance/concurrency-issue` | 동시성 문제 시뮬레이션 |
+| `GET /chaos/random?errorRate=0.1` | 랜덤 에러 주입 |
+| `POST /chaos/config` | Chaos 설정 변경 |
+
+Chaos Middleware를 통해 모든 엔드포인트에 헤더 기반 에러 주입도 가능합니다:
+```
+x-chaos-enabled: true
+x-chaos-error-rate: 0.2
+x-chaos-status-codes: 500,503
+```
+
+## 프로젝트 구조
+
+```
+k6-testing-platform/
+├── apps/
+│   ├── control-panel/        # Next.js 15 UI + API (Prisma/PostgreSQL)
+│   ├── mock-server/          # NestJS 테스트 타겟 서버
+│   └── k6-runner-v2/         # Express K6 실행 서비스 (xk6 확장)
+├── services/
+│   ├── influxdb/             # InfluxDB 초기화 스크립트
+│   └── postgres/             # PostgreSQL init SQL
+├── helm/k6-platform/         # Helm 차트 (Kind/GKE)
+├── argocd/                   # ArgoCD GitOps 매니페스트
+├── docs/                     # 아키텍처/운영 문서
+├── docker-compose.yml
+└── Makefile
+```
+
+## 배포
+
+### 로컬 (Docker Compose)
 
 ```bash
-curl -X POST "$CONTROL_PANEL_BASE_URL/api/k6/run" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scenario": "stress",
-    "vus": 100,
-    "duration": "10m",
-    "executionMode": "duration",
-    "targetUrl": "https://api.example.com",
-    "urlPath": "/v1/products",
-    "httpMethod": "POST",
-    "requestBody": "{\"category\":\"electronics\",\"limit\":100}"
-  }'
+make local-setup
+make local-up
+make local-health
 ```
 
-### Mock Server API
-
-| 엔드포인트       | 메소드 | 설명                 | 응답 시간 |
-| ---------------- | ------ | -------------------- | --------- |
-| `/health`        | GET    | 헬스 체크            | 즉시      |
-| `/api/users`     | GET    | 사용자 목록 (페이징) | 0-100ms   |
-| `/api/users/:id` | GET    | 사용자 상세          | 0-100ms   |
-| `/api/products`  | GET    | 제품 목록            | 0-100ms   |
-| `/api/orders`    | POST   | 주문 생성            | 100-500ms |
-| `/api/heavy`     | GET    | CPU 집약 작업        | 1-3s      |
-| `/api/slow`      | GET    | 느린 응답 시뮬레이션 | 3-5s      |
-| `/api/error`     | GET    | 에러 시뮬레이션      | 5% 실패율 |
-
-### K6 Runner API
-
-| 엔드포인트              | 메소드 | 설명                  |
-| ----------------------- | ------ | --------------------- |
-| `/api/test/start`       | POST   | K6 테스트 시작        |
-| `/api/test/stop`        | POST   | 실행 중인 테스트 중지 |
-| `/api/test/status`      | GET    | 테스트 상태 확인      |
-| `/api/test/progress/:testId?` | GET | 진행률 확인      |
-| `/api/scenarios`        | GET    | 사용 가능한 시나리오 목록 |
-| `/health`               | GET    | 서비스 헬스 체크      |
-| `/config`               | GET    | 현재 설정 확인        |
-
-### InfluxDB 데이터 쿼리
-
-```sql
--- InfluxDB 3.x query_sql 예시
-SELECT AVG(value) AS avg_duration
-FROM http_req_duration
-WHERE time > now() - INTERVAL '1 hour';
-
-SELECT COUNT(value) AS failed_requests, AVG(value) AS error_rate
-FROM http_req_failed
-WHERE time > now() - INTERVAL '1 hour';
-```
-
-## 🐛 문제 해결
-
-### 일반적인 문제와 해결법
-
-#### 1. Docker 권한 오류
+### Kubernetes (Kind)
 
 ```bash
-# 해결법 1: Docker 그룹에 사용자 추가
-sudo usermod -aG docker $USER
-newgrp docker
-
-# 해결법 2: Docker 소켓 권한 변경
-sudo chmod 666 /var/run/docker.sock
+make k8s-install    # kubectl, helm, kind 설치
+make k8s-all        # 클러스터 생성 → 빌드 → 배포
+make k8s-forward    # 포트 포워딩
+make k8s-status     # 상태 확인
+make k8s-destroy    # 클러스터 삭제
 ```
 
-#### 2. 포트 충돌
+### GKE (GitOps)
+
+```
+GitHub Push → GitHub Actions CI/CD → Artifact Registry → ArgoCD auto-sync → GKE
+```
+
+관련 파일:
+- `helm/k6-platform/` — Helm 차트
+- `argocd/` — ArgoCD Application/Project 매니페스트
+- `.github/workflows/cd.yml` — CI/CD 파이프라인
+- `scripts/setup-argocd.sh` — ArgoCD 설치 스크립트
+
+ArgoCD 명령어:
+```bash
+make argocd-full-deploy   # ArgoCD 설치 + 앱 배포
+make argocd-status        # 앱 상태 확인
+make argocd-sync          # 수동 싱크
+```
+
+## 로컬 개발
 
 ```bash
-# 사용 중인 포트 확인
-lsof -i :3000
-netstat -tulpn | grep 3000
+# 전체 스택
+make local-setup
+make local-dev
 
-# Make 실행 포트만 바꾸려면
-make test CONTROL_PANEL_PORT=3100
-
-# Compose 서비스 포트를 바꾸려면 (.env 사용)
-CONTROL_PANEL_PORT=3100 MOCK_SERVER_PORT=3101 K6_RUNNER_PORT=3102 docker compose up -d
+# 개별 서비스 실행
+cd apps/control-panel && npm install && npm run dev   # :3000
+cd apps/mock-server && npm install && npm run start:dev  # :3001
+cd apps/k6-runner-v2 && npm install && npm run dev    # :3002
 ```
 
-#### 3. 메모리 부족
+## 환경 변수
 
-- Docker Desktop: Preferences → Resources → Memory를 4GB 이상으로 설정
-- Linux: `/etc/docker/daemon.json` 수정
+루트 `.env`에서 전체 스택을 설정합니다 (`.env.example` 참조):
 
-#### 4. 네트워크 연결 실패
-
-```bash
-# 네트워크 재생성
-docker compose down
-docker network prune
-docker compose up -d
-```
-
-#### 5. K6 Dashboard 접속 불가
-
-```bash
-# 포트 확인
-docker compose logs k6-runner | grep "Dashboard"
-
-# 방화벽 규칙 확인
-sudo ufw allow 5665/tcp
-```
-
-### 성능 최적화 팁
-
-1. **Docker 리소스 할당**: CPU 4코어, 메모리 8GB 권장
-2. **InfluxDB 튜닝**: Write buffer 크기 증가
-3. **K6 최적화**: `--no-thresholds --no-summary` 옵션으로 오버헤드 감소
-
-## 🔒 보안 및 인증
-
-### 프로덕션 환경 보안 설정
-
-#### InfluxDB / PostgreSQL 시크릿 관리
-
-현재 저장소 기준 운영 배포에서는 DB 인증값을 애플리케이션 코드에 두지 않고
-**Kubernetes Secret / External Secret / Secret Manager** 경로로 주입하는 구성을 전제로 합니다.
-
-대표 값:
-
-```bash
-INFLUXDB_TOKEN=...
-POSTGRES_USERNAME=...
-POSTGRES_PASSWORD=...
-DATABASE_URL=postgresql://<user>:<password>@<host>:5432/k6_test_history?schema=public
-```
-
-#### PostgreSQL 보안
-
-프로덕션 환경에서 PostgreSQL은 외부 DB(예: Cloud SQL/RDS) 또는
-Kubernetes Secret 기반 계정 주입을 전제로 합니다.
-
-```yaml
-# Helm values.yaml
-postgresql:
-  external: true
-  host: <private-db-host>
-  port: 5432
-  database: k6_test_history
-  existingSecret: postgres-secret
-```
-
-### 보안 모범 사례
-
-1. **환경 변수 관리**
-
-   - 프로덕션 환경변수는 절대 코드 저장소에 커밋하지 않음
-   - Kubernetes Secrets 또는 GCP Secret Manager 사용 권장
-
-2. **네트워크 보안**
-
-   - 서비스 간 통신은 내부 네트워크로 제한
-   - 외부 접근이 필요한 경우 VPN 또는 Private Link 사용
-
-3. **접근 제어**
-
-   - 최소 권한 원칙 적용
-   - K6 사용자는 k6 데이터베이스에만 접근 가능
-
-4. **모니터링**
-   - 인증 실패 로그 모니터링
-   - 비정상적인 쿼리 패턴 감지
-
-## ☁️ GKE GitOps 배포 경로
-
-로컬 Docker Compose 개발 흐름과 별개로, 저장소에는 GKE 기반 GitOps 산출물이 포함되어 있습니다.
-
-### 배포 모드 요약
-
-| 모드 | 진입점 | 목적 |
+| 변수 | 기본값 | 설명 |
 |------|--------|------|
-| Local Compose | `make up` | 일상 개발 및 빠른 기능 확인 |
-| Local Kind | `make k8s-setup && make k8s-deploy` | Helm / Kind 통합 검증 |
-| GKE GitOps | `.github/workflows/cd.yml` + `argocd/` | Artifact Registry + ArgoCD 기반 선언형 배포 |
+| `POSTGRES_USER` | `test_admin` | PostgreSQL 사용자 |
+| `POSTGRES_PASSWORD` | `testpassword` | PostgreSQL 비밀번호 |
+| `POSTGRES_DB` | `k6_test_history` | 데이터베이스 이름 |
+| `INFLUXDB_TOKEN` | `dev-token-for-testing` | InfluxDB 인증 토큰 |
+| `INFLUXDB_ORG` | `k6org` | InfluxDB 조직 |
+| `INFLUXDB_BUCKET` | `k6` | InfluxDB 버킷 |
+| `CONTROL_PANEL_PORT` | `3000` | Control Panel 포트 |
+| `MOCK_SERVER_PORT` | `3001` | Mock Server 포트 |
+| `K6_RUNNER_PORT` | `3002` | K6 Runner 포트 |
+| `K6_DASHBOARD_PORT` | `5665` | K6 Web Dashboard 포트 |
 
-### GitOps 흐름
-
-```mermaid
-flowchart LR
-  A[GitHub Push] --> B[GitHub Actions CI/CD]
-  B --> C[Artifact Registry]
-  B --> D[helm/k6-platform/values-gke-dev.yaml tag update]
-  D --> E[ArgoCD auto-sync]
-  E --> F[GKE namespace k6-platform]
-```
-
-### 핵심 산출물
-
-- `helm/k6-platform/` — 애플리케이션 Helm 차트
-- `argocd/values.yaml` — ArgoCD 리소스 튜닝 값
-- `argocd/projects/k6-platform.yaml` — AppProject
-- `argocd/applications/k6-platform.yaml` — GitOps Application
-- `scripts/setup-argocd.sh` — ArgoCD 설치 + 매니페스트 적용
-- `scripts/cluster-start.sh`, `scripts/cluster-stop.sh` — GKE 비용 절감용 운영 스크립트
-- `scripts/demo.sh` — 데모 플로우 자동화 스크립트
-
-K8s 배포 후에는 `control-panel` Pod의 `control-panel-migrate` initContainer가 먼저 성공해야 테이블이 생성됩니다. 배포 직후 `kubectl logs <control-panel-pod> -n k6-platform -c control-panel-migrate` 와 `kubectl get pod <control-panel-pod> -n k6-platform -o jsonpath="{.status.initContainerStatuses[*].state}"` 로 migration 성공 여부를 확인하세요. 자세한 점검 순서는 `docs/runbook/demo-gitops-runbook.md` 에 정리되어 있습니다.
-
-### 포트폴리오 문서
-
-문서 안내가 필요하면 먼저 `docs/README.md` 를 보세요.  
-현재 운영/설명용 문서와 과거 계획 문서를 구분해서 안내합니다.
-
-- `docs/architecture/cost-comparison.md`
-- `docs/architecture/multi-cloud-tradeoffs.md`
-- `docs/architecture/adr-001-why-gke.md`
-- `docs/interview-prep/gke-portfolio-qa.md`
-- `docs/runbook/demo-gitops-runbook.md`
-
-## 📚 추가 리소스
-
-### 공식 문서
-
-- [K6 Documentation](https://k6.io/docs/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [NestJS Documentation](https://docs.nestjs.com/)
-- [Docker Documentation](https://docs.docker.com/)
-
-### 관련 프로젝트
-
-- [K6 Examples](https://github.com/grafana/k6-examples)
-- [K6 Extensions](https://k6.io/docs/extensions/)
-
-## 🐳 Docker Hub 이미지 사용
-
-Mock Server는 Docker Hub에서 제공됩니다:
-
+Make 명령어에서 포트 오버라이드:
 ```bash
-# 이미지 pull (public repository - 로그인 불필요)
-docker pull leehyeontae/k6-testing-platform-mock-server:latest
-
-# 단독 실행
-docker run -p 3001:3001 leehyeontae/k6-testing-platform-mock-server:latest
+make test CONTROL_PANEL_PORT=3100
+make test-quick CONTROL_PANEL_BASE_URL=http://localhost:3100
 ```
 
-### 이미지 업데이트 방법 (관리자용)
+## API 요약
 
-```bash
-# 1. 로컬에서 이미지 빌드
-docker compose build --no-cache mock-server
+### Control Panel
 
-# 2. Docker Hub 태그 지정
-docker tag k6-testing-platform-mock-server:latest leehyeontae/k6-testing-platform-mock-server:latest
+| 엔드포인트 | 메서드 | 설명 |
+|------------|--------|------|
+| `/api/k6/run` | POST | 테스트 시작 |
+| `/api/k6/stop` | POST | 테스트 중지 |
+| `/api/k6/status` | GET | 테스트 상태 |
+| `/api/k6/metrics` | GET | 메트릭 조회 |
+| `/api/tests` | GET | 테스트 이력 |
 
-# 3. Docker Hub에 푸시 (로그인 필요)
-docker push leehyeontae/k6-testing-platform-mock-server:latest
-```
+### K6 Runner
 
-### 튜토리얼
+| 엔드포인트 | 메서드 | 설명 |
+|------------|--------|------|
+| `/api/test/start` | POST | K6 테스트 시작 |
+| `/api/test/stop` | POST | 테스트 중지 |
+| `/api/test/status` | GET | 테스트 상태 |
+| `/api/test/progress/:testId?` | GET | 진행률 |
+| `/api/scenarios` | GET | 시나리오 목록 |
+| `/health` | GET | 헬스 체크 |
 
-- [K6 Performance Testing Guide](https://k6.io/docs/testing-guides/)
-- [Load Testing Best Practices](https://k6.io/docs/testing-guides/load-testing-websites/)
+## 문제 해결
 
-## Known Issues & Future Improvements
+| 문제 | 해결 |
+|------|------|
+| 포트 충돌 | `.env`에서 포트 변경 또는 `make test CONTROL_PANEL_PORT=3100` |
+| 메모리 부족 | Docker Desktop에서 RAM 4GB 이상 할당 |
+| 네트워크 오류 | `docker compose down && docker network prune && docker compose up -d` |
+| K6 Dashboard 안 뜸 | 테스트 실행 중에만 접속 가능. `docker compose logs k6-runner` 확인 |
+| DB 마이그레이션 실패 | `make db-migrate` 또는 `docker compose exec control-panel npm run db:migrate` |
 
-### Architecture
+## 문서
 
-| # | Issue | Description | Priority |
-|---|-------|-------------|----------|
-| 1 | No shared types | Control Panel and K6 Runner define types independently. API contract changes require manual sync. | Medium |
-| 2 | No API versioning | All endpoints are unversioned. Breaking changes affect all consumers simultaneously. | Low |
-| 3 | Single instance K6 Runner | Only one K6 test can run at a time (`currentTest` field). Not suitable for multi-user scenarios. | Low |
-| 4 | In-memory progress tracking | Test progress stored in `ProcessManagerService` Map. K6 Runner restart during test loses all progress data. | Medium |
-| 5 | No retry logic for InfluxDB writes | K6 process writes to InfluxDB via `xk6-output-influxdb`. Temporary InfluxDB unavailability causes metric loss. | Low |
+자세한 아키텍처 및 운영 문서는 `docs/` 디렉토리를 참조하세요:
 
-### Bugs / Edge Cases
+- `docs/architecture/` — ADR, 비용 비교, 멀티클라우드 분석
+- `docs/runbook/` — GitOps 데모 런북
+- `docs/interview-prep/` — 포트폴리오 Q&A
 
-| # | Issue | Description | Priority |
-|---|-------|-------------|----------|
-| 6 | Race condition on test completion | `checkStatus()` fetches final metrics on completion, but `pollMetrics()` runs independently every 2s. Metrics may be stale if test completes between polling cycles. | Medium |
-| 7 | TestController.tsx is 1007 lines | Component handles too many responsibilities (scenario selection, execution mode, target server, endpoint, request body, error simulation). Should be split into smaller components. | Medium |
+## Known Issues
 
-### Configuration
-
-| # | Issue | Description | Priority |
-|---|-------|-------------|----------|
-| 8 | `.env` committed to repo | Root `.env` contains `POSTGRES_PASSWORD=testpassword` and `INFLUXDB_TOKEN=dev-token-for-testing`. Already in `.gitignore` but previously tracked files remain. | Low |
-| 9 | InfluxDB `--without-auth` | InfluxDB runs without authentication in development. Must be changed for production deployment. | High (prod) |
-
-<div align="center">
-  <strong>Built with ❤️ for Performance Testing</strong>
-  <br>
-  <sub>Making load testing accessible and powerful</sub>
-</div>
+| 이슈 | 설명 | 우선순위 |
+|------|------|----------|
+| 공유 타입 없음 | Control Panel과 K6 Runner가 타입을 독립 정의. API 변경 시 수동 동기화 필요 | Medium |
+| 단일 인스턴스 K6 Runner | 동시에 하나의 테스트만 실행 가능 | Low |
+| 인메모리 진행률 추적 | K6 Runner 재시작 시 진행률 데이터 소실 | Medium |
+| InfluxDB 무인증 모드 | 개발 환경에서 `--without-auth`로 실행. 프로덕션에서는 인증 필수 | High (prod) |
