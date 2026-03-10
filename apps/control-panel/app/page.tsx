@@ -6,6 +6,7 @@ import TestController from "@/components/TestController";
 import TestStatus from "@/components/TestStatus";
 import TestResults from "@/components/TestResults";
 import TestProgress from "@/components/TestProgress";
+import { runtimeConfig } from "@/lib/runtime-config";
 
 interface Metrics {
   http_req_duration: { avg: number; min: number; max: number; p95: number | null };
@@ -42,7 +43,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `/api/k6/metrics?testId=${testIdRef.current}`
+        `/api/k6/metrics?testId=${testIdRef.current}&realtime=true&timeRange=${runtimeConfig.metricsTimeRange}`
       );
       const data = await response.json();
       setMetrics(data);
@@ -125,7 +126,10 @@ export default function Home() {
 
       // 테스트가 계속 실행 중이면 다음 체크 스케줄
       if (statusRef.current === "running") {
-        pollingTimeoutRef.current = setTimeout(checkStatus, 2000);
+        pollingTimeoutRef.current = setTimeout(
+          checkStatus,
+          runtimeConfig.statusPollIntervalMs
+        );
       }
     } catch (error) {
       console.error("Failed to check test status:", error);
@@ -144,7 +148,10 @@ export default function Home() {
 
       // 에러가 있어도 재시도
       if (statusRef.current === "running") {
-        pollingTimeoutRef.current = setTimeout(checkStatus, 2000);
+        pollingTimeoutRef.current = setTimeout(
+          checkStatus,
+          runtimeConfig.statusPollIntervalMs
+        );
       }
     }
   }, [saveTestResults]);
@@ -159,7 +166,10 @@ export default function Home() {
 
     // 다음 메트릭 폴링 스케줄
     if (statusRef.current === "running") {
-      metricsTimeoutRef.current = setTimeout(pollMetrics, 2000);
+      metricsTimeoutRef.current = setTimeout(
+        pollMetrics,
+        runtimeConfig.metricsPollIntervalMs
+      );
     }
   }, [fetchMetrics]);
 

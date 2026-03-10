@@ -29,6 +29,13 @@ controlPanel:
     K6_RUNNER_BASE_URL: http://k6-runner:3002
     K6_DASHBOARD_URL: http://k6-runner:5665
     MOCK_SERVER_URL: http://mock-server:3001
+    NEXT_PUBLIC_K6_DASHBOARD_URL: http://localhost:5665
+    NEXT_PUBLIC_K6_STATUS_POLL_INTERVAL_MS: "1000"
+    NEXT_PUBLIC_K6_METRICS_POLL_INTERVAL_MS: "1000"
+    NEXT_PUBLIC_K6_PROGRESS_POLL_INTERVAL_MS: "1000"
+    NEXT_PUBLIC_K6_METRICS_TIME_RANGE: "30s"
+    K6_METRICS_DEFAULT_TIME_RANGE: "30s"
+    K6_METRICS_STANDARD_TIME_RANGE: "5m"
   hpa:
     enabled: false
     minReplicas: 1
@@ -58,7 +65,7 @@ k6Runner:
   env:
     NODE_ENV: production
     K6_DASHBOARD_HOST: "0.0.0.0"
-    K6_DASHBOARD_PERIOD: "10s"
+    K6_DASHBOARD_PERIOD: "1s"
   serviceAccount:
     create: true
     name: k6-runner-sa

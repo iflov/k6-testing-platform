@@ -70,6 +70,20 @@ spec:
                 configMapKeyRef:
                   name: k6-platform-config
                   key: K6_DASHBOARD_URL
+            - name: NEXT_PUBLIC_K6_DASHBOARD_URL
+              value: {{ .Values.controlPanel.env.NEXT_PUBLIC_K6_DASHBOARD_URL | quote }}
+            - name: NEXT_PUBLIC_K6_STATUS_POLL_INTERVAL_MS
+              value: {{ .Values.controlPanel.env.NEXT_PUBLIC_K6_STATUS_POLL_INTERVAL_MS | quote }}
+            - name: NEXT_PUBLIC_K6_METRICS_POLL_INTERVAL_MS
+              value: {{ .Values.controlPanel.env.NEXT_PUBLIC_K6_METRICS_POLL_INTERVAL_MS | quote }}
+            - name: NEXT_PUBLIC_K6_PROGRESS_POLL_INTERVAL_MS
+              value: {{ .Values.controlPanel.env.NEXT_PUBLIC_K6_PROGRESS_POLL_INTERVAL_MS | quote }}
+            - name: NEXT_PUBLIC_K6_METRICS_TIME_RANGE
+              value: {{ .Values.controlPanel.env.NEXT_PUBLIC_K6_METRICS_TIME_RANGE | quote }}
+            - name: K6_METRICS_DEFAULT_TIME_RANGE
+              value: {{ .Values.controlPanel.env.K6_METRICS_DEFAULT_TIME_RANGE | quote }}
+            - name: K6_METRICS_STANDARD_TIME_RANGE
+              value: {{ .Values.controlPanel.env.K6_METRICS_STANDARD_TIME_RANGE | quote }}
             - name: INFLUXDB_URL
               valueFrom:
                 configMapKeyRef:

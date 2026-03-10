@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { runtimeConfig } from "@/lib/runtime-config";
 
 interface TestProgress {
   currentTime: string;
@@ -55,8 +56,10 @@ export default function TestProgress({ testId, isRunning }: TestProgressProps) {
     // Initial fetch
     fetchProgress();
 
-    // Poll for updates every 2 seconds (consistent with status/metrics polling)
-    const interval = setInterval(fetchProgress, 2000);
+    const interval = setInterval(
+      fetchProgress,
+      runtimeConfig.progressPollIntervalMs
+    );
 
     return () => clearInterval(interval);
   }, [testId, isRunning]);

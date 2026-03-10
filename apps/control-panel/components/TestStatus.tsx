@@ -1,5 +1,7 @@
 "use client";
 
+import { runtimeConfig } from "@/lib/runtime-config";
+
 interface TestStatusProps {
   status: "idle" | "running";
   testId: string | null;
@@ -86,7 +88,7 @@ export default function TestStatus({ status, testId }: TestStatusProps) {
                 </p>
               </div>
               <a
-                href="http://localhost:5665"
+                href={runtimeConfig.dashboardUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
